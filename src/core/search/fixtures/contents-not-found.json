@@ -1,0 +1,18 @@
+{
+  "requestId": "bd68e26defb7a1370b0bc0b3b4e61ca0",
+  "results": [],
+  "statuses": [
+    {
+      "id": "https://www.postgresql.org/this-page-does-not-exist-minimi",
+      "status": "error",
+      "error": {
+        "httpStatusCode": 404,
+        "tag": "CRAWL_NOT_FOUND"
+      }
+    }
+  ],
+  "costDollars": {
+    "total": 0
+  },
+  "searchTime": 1964.528959999996
+}

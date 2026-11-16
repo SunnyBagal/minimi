@@ -1,0 +1,36 @@
+{
+  "requestId": "feb3bd46444ad74e4901bbe794b90933",
+  "results": [
+    {
+      "id": "https://www.postgresql.org/about/",
+      "title": "PostgreSQL: About",
+      "url": "https://www.postgresql.org/about/",
+      "author": null,
+      "text": "PostgreSQL: About\n\n# About \n\n## What is PostgreSQL?\n\nPostgreSQL is a powerful, open source object-relational database system that uses and extends the SQL language combined with many features that safely store and scale the most complicated data workloads. The origins of PostgreSQL date back to 1986 as part of the POSTGRES project at the University of California at Berkeley and has nearly 40 years of active development on the core platform.\n\nPostgreSQL has earned a strong reputation for its proven architecture, reliability, data integrity, robust feature set, extensibility, and the dedication of the open source community behind the software to consistently deliver performant and innovative solutions. PostgreSQL runs on all major operating systems, has been ACID-compliant since 2001, and has powerful add-ons such as the popular PostGIS geospatial database extender. It is no surprise that PostgreSQL has become the open source relational database of choice for many people and organisations.\n\nGetting started with using PostgreSQL has never been easier - pick a project you want to build, and let PostgreSQL safely and robustly store your data.\n\n## Why use PostgreSQL?\n\n PostgreSQL comes with many features aimed to help developers build applications, administrators to protect data integrity and build fault-tolerant environments, and help you manage your data no matter how big or small the dataset. In addition to being free and open source, PostgreSQL is highly extensible. For example, you can define your own data types, build out custom functions, even write code from different programming languages without recompiling your database! \n\nPostgreSQL tries to conform with the SQL standard where such conformance does not contradict traditional features or could lead to poor architectural decisions. Many of the features required by the SQL standard are supported, though sometimes with slightly differing syntax or function. Further moves towards conformance can be expected over time. As of the version 18 release in September 2025, PostgreSQL conforms to at least 170 of the 177 mandatory features for SQL:2023 Core conformance. As of this writing, no relational database meets full conformance with this standard. \n\nBelow is an inexhaustive list of various features found in PostgreSQL, with more being added in every major release: \n\n- Data Types\n\n- Primitives: Integer, Numeric, String, Boolean\n- Structured: Date/Time, Array, Range / Multirange, UUID\n- Document: JSON/JSONB, XML, Key-value (Hstore)\n- Geometry: Point, Line, Circle, Polygon\n- Customizations: Composite, Custom Types\n- Data Integrity\n\n- UNIQUE, NOT NULL\n- Primary Keys\n- Foreign Keys\n- Exclusion Constraints\n- Explicit Locks, Advisory Locks\n- Concurrency, Performance\n\n- Indexing: B-tree, Multicolumn, Expressions, Partial\n- Advanced Indexing: GiST, SP-Gist, KNN Gist, GIN, BRIN, Covering indexes, Bloom filters\n- Sophisticated query planner / optimizer, index-only scans, multicolumn statistics\n- Transactions,",
+      "image": "https://www.postgresql.org/media/img/about/press/elephant.png",
+      "favicon": "https://www.postgresql.org/favicon.ico"
+    }
+  ],
+  "statuses": [
+    {
+      "id": "https://www.postgresql.org/about/",
+      "status": "success",
+      "source": "crawled"
+    },
+    {
+      "id": "https://nonexistent-host.invalid/pricing",
+      "status": "error",
+      "error": {
+        "httpStatusCode": 500,
+        "tag": "CRAWL_UNKNOWN_ERROR"
+      }
+    }
+  ],
+  "costDollars": {
+    "total": 0.001,
+    "contents": {
+      "text": 0.001
+    }
+  },
+  "searchTime": 784.7724959999323
+}

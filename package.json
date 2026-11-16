@@ -1,0 +1,43 @@
+{
+  "name": "minimi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check:imports": "node scripts/check-imports.mjs",
+    "check:contracts": "node scripts/check-contracts.mjs",
+    "contracts:accept": "node scripts/contracts-accept.mjs",
+    "gate": "npm run typecheck && npm run test && npm run check:imports && npm run check:contracts",
+    "seed": "tsx scripts/seed.ts",
+    "evals": "tsx evals/run.ts",
+    "golden": "tsx src/core/llm/golden/run.ts",
+    "smoke:fresh": "tsx scripts/smoke-fresh.ts",
+    "measure": "tsx scripts/measure.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "4.0.105",
+    "@ai-sdk/react": "4.0.177",
+    "ai": "7.0.173",
+    "luxon": "3.7.2",
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/luxon": "3.7.6",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.1.0"
+  }
+}

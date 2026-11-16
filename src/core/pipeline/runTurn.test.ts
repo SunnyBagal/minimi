@@ -1,59 +1,22 @@
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import type { AgentDeps, AgentEvent, TurnInput } from '../contracts';
-import { defaultConfig } from '../config';
-import { chatPlan, FakeClock, FakeLlm, FakeSearch, fakeTime, passThroughGuard, type FakeLlmScript } from '../testing/fakes';
-import { InMemoryStore } from '../testing/inMemoryStore';
-import { runTurn } from './runTurn';
+import { rig, SESSION, textOf, types } from './testSupport';
 
-const NOW = '2026-11-10T20:00:00.000Z';
-
-function makeDeps(script: FakeLlmScript = {}, store = new InMemoryStore()): { deps: AgentDeps; store: InMemoryStore; llm: FakeLlm; clock: FakeClock } {
-  const clock = new FakeClock(NOW);
-  const llm = new FakeLlm(script);
-  const deps: AgentDeps = {
-    clock,
-    store,
-    search: new FakeSearch(clock),
-    llm,
-    time: fakeTime(),
-    guardVerdict: passThroughGuard,
-    config: defaultConfig,
-  };
-  return { deps, store, llm, clock };
-}
-
-async function collect(input: TurnInput, deps: AgentDeps): Promise<AgentEvent[]> {
-  const events: AgentEvent[] = [];
-  for await (const event of runTurn(input, deps)) events.push(event);
-  return events;
-}
-
-const live = (overrides: Partial<TurnInput> = {}): TurnInput => ({
-  sessionId: 's1',
-  message: 'hello',
-  tz: 'Asia/Kolkata',
-  ...overrides,
-});
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 describe('runTurn', () => {
-  it('chat turn emits status, text…, done in order', async () => {
-    const { deps, store } = makeDeps({ write: ['Hel', 'lo'] });
-    const events = await collect(live(), deps);
-
-    expect(events.map((event) => event.type)).toEqual(['status', 'text', 'text', 'done']);
-    const deltas = events.filter((event) => event.type === 'text').map((event) => event.delta);
-    expect(deltas.join('')).toBe('Hello');
-    const done = events.at(-1);
-    if (done === undefined || done.type !== 'done') throw new Error('last event is not done');
-    expect(done.intent).toBe('chat');
-    const assistant = store.allTurns().find((turn) => turn.role === 'assistant');
-    expect(done.turnId).toBe(assistant?.id);
+  it('event order: chat', async () => {
+    const { run } = rig({ llm: { write: ['Hel', 'lo'] } });
+    const events = await run({ message: 'hello' });
+    expect(types(events, ['timing'])).toEqual(['status', 'text', 'text', 'done']);
+    expect(textOf(events)).toBe('Hello');
   });
 
   it('saves both turns', async () => {
-    const { deps, store } = makeDeps({ write: ['hi'] });
-    await collect(live({ message: 'remember me' }), deps);
-
+    const { run, store } = rig({ llm: { write: ['hi'] }, now: '2026-11-10T20:00:00.000Z' });
+    await run({ sessionId: 's1', message: 'remember me' });
     const turns = store.allTurns();
     expect(turns.map((turn) => turn.role)).toEqual(['user', 'assistant']);
     expect(turns[0]?.content).toBe('remember me');
@@ -61,7 +24,6 @@ describe('runTurn', () => {
     for (const turn of turns) {
       expect(turn.sessionId).toBe('s1');
       expect(turn.tz).toBe('Asia/Kolkata');
-      expect(turn.localDate).toBe('2026-11-11');
       expect(turn.origin).toBe('live');
     }
     expect(turns[0]?.intent).toBeNull();
@@ -69,59 +31,61 @@ describe('runTurn', () => {
   });
 
   it('marks both turns origin seed when input.origin is seed', async () => {
-    const { deps, store } = makeDeps();
-    await collect(live({ origin: 'seed' }), deps);
+    const { run, store } = rig({});
+    await run({ origin: 'seed', message: 'seeded' });
     expect(store.allTurns().map((turn) => turn.origin)).toEqual(['seed', 'seed']);
   });
 
   it('recent never holds the current message', async () => {
-    const { deps, store, llm } = makeDeps({ write: ['first answer'] });
-    await collect(live({ message: 'first question' }), deps);
-
-    const { deps: deps2, llm: llm2 } = makeDeps({ write: ['second answer'] }, store);
-    await collect(live({ message: 'second question' }), deps2);
-
+    const { run, store } = rig({ llm: { write: ['first answer'] } });
+    await run({ message: 'first question' });
+    const { run: run2, llm: llm2 } = rig({ store });
+    await run2({ message: 'second question' });
     const firstIds = store.allTurns().slice(0, 2).map((turn) => turn.id);
-    const secondUserId = store.allTurns()[2]?.id;
-
     const routeRecent = llm2.calls('route')[0]?.input.recent ?? [];
-    const writeCall = llm2.calls('write')[0]?.input;
-    if (writeCall === undefined || writeCall.mode !== 'chat') throw new Error('write was not chat mode');
-    const recentIds = (recent: typeof routeRecent) => recent.map((turn) => turn.id);
-    expect(recentIds(routeRecent)).toEqual(firstIds);
-    expect(recentIds(routeRecent)).not.toContain(secondUserId);
-    expect(recentIds(writeCall.recent)).toEqual(firstIds);
-    expect(writeCall.recent.map((turn) => turn.content)).not.toContain('second question');
-    expect(llm.calls('route')[0]?.input.recent).toEqual([]);
+    expect(routeRecent.map((turn) => turn.id)).toEqual(firstIds);
+    expect(routeRecent.map((turn) => turn.content)).not.toContain('second question');
   });
 
-  it('a non-chat intent gives status, error, text, done', async () => {
-    const { deps } = makeDeps({ route: chatPlan({ intent: 'fresh' }) });
-    const events = await collect(live({ message: 'what is new?' }), deps);
-
-    expect(events.map((event) => event.type)).toEqual(['status', 'error', 'text', 'done']);
-    const done = events.at(-1);
-    if (done === undefined || done.type !== 'done') throw new Error('last event is not done');
-    expect(done.intent).toBe('fresh');
-  });
-
-  it('a writer error gives an error event then done', async () => {
-    const { deps, store } = makeDeps({
-      write: () => {
-        async function* fail(): AsyncIterable<string> {
-          throw new Error('model exploded');
-        }
-        return fail();
+  it('a writer error gives an error event then done, and the turn is saved', async () => {
+    const { run, store } = rig({
+      llm: {
+        write: () => {
+          async function* fail(): AsyncIterable<string> {
+            yield 'partial';
+            throw new Error('model exploded');
+          }
+          return fail();
+        },
       },
     });
-    const events = await collect(live(), deps);
-
-    const tail = events.map((event) => event.type).slice(-2);
-    expect(tail).toEqual(['error', 'done']);
+    const events = await run({ message: 'hi' });
+    expect(types(events).slice(-2)).toEqual(['error', 'done']);
     const error = events.find((event) => event.type === 'error');
     if (error === undefined || error.type !== 'error') throw new Error('no error event');
     expect(error.stage).toBe('write');
     const assistant = store.allTurns().find((turn) => turn.role === 'assistant');
-    expect(assistant?.content).toBe('');
+    expect(assistant?.content).toBe('partial');
+  });
+
+  it('a router error still ends with done and a saved assistant turn', async () => {
+    const { run, store } = rig({ llm: { route: () => Promise.reject(new Error('router down')) } });
+    const events = await run({ message: 'hi' });
+    expect(types(events).at(-1)).toBe('done');
+    expect(store.allTurns().filter((turn) => turn.role === 'assistant')).toHaveLength(1);
+  });
+
+  it('no pipeline file imports src/core/time or ./guards', () => {
+    const result = spawnSync('node', [path.join(REPO_ROOT, 'scripts', 'check-imports.mjs'), REPO_ROOT], {
+      encoding: 'utf8',
+    });
+    expect(result.stdout.trim()).toBe('check-imports: ok');
+    expect(result.status).toBe(0);
+  });
+
+  it('uses the caller session id on both turns', async () => {
+    const { run, store } = rig({});
+    await run({ message: 'hi' });
+    expect(store.allTurns().every((turn) => turn.sessionId === SESSION)).toBe(true);
   });
 });

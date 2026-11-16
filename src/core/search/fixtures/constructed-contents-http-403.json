@@ -1,0 +1,14 @@
+{
+  "requestId": "constructed",
+  "results": [],
+  "statuses": [
+    {
+      "id": "https://blocked.example.test/pricing",
+      "status": "error",
+      "error": {
+        "tag": "CRAWL_HTTP_403",
+        "httpStatusCode": 403
+      }
+    }
+  ]
+}

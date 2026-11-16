@@ -406,7 +406,7 @@ export interface AgentDeps {
   store: MemoryStore;
   search: SearchProvider;
   llm: Llm;
-  /** Lane 1. Until it merges, the entry module re-exports Lane 0's placeholders. */
+  /** Lane 1: the time functions. Injected, never imported by the pipeline. */
   time: TimeFns;
   /** Lane 1. Same rule: injected, never imported by the pipeline. */
   guardVerdict: GuardVerdict;

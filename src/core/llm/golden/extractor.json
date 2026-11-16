@@ -1,0 +1,94 @@
+{
+  "items": [
+    {
+      "id": "starter-price",
+      "answer": "Northwind PG Starter is 19 USD per month [1].",
+      "evidence": [
+        {
+          "n": 1,
+          "sourceId": "src-starter",
+          "url": "https://northwindpg.test/pricing",
+          "title": "Pricing",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Northwind PG Starter is 19 USD per month."
+        }
+      ]
+    },
+    {
+      "id": "two-claims",
+      "answer": "Basalt DB Pro is 25 USD per month [1]. Basalt DB's free tier includes 1 project [2].",
+      "evidence": [
+        {
+          "n": 1,
+          "sourceId": "src-pro",
+          "url": "https://basaltdb.test/pricing",
+          "title": "Pricing",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Basalt DB Pro is 25 USD per month."
+        },
+        {
+          "n": 2,
+          "sourceId": "src-free",
+          "url": "https://basaltdb.test/pricing#free",
+          "title": "Free tier",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Basalt DB free tier includes 1 project."
+        }
+      ]
+    },
+    {
+      "id": "seat-price",
+      "answer": "Pipeloom Team is 30 USD per seat per month [1].",
+      "evidence": [
+        {
+          "n": 1,
+          "sourceId": "src-team",
+          "url": "https://pipeloom.test/pricing",
+          "title": "Pricing",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Pipeloom Team is 30 USD per seat per month, billed monthly."
+        }
+      ]
+    },
+    {
+      "id": "skip-uncited",
+      "answer": "Managed Postgres is often worth it. Northwind PG Starter is 19 USD per month [1].",
+      "evidence": [
+        {
+          "n": 1,
+          "sourceId": "src-starter-2",
+          "url": "https://northwindpg.test/pricing",
+          "title": "Pricing",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Northwind PG Starter is 19 USD per month."
+        }
+      ]
+    },
+    {
+      "id": "quote-from-evidence",
+      "answer": "The Pro plan costs twenty-five dollars a month [1].",
+      "evidence": [
+        {
+          "n": 1,
+          "sourceId": "src-pro-2",
+          "url": "https://basaltdb.test/pricing",
+          "title": "Pricing",
+          "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+          "live": true,
+          "firstParty": true,
+          "text": "Basalt DB Pro is 25 USD per month."
+        }
+      ]
+    }
+  ]
+}

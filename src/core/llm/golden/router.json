@@ -1,0 +1,317 @@
+{
+  "items": [
+    {
+      "id": "brief-1",
+      "group": "brief",
+      "message": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recheck",
+        "timeRef": { "kind": "weekday", "weekday": 1, "modifier": "bare" },
+        "refersToPrevious": false,
+        "wantsNews": true
+      }
+    },
+    {
+      "id": "brief-2",
+      "group": "brief",
+      "message": "What did I ask you on 3 November? Is your answer still correct today?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recheck",
+        "timeRef": { "kind": "calendar", "day": 3, "month": 11 },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "brief-3",
+      "group": "brief",
+      "message": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recheck",
+        "timeRef": { "kind": "weekday", "weekday": 2, "modifier": "last" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-3-11",
+      "group": "eval",
+      "message": "What did we talk about on 3/11?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "numeric", "first": 3, "second": 11 },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-basalt-price",
+      "group": "eval",
+      "message": "What does Basalt DB's Pro plan cost?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-still-right",
+      "group": "eval",
+      "message": "Is that still right?",
+      "recent": [
+        {
+          "role": "user",
+          "content": "What does Basalt DB's Pro plan cost?",
+          "localDate": "2026-11-13"
+        },
+        {
+          "role": "assistant",
+          "content": "Basalt DB Pro is 25 USD per month.",
+          "localDate": "2026-11-13"
+        }
+      ],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recheck",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": true,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-the-10th",
+      "group": "eval",
+      "message": "The 10th.",
+      "recent": [
+        {
+          "role": "user",
+          "content": "Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?",
+          "localDate": "2026-11-13"
+        },
+        {
+          "role": "assistant",
+          "content": "I found two Tuesdays: Tue 10 Nov and Tue 3 Nov. Which day do you mean?",
+          "localDate": "2026-11-13"
+        }
+      ],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recheck",
+        "timeRef": { "kind": "calendar", "day": 10, "month": 11 },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-names",
+      "group": "eval",
+      "message": "Pipeloom, Dealbase, Closewise, Leadharbor and Salesyard.",
+      "recent": [
+        {
+          "role": "user",
+          "content": "On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?",
+          "localDate": "2026-11-13"
+        },
+        {
+          "role": "assistant",
+          "content": "I do not have that shortlist saved. Name the tools and I can look up their current prices.",
+          "localDate": "2026-11-13"
+        }
+      ],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-shorter",
+      "group": "eval",
+      "message": "Make this shorter: 'We are reaching out to inform you that the meeting has been moved.'",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "chat",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-mutex",
+      "group": "eval",
+      "message": "What's the difference between a mutex and a semaphore?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "chat",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-yesterday",
+      "group": "eval",
+      "message": "What did I ask you yesterday?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "named", "name": "yesterday" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "eval-monday",
+      "group": "eval",
+      "message": "What did we talk about on Monday?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "weekday", "weekday": 1, "modifier": "bare" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-future",
+      "group": "paraphrase",
+      "message": "What will Basalt DB cost next year?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "future" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-today",
+      "group": "paraphrase",
+      "message": "What did we discuss today?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "named", "name": "today" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-this-tuesday",
+      "group": "paraphrase",
+      "message": "Did we talk about Postgres this Tuesday?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "weekday", "weekday": 2, "modifier": "this" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-ago",
+      "group": "paraphrase",
+      "message": "What did I ask you 3 days ago?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "ago", "unit": "day", "n": 3 },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-last-week",
+      "group": "paraphrase",
+      "message": "Summarise what we decided last week.",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "period", "unit": "week", "which": "last" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-this-month",
+      "group": "paraphrase",
+      "message": "What have we covered this month?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "period", "unit": "month", "which": "this" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-calendar-year",
+      "group": "paraphrase",
+      "message": "On 3 November 2025, what did I ask about Pipeloom?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "recall",
+        "timeRef": { "kind": "calendar", "day": 3, "month": 11, "year": 2025 },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "para-news",
+      "group": "paraphrase",
+      "message": "Has Pipeloom announced anything new since Monday?",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "weekday", "weekday": 1, "modifier": "bare" },
+        "refersToPrevious": false,
+        "wantsNews": true
+      }
+    }
+  ]
+}

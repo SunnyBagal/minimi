@@ -71,7 +71,7 @@
               ],
               "queries": [
                 "CRM tools pricing changes",
-                "CRM tools new features launch"
+                "CRM tools new releases"
               ],
               "refersToPrevious": false,
               "wantsNews": true
@@ -288,49 +288,49 @@
                 "kind": "none"
               },
               "timeText": null,
+              "topic": "Basalt DB Pro plan price",
+              "entities": [
+                "Basalt DB",
+                "Basalt DB Pro"
+              ],
+              "queries": [
+                "Basalt DB Pro plan price"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "Basalt DB Pro plan price",
+              "entities": [
+                "Basalt DB",
+                "Basalt DB Pro"
+              ],
+              "queries": [
+                "Basalt DB Pro plan price"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
               "topic": "Basalt DB Pro price",
-              "entities": [
-                "Basalt DB",
-                "Basalt DB Pro"
-              ],
-              "queries": [
-                "Basalt DB Pro plan price"
-              ],
-              "refersToPrevious": false,
-              "wantsNews": false
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "intent": "fresh",
-              "timeRef": {
-                "kind": "none"
-              },
-              "timeText": null,
-              "topic": "Basalt DB Pro plan price",
-              "entities": [
-                "Basalt DB",
-                "Basalt DB Pro"
-              ],
-              "queries": [
-                "Basalt DB Pro plan price"
-              ],
-              "refersToPrevious": false,
-              "wantsNews": false
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "intent": "fresh",
-              "timeRef": {
-                "kind": "none"
-              },
-              "timeText": null,
-              "topic": "Basalt DB Pro plan price",
               "entities": [
                 "Basalt DB",
                 "Basalt DB Pro"
@@ -385,8 +385,7 @@
                 "Basalt DB Pro"
               ],
               "queries": [
-                "Basalt DB Pro plan price",
-                "Basalt DB Pro pricing change"
+                "Basalt DB Pro plan price"
               ],
               "refersToPrevious": true,
               "wantsNews": false
@@ -867,7 +866,7 @@
               ],
               "queries": [
                 "Basalt DB pricing",
-                "Basalt DB plan cost next year"
+                "Basalt DB plan cost"
               ],
               "refersToPrevious": false,
               "wantsNews": false
@@ -1268,16 +1267,16 @@
                 "weekday": 1,
                 "modifier": "bare"
               },
-              "timeText": "since Monday",
+              "timeText": "Monday",
               "topic": "Pipeloom announcements",
               "entities": [
                 "Pipeloom"
               ],
               "queries": [
                 "Pipeloom announcements",
+                "Pipeloom news",
                 "Pipeloom new features",
-                "Pipeloom product launch news",
-                "Pipeloom latest updates"
+                "Pipeloom launch"
               ],
               "refersToPrevious": false,
               "wantsNews": true
@@ -1300,8 +1299,9 @@
               ],
               "queries": [
                 "Pipeloom announcements",
+                "Pipeloom news",
                 "Pipeloom new features",
-                "Pipeloom product launch news"
+                "Pipeloom launch"
               ],
               "refersToPrevious": false,
               "wantsNews": true
@@ -1360,7 +1360,24 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page's plan table states the Starter price as 24 USD per month, which differs from the stored 19 USD per month for the same plan and billing period."
+              "reason": "The pricing page now lists the Starter plan at 24 USD per month, up from the stored 19 USD per month."
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "verdict": "changed",
+              "newValue": "24 USD per month",
+              "quote": "Northwind PG Starter is 24 USD per month",
+              "quoteUrl": "https://northwindpg.test/pricing",
+              "scope": {
+                "plan": "Starter",
+                "period": "month",
+                "currency": "USD",
+                "unit": "flat"
+              },
+              "reason": "The pricing page's plan table states the current Starter price as 24 USD per month, which differs from the stored 19 USD per month."
             },
             "error": null
           },
@@ -1377,24 +1394,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the Starter plan now costs 24 USD per month, which differs from the stored 19 USD per month."
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "verdict": "changed",
-              "newValue": "24 USD per month",
-              "quote": "Northwind PG Starter is 24 USD per month.",
-              "quoteUrl": "https://northwindpg.test/pricing",
-              "scope": {
-                "plan": "Starter",
-                "period": "month",
-                "currency": "USD",
-                "unit": "flat"
-              },
-              "reason": "The pricing page states the Starter plan at 24 USD per month, which differs from the stored 19 USD per month."
+              "reason": "The pricing page now lists the Starter plan at 24 USD per month, which differs from the stored 19 USD per month."
             },
             "error": null
           }
@@ -1411,7 +1411,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Basalt DB Pro — 25 USD per month",
+              "quote": "Basalt DB Pro — 25 USD per month.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Pro",
@@ -1419,7 +1419,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the same Pro price of 25 USD per month as the stored claim."
+              "reason": "The page states the same Pro price of 25 USD per month as the claim."
             },
             "error": null
           },
@@ -1428,7 +1428,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Basalt DB Pro — 25 USD per month",
+              "quote": "Basalt DB Pro — 25 USD per month.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Pro",
@@ -1436,7 +1436,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the same Pro price of 25 USD per month as the stored claim."
+              "reason": "The page states the same price of 25 USD per month for the Pro plan, so the claim still holds."
             },
             "error": null
           },
@@ -1445,7 +1445,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Basalt DB Pro — 25 USD per month",
+              "quote": "Basalt DB Pro — 25 USD per month.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Pro",
@@ -1478,7 +1478,24 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page gives only an annual price for Pro (240 USD billed annually), which is a different billing period from the monthly claim, so it cannot confirm or change the monthly value."
+              "reason": "The page states only an annual price of 240 USD for Pro, which is a different billing period from the monthly claim, so it does not show the current monthly value."
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "verdict": "unverifiable",
+              "newValue": null,
+              "quote": null,
+              "quoteUrl": null,
+              "scope": {
+                "plan": "Pro",
+                "period": "month",
+                "currency": "USD",
+                "unit": "flat"
+              },
+              "reason": "The page states only an annual price for Basalt DB Pro, so it does not give the current monthly value the claim needs."
             },
             "error": null
           },
@@ -1495,24 +1512,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states only an annual Pro price of 240 USD, not the monthly price the claim covers, so it gives no current value for the claimed billing period."
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "verdict": "unverifiable",
-              "newValue": null,
-              "quote": null,
-              "quoteUrl": null,
-              "scope": {
-                "plan": "Pro",
-                "period": "year",
-                "currency": "USD",
-                "unit": "flat"
-              },
-              "reason": "The page states only an annual price of 240 USD for Pro, which is a different billing period from the stored monthly claim, so it cannot confirm or change that claim."
+              "reason": "The page states an annual price of 240 USD for Pro but no current monthly price, so it cannot confirm or change the stored monthly claim."
             },
             "error": null
           }
@@ -1537,7 +1537,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The plan table states the current Starter price as 24 USD per month, while the FAQ's 19 USD refers to an older price."
+              "reason": "The plan table states the current Starter price as 24 USD per month, while the older 19 USD figure appears only in the FAQ as a past price."
             },
             "error": null
           },
@@ -1554,7 +1554,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The plan table on the page states the current Starter price as 24 USD per month, while the 19 USD figure appears only in the FAQ as a former price."
+              "reason": "The plan table states the current Starter price as 24 USD per month, while the FAQ's 19 USD figure is an older price."
             },
             "error": null
           },
@@ -1571,7 +1571,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The plan table on the page states the current Starter price as 24 USD per month, while the 19 USD figure appears only in the FAQ as a past price."
+              "reason": "The page's plan table states the current Starter price as 24 USD per month, while the FAQ's 19 USD figure is described as an older price."
             },
             "error": null
           }
@@ -1596,7 +1596,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page status is ok but the page text is empty, so it does not state the current Starter monthly price."
+              "reason": "The page status is ok but its text is empty, so it does not state the current Starter price."
             },
             "error": null
           },
@@ -1613,7 +1613,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page status is ok but its text is empty, so it does not state the current Starter monthly price."
+              "reason": "The page status is ok but its text is empty, so it does not state the current Starter price."
             },
             "error": null
           },
@@ -1630,7 +1630,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page status is ok but its text is empty, so it does not state the current Starter monthly price."
+              "reason": "The fetched page returned status ok but contains no text stating the Starter monthly price, so there is no evidence either way."
             },
             "error": null
           }
@@ -1655,24 +1655,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the Starter price as 24 USD per month, which differs from the stored 19 USD per month for the same plan and billing period."
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "verdict": "changed",
-              "newValue": "24 USD per month",
-              "quote": "Northwind PG Starter is 24 USD per month",
-              "quoteUrl": "https://northwindpg.test/pricing",
-              "scope": {
-                "plan": "Starter",
-                "period": "month",
-                "currency": "USD",
-                "unit": "flat"
-              },
-              "reason": "The pricing page states the Starter plan at 24 USD per month, which differs from the stored 19 USD per month for the same plan and period."
+              "reason": "The page states the Starter price as 24 USD per month, a different number from the stored 19 USD per month for the same plan and period."
             },
             "error": null
           },
@@ -1689,7 +1672,24 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the Starter price as 24 USD per month, which differs from the stored 19 USD per month for the same plan and billing period."
+              "reason": "The fetched pricing page states the Starter plan at 24 USD per month, which differs from the stored 19 USD per month for the same plan and billing period."
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "verdict": "changed",
+              "newValue": "24 USD per month",
+              "quote": "Northwind PG Starter is 24 USD per month.",
+              "quoteUrl": "https://northwindpg.test/pricing",
+              "scope": {
+                "plan": "Starter",
+                "period": "month",
+                "currency": "USD",
+                "unit": "flat"
+              },
+              "reason": "The pricing page states the Starter plan at 24 USD per month, which differs from the stored 19 USD per month for the same plan and billing period."
             },
             "error": null
           }
@@ -1714,7 +1714,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page fetch timed out, so the current Starter price could not be checked."
+              "reason": "The pricing page fetch timed out, so the current Starter price cannot be verified."
             },
             "error": null
           },
@@ -1731,7 +1731,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page fetch timed out, so the current Starter price could not be checked."
+              "reason": "The pricing page fetch timed out, so the current Starter price cannot be checked."
             },
             "error": null
           },
@@ -1748,7 +1748,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page fetch timed out, so the stored Starter price cannot be checked against the page."
+              "reason": "The pricing page fetch timed out, so the current Starter price cannot be verified from the page."
             },
             "error": null
           }
@@ -1773,7 +1773,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The pricing page returned status not_found, so the current seat price cannot be verified from the page."
+              "reason": "The pricing page returned not_found, so the current seat price cannot be checked."
             },
             "error": null
           },
@@ -1807,7 +1807,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The pricing page returned not_found, so the current seat price cannot be checked against the source."
+              "reason": "The pricing page returned not_found, so the current seat price cannot be verified from the page."
             },
             "error": null
           }
@@ -1832,7 +1832,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The fetched pricing page states the same Team price of 30 USD per seat per month, matching the stored claim."
+              "reason": "The page states the same 30 USD per seat per month price for the Team plan, matching the claim."
             },
             "error": null
           },
@@ -1849,7 +1849,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The page states the same value of 30 USD per seat per month for the Team plan, matching the claim's scope."
+              "reason": "The page states the same price of 30 USD per seat per month for the Team plan, matching the claim."
             },
             "error": null
           },
@@ -1866,7 +1866,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The fetched pricing page states the same Team price of 30 USD per seat per month, billed monthly, as the stored claim."
+              "reason": "The page states the same value of 30 USD per seat per month for the Team plan, matching the claim."
             },
             "error": null
           }
@@ -1883,7 +1883,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "USD 25 / month for Basalt DB Pro",
+              "quote": "Price: USD 25 / month for Basalt DB Pro.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Pro",
@@ -1891,7 +1891,24 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the same Pro price of USD 25 per month, worded differently from the claim."
+              "reason": "The page states the same Pro price of USD 25 per month, written as USD 25 / month."
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "verdict": "unchanged",
+              "newValue": null,
+              "quote": "Price: USD 25 / month for Basalt DB Pro.",
+              "quoteUrl": "https://basaltdb.test/pricing",
+              "scope": {
+                "plan": "Pro",
+                "period": "month",
+                "currency": "USD",
+                "unit": "flat"
+              },
+              "reason": "The fetched pricing page states the same Pro price of USD 25 per month, worded differently from the claim."
             },
             "error": null
           },
@@ -1908,24 +1925,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the same Pro price of USD 25 per month, written differently from the claim."
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "verdict": "unchanged",
-              "newValue": null,
-              "quote": "USD 25 / month for Basalt DB Pro",
-              "quoteUrl": "https://basaltdb.test/pricing",
-              "scope": {
-                "plan": "Pro",
-                "period": "month",
-                "currency": "USD",
-                "unit": "flat"
-              },
-              "reason": "The page states the same Pro price of USD 25 per month, worded differently from the claim."
+              "reason": "The page states the same Basalt DB Pro price of USD 25 per month, worded differently from the claim."
             },
             "error": null
           }
@@ -1950,7 +1950,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The fetched page states only a Pro plan price and says nothing about the Starter plan's current price, so there is no evidence either way."
+              "reason": "The fetched pricing page states only the Pro plan price and does not give the current Starter price, so there is no evidence either way."
             },
             "error": null
           },
@@ -1967,7 +1967,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states a price only for the Pro plan, not the Starter plan in the claim, and a different plan is not a change, so there is no evidence for the Starter price."
+              "reason": "The page status is ok but it only states the Pro plan price, not the current Starter monthly price, so there is no evidence either way."
             },
             "error": null
           },
@@ -1984,7 +1984,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The fetched page states only the Pro plan price and gives no current Starter price, so the stored Starter claim cannot be verified."
+              "reason": "The fetched page states a price only for the Pro plan, not the current Starter price, so there is no evidence either way."
             },
             "error": null
           }
@@ -2009,23 +2009,6 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The fetched page is a blog post about connection pooling and does not state the Starter plan's current monthly price, so there is no evidence either way."
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "verdict": "unverifiable",
-              "newValue": null,
-              "quote": null,
-              "quoteUrl": null,
-              "scope": {
-                "plan": "Starter",
-                "period": "month",
-                "currency": "USD",
-                "unit": "flat"
-              },
               "reason": "The fetched page is a blog post about connection pooling and does not state the current Starter price, so there is no evidence either way."
             },
             "error": null
@@ -2043,7 +2026,24 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The fetched page is a blog post about connection pooling and does not state the current Starter price, so there is no evidence either way."
+              "reason": "The fetched page is a blog post about connection pooling and does not state the Starter price, so there is no evidence either way."
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "verdict": "unverifiable",
+              "newValue": null,
+              "quote": null,
+              "quoteUrl": null,
+              "scope": {
+                "plan": "Starter",
+                "period": "month",
+                "currency": "USD",
+                "unit": "flat"
+              },
+              "reason": "The fetched page is a blog post about connection pooling and does not state the Starter price, so there is no evidence either way."
             },
             "error": null
           }
@@ -2068,7 +2068,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "No page was fetched and there are no fresh results, so there is no evidence of the current Starter price."
+              "reason": "No page was fetched, so there is no evidence of the current Starter price."
             },
             "error": null
           },
@@ -2085,7 +2085,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "No page text or fresh results were provided, so there is no evidence of the current Starter price."
+              "reason": "No page was fetched, so there is no evidence of the current Starter price."
             },
             "error": null
           },
@@ -2102,7 +2102,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "No page was fetched and there are no fresh results, so there is no evidence of the current Starter price."
+              "reason": "No page was fetched, so there is no evidence of the current Starter price."
             },
             "error": null
           }
@@ -2124,7 +2124,7 @@
               "scope": {
                 "plan": "Free"
               },
-              "reason": "The pricing page states the free tier includes 1 project, the same value as the stored claim."
+              "reason": "The page states the same free tier allowance of 1 project for the Free plan as the stored claim."
             },
             "error": null
           },
@@ -2138,7 +2138,7 @@
               "scope": {
                 "plan": "Free"
               },
-              "reason": "The pricing page states the same value, 1 project on the free tier, as the stored claim."
+              "reason": "The pricing page states the same free tier allowance of 1 project for the Free plan, so the stored claim still matches."
             },
             "error": null
           },
@@ -2147,12 +2147,12 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Basalt DB free tier includes 1 project",
+              "quote": "Basalt DB free tier includes 1 project.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Free"
               },
-              "reason": "The pricing page states the same free tier allowance of 1 project for the Free plan, so the stored claim still matches."
+              "reason": "The pricing page states the same free tier limit of 1 project for the Free plan."
             },
             "error": null
           }
@@ -2172,7 +2172,7 @@
               "quote": "Basalt DB extensions: pgvector only.",
               "quoteUrl": "https://basaltdb.test/extensions",
               "scope": {},
-              "reason": "The page lists only pgvector as the extension, while the stored claim includes PostGIS as well."
+              "reason": "The fetched page states the current extensions as pgvector only, which differs from the stored list of pgvector and PostGIS."
             },
             "error": null
           },
@@ -2184,7 +2184,7 @@
               "quote": "Basalt DB extensions: pgvector only.",
               "quoteUrl": "https://basaltdb.test/extensions",
               "scope": {},
-              "reason": "The page lists only pgvector as the extension, while the stored claim includes PostGIS as well."
+              "reason": "The page now lists only pgvector as Basalt DB's extension, dropping PostGIS from the stored claim."
             },
             "error": null
           },
@@ -2196,7 +2196,7 @@
               "quote": "Basalt DB extensions: pgvector only.",
               "quoteUrl": "https://basaltdb.test/extensions",
               "scope": {},
-              "reason": "The page states that Basalt DB's extensions are now pgvector only, which differs from the stored pgvector, PostGIS value."
+              "reason": "The fetched page lists only pgvector as Basalt DB's extension, while the stored claim includes PostGIS as well."
             },
             "error": null
           }
@@ -2221,7 +2221,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the same Pro price of 25 USD per month, and the annual 240 USD figure is a different billing period so it does not affect this monthly claim."
+              "reason": "The page states the same Pro price of 25 USD per month that the claim records."
             },
             "error": null
           },
@@ -2238,7 +2238,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the same Pro price of 25 USD per month, and the annual price is a different billing period so it does not change the monthly claim."
+              "reason": "The fetched pricing page still states Pro at 25 USD per month, the same value as the claim."
             },
             "error": null
           },
@@ -2255,7 +2255,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The page states the same Pro price of 25 USD per month, matching the claim's plan, period and currency."
+              "reason": "The page states the same Pro price of 25 USD per month, so the claim still matches."
             },
             "error": null
           }
@@ -2280,7 +2280,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The pricing page returned a blocked status, so the current seat price cannot be checked against it."
+              "reason": "The pricing page returned a blocked status, so the current seat price cannot be verified from the page."
             },
             "error": null
           },
@@ -2297,7 +2297,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The pricing page returned status blocked, so the current seat price cannot be checked."
+              "reason": "The pricing page was blocked, so the current seat price cannot be checked."
             },
             "error": null
           },
@@ -2314,7 +2314,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The pricing page returned status blocked, so the current seat price could not be checked."
+              "reason": "The pricing page returned a blocked status, so the current seat price cannot be verified from the page."
             },
             "error": null
           }
@@ -2331,7 +2331,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Basalt DB Pro is 25 USD per month",
+              "quote": "Basalt DB Pro is 25 USD per month.",
               "quoteUrl": "https://basaltdb.test/pricing",
               "scope": {
                 "plan": "Pro",
@@ -2339,7 +2339,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The fetched pricing page states the same Pro price of 25 USD per month, so the stored claim still matches."
+              "reason": "The page states the same Pro price of 25 USD per month as the claim, so the value is unchanged."
             },
             "error": null
           },
@@ -2356,7 +2356,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the same Pro price of 25 USD per month as the stored claim."
+              "reason": "The page states the same Pro price of 25 USD per month as the stored claim, so the value is unchanged."
             },
             "error": null
           },
@@ -2373,7 +2373,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page states the same Pro price of 25 USD per month as the stored claim, and the embedded instruction on the page was ignored."
+              "reason": "The page states the same Pro price of 25 USD per month as the stored claim."
             },
             "error": null
           }
@@ -2398,7 +2398,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page fetch timed out, and the fresh news snippet cannot substitute for the page."
+              "reason": "The pricing page fetch timed out, and the fresh news snippet cannot substitute for the page itself."
             },
             "error": null
           },
@@ -2432,7 +2432,7 @@
                 "currency": "USD",
                 "unit": "flat"
               },
-              "reason": "The pricing page fetch timed out, and a search snippet cannot stand in for the page, so the claim cannot be checked."
+              "reason": "The pricing page fetch timed out, and the fresh news snippet cannot substitute for the page."
             },
             "error": null
           }
@@ -2449,7 +2449,7 @@
             "output": {
               "verdict": "unchanged",
               "newValue": null,
-              "quote": "Pipeloom Team — 30 USD per seat per month.",
+              "quote": "Pipeloom Team — 30 USD per seat per month",
               "quoteUrl": "https://pipeloom.test/pricing",
               "scope": {
                 "plan": "Team",
@@ -2457,7 +2457,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The page states the same price of 30 USD per seat per month for the Team plan, matching the stored claim."
+              "reason": "The fetched pricing page states the same Team price of 30 USD per seat per month as the stored claim."
             },
             "error": null
           },
@@ -2491,7 +2491,7 @@
                 "currency": "USD",
                 "unit": "seat"
               },
-              "reason": "The page states the same price of 30 USD per seat per month for the Team plan, matching the stored claim."
+              "reason": "The page states the same price of 30 USD per seat per month for the Team plan, matching the claim."
             },
             "error": null
           }
@@ -2504,7 +2504,7 @@
     "quotesPass": 6,
     "drafts": 6,
     "share": 1,
-    "containsQuote": "src/core/search placeholder until Lane 3 merges",
+    "containsQuote": "src/core/search/quote.ts containsQuote",
     "fixtures": [
       {
         "id": "starter-price",
@@ -2561,7 +2561,7 @@
         "drafts": [
           {
             "sourceN": 1,
-            "quote": "Basalt DB Pro is 25 USD per month.",
+            "quote": "Basalt DB Pro is 25 USD per month",
             "pass": true
           }
         ]

@@ -361,7 +361,7 @@ const results = {
     quotesPass,
     drafts,
     share,
-    containsQuote: 'src/core/search placeholder until Lane 3 merges',
+    containsQuote: 'src/core/search/quote.ts containsQuote',
     fixtures: extractorFixtures,
   },
 };

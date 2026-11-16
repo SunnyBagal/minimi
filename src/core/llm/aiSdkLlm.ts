@@ -135,13 +135,14 @@ function evidenceText(items: readonly SourceRef[]): string {
 
 function pageText(page: FetchedPage | null): string {
   if (page === null) return 'Page: (none)';
-  return labeledBlock(`Page (status ${page.status}, url ${page.finalUrl})`, page.text);
+  // Status is our label. The URL is fetched data, so it stays inside the block.
+  return labeledBlock(`Page (status ${page.status})`, `${page.finalUrl}\n${page.text}`);
 }
 
 function freshText(fresh: readonly SearchResult[]): string {
   if (fresh.length === 0) return 'Fresh results: (none)';
   return fresh
-    .map((item) => labeledBlock(`Fresh result (${item.url})`, item.text))
+    .map((item) => labeledBlock('Fresh result', `${item.url}\n${item.text}`))
     .join('\n');
 }
 

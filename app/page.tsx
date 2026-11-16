@@ -1,13 +1,20 @@
 'use client';
 
 /**
- * Lane 0 page: an input, the message list and one status line. Lane 5 builds
- * the real UI on top of the data parts that the chat route already sends.
+ * The chat page: an input, the message list rendered from the stream's data
+ * parts (recall card, cited text, verdict table, errors, timings), a status
+ * line and a dev footer.
  */
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import type { SourceRef, VerdictRow } from '../src/core/contracts';
 import type { ChatUIMessage } from './api/chat/route';
+import { CitedText } from './components/CitedText';
+import { DevFooter } from './components/DevFooter';
+import { RecallCard } from './components/RecallCard';
+import { StatusLine } from './components/StatusLine';
+import { VerdictTable } from './components/VerdictTable';
 
 const SESSION_KEY = 'minimi.sessionId';
 const HISTORY_KEY = 'minimi.messages';
@@ -20,6 +27,42 @@ function sessionId(): string {
     window.localStorage.setItem(SESSION_KEY, id);
   }
   return id;
+}
+
+type Citation = Omit<SourceRef, 'text'>;
+
+/** The data parts one assistant message carries, for the renderers below. */
+interface MessageData {
+  citations: Citation[];
+  uncited: string[];
+  rows: VerdictRow[];
+  timings: { stage: string; ms: number }[];
+}
+
+/** Renders one assistant message's parts in stream order. */
+function renderAssistantParts(message: ChatUIMessage, data: MessageData): ReactNode[] {
+  const rendered: ReactNode[] = [];
+  let tableShown = false;
+  message.parts.forEach((part, index) => {
+    if (part.type === 'text') {
+      rendered.push(<CitedText key={index} text={part.text} citations={data.citations} uncited={data.uncited} />);
+    } else if (part.type === 'data-recall') {
+      rendered.push(<RecallCard key={index} data={part.data} />);
+    } else if (part.type === 'data-verdict') {
+      if (!tableShown) {
+        tableShown = true;
+        rendered.push(<VerdictTable key={index} rows={data.rows} />);
+      }
+    } else if (part.type === 'data-error') {
+      rendered.push(
+        <em key={index} role="alert">
+          {' '}
+          [{part.data.stage}] {part.data.message}
+        </em>,
+      );
+    }
+  });
+  return rendered;
 }
 
 function lastUserText(messages: ChatUIMessage[]): string {
@@ -81,6 +124,21 @@ export default function Page() {
   }, [restored, status, messages]);
 
   const busy = status === 'submitted' || status === 'streaming';
+  const lastAssistant = messages.findLast((message) => message.role === 'assistant');
+  const lastTimings =
+    lastAssistant?.parts
+      .filter((part) => part.type === 'data-timing')
+      .map((part) => part.data) ?? [];
+
+  function dataFor(message: ChatUIMessage): MessageData {
+    return {
+      citations:
+        message.parts.find((part) => part.type === 'data-citations')?.data.items ?? [],
+      uncited: message.parts.find((part) => part.type === 'data-flags')?.data.uncitedNumbers ?? [],
+      rows: message.parts.filter((part) => part.type === 'data-verdict').map((part) => part.data.row),
+      timings: message.parts.filter((part) => part.type === 'data-timing').map((part) => part.data),
+    };
+  }
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -98,25 +156,15 @@ export default function Page() {
         {messages.map((message) => (
           <li key={message.id} data-role={message.role} style={{ margin: '12px 0', whiteSpace: 'pre-wrap' }}>
             <strong>{message.role === 'user' ? 'You' : 'Agent'}: </strong>
-            {message.parts.map((part, index) => {
-              if (part.type === 'text') return <span key={index}>{part.text}</span>;
-              if (part.type === 'data-error') {
-                return (
-                  <em key={index} role="alert">
-                    {' '}
-                    [{part.data.stage}] {part.data.message}
-                  </em>
-                );
-              }
-              return null;
-            })}
+            {message.role === 'user'
+              ? message.parts.map((part, index) => (part.type === 'text' ? <span key={index}>{part.text}</span> : null))
+              : renderAssistantParts(message, dataFor(message))}
           </li>
         ))}
       </ol>
 
-      <p aria-live="polite" data-testid="status" style={{ minHeight: 20, color: '#555' }}>
-        {error ? `Error: ${error.message}` : busy ? statusLine : ''}
-      </p>
+      <StatusLine text={busy ? statusLine : ''} error={error ? error.message : null} />
+      <DevFooter timings={lastTimings} />
 
       <form onSubmit={onSubmit} style={{ display: 'flex', gap: 8 }}>
         <input

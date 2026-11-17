@@ -60,6 +60,12 @@ CREATE TABLE IF NOT EXISTS claims (
 CREATE INDEX IF NOT EXISTS claims_turn_id ON claims (turn_id);
 CREATE INDEX IF NOT EXISTS claims_supersedes_id ON claims (supersedes_id);
 
+-- Which source rows the seed script wrote, so a re-run can find them again.
+-- Sources have no turn link of their own, hence the side table.
+CREATE TABLE IF NOT EXISTS seed_sources (
+  source_id TEXT PRIMARY KEY REFERENCES sources(id)
+);
+
 CREATE TABLE IF NOT EXISTS checks (
   seq INTEGER PRIMARY KEY AUTOINCREMENT,
   id TEXT NOT NULL UNIQUE,

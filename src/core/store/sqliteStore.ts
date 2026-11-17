@@ -621,6 +621,103 @@ export class SqliteStore implements MemoryStore {
     return found;
   }
 
+  /**
+   * Records that the seed script wrote this source. Not on MemoryStore:
+   * scripts/seed.ts is the only caller, and it requires a SqliteStore.
+   */
+  markSeedSource(id: Id): void {
+    this.run('INSERT INTO seed_sources (source_id) VALUES (?) ON CONFLICT(source_id) DO NOTHING', [
+      id,
+    ]);
+  }
+
+  /**
+   * Removes every row the seed wrote — seed turns with their claims, checks,
+   * FTS rows, orphaned sessions and marked seed sources — inside one
+   * transaction. Turns with origin 'live' are never touched, so a live claim
+   * that supersedes a deleted seed claim survives with supersedes_id nulled.
+   * When `only` is given, just that session's seed turns and just those
+   * marked sources are removed. A marked source still referenced by a
+   * remaining claim is kept. Not on MemoryStore; see markSeedSource.
+   */
+  deleteSeed(only?: { sessionId: Id; sourceIds: Id[] }): {
+    turns: number;
+    claims: number;
+    checks: number;
+    sources: number;
+  } {
+    const counts = { turns: 0, claims: 0, checks: 0, sources: 0 };
+    this.db.exec('BEGIN');
+    try {
+      const seedTurns = this.all<Pick<TurnRow, 'seq' | 'id' | 'session_id'>>(
+        `SELECT seq, id, session_id FROM turns WHERE origin = 'seed'${only !== undefined ? ' AND session_id = ?' : ''}`,
+        only !== undefined ? [only.sessionId] : [],
+      );
+      const inList = (ids: (string | number)[]): string => `IN (${ids.map(() => '?').join(', ')})`;
+
+      if (seedTurns.length > 0) {
+        const turnIds = seedTurns.map((row) => row.id);
+        const claims = this.all<Pick<ClaimRow, 'id'>>(
+          `SELECT id FROM claims WHERE turn_id ${inList(turnIds)}`,
+          turnIds,
+        );
+        const claimIds = claims.map((row) => row.id);
+        if (claimIds.length > 0) {
+          counts.checks = this.all<{ n: number }>(
+            `SELECT count(*) n FROM checks WHERE claim_id ${inList(claimIds)}`,
+            claimIds,
+          )[0]?.n ?? 0;
+          this.run(`DELETE FROM checks WHERE claim_id ${inList(claimIds)}`, claimIds);
+          // A live claim (e.g. a re-check's superseding claim) that pointed at a
+          // deleted seed claim keeps its own row; only the dead link is cut.
+          // This must run before the claims delete or the FK refuses it.
+          this.run(
+            `UPDATE claims SET supersedes_id = NULL WHERE supersedes_id ${inList(claimIds)}`,
+            claimIds,
+          );
+          this.run(`DELETE FROM claims WHERE id ${inList(claimIds)}`, claimIds);
+          counts.claims = claimIds.length;
+        }
+        if (this.textSearch === 'fts') {
+          const seqs = seedTurns.map((row) => row.seq);
+          this.run(`DELETE FROM turns_fts WHERE rowid ${inList(seqs)}`, seqs);
+        }
+        this.run(`DELETE FROM turns WHERE id ${inList(turnIds)}`, turnIds);
+        counts.turns = turnIds.length;
+        const sessionIds = [...new Set(seedTurns.map((row) => row.session_id))];
+        this.run(
+          `DELETE FROM sessions WHERE id ${inList(sessionIds)} AND id NOT IN (SELECT session_id FROM turns)`,
+          sessionIds,
+        );
+      }
+
+      const marked =
+        only !== undefined
+          ? this.all<{ source_id: string }>(
+              `SELECT source_id FROM seed_sources WHERE source_id ${inList(only.sourceIds)}`,
+              only.sourceIds,
+            )
+          : this.all<{ source_id: string }>('SELECT source_id FROM seed_sources');
+      const removable = marked
+        .map((row) => row.source_id)
+        .filter(
+          (id) =>
+            this.all<{ n: number }>('SELECT count(*) n FROM claims WHERE source_id = ?', [id])[0]
+              ?.n === 0,
+        );
+      if (removable.length > 0) {
+        this.run(`DELETE FROM seed_sources WHERE source_id ${inList(removable)}`, removable);
+        this.run(`DELETE FROM sources WHERE id ${inList(removable)}`, removable);
+        counts.sources = removable.length;
+      }
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+    return counts;
+  }
+
   // --------------------------------------------------------------- claims
 
   saveClaims(claims: NewClaim[]): Claim[] {

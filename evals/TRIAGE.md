@@ -44,6 +44,8 @@ On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: "What does Pipeloom's Team plan cos
 
 `done.intent is recheck` passed (`recheck`). `found without a date lookup` passed (`the previous answer in this session`). `one verdict` passed (observed `1`). `verdictFor` found no row with entity `Basalt DB` and attribute `price`, so the verdict value is null. The results file does not store that row's entity, attribute, or verdict. Both number checks passed, observed `[]`.
 
+One later live run, kept out of `evals/results`, printed one stored claim on turn A: entity `Basalt DB`, attribute `price`, value `25 USD per month`. Its one verdict row was claim.entity `Basalt DB`, claim.attribute `price`, check.verdict `unchanged`, check.reason `The quote is still on the live first-party page.`
+
 ## Scored 3 of 3, strict not
 
 These passed every scored run. The literal number check failed. Case 17 is the only case in `strict.passAtAll`. Case 19 turn A is not in the literal failures.

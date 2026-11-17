@@ -250,7 +250,7 @@ export class SqliteStore implements MemoryStore {
     this.db.prepare(sql).run(...params);
   }
 
-  /** A NOT IN (...) clause over excludeTurnIds, with bound placeholders. */
+  /** A NOT IN (...) clause over excludeTurnIds, with bound parameters. */
   private exclusion(excludeTurnIds: Id[]): { clause: string; params: string[] } {
     if (excludeTurnIds.length === 0) return { clause: '', params: [] };
     const marks = excludeTurnIds.map(() => '?').join(', ');

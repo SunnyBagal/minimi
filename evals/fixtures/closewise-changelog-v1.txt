@@ -1,0 +1,2 @@
+# Invented prices. Not a real vendor.
+1 Oct 2026: Closewise shipped a draft scheduler.

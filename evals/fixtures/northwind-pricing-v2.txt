@@ -1,0 +1,2 @@
+# Invented prices. Not a real vendor.
+Northwind PG Starter is 24 USD per month.

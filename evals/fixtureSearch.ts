@@ -28,6 +28,23 @@ function isFailure(spec: FixturePageSpec): spec is { failure: FixtureFailure } {
   return 'failure' in spec;
 }
 
+/** The same match `FixtureSearch.search` uses: first substring hit, then `numResults`. */
+function hitsFor(scenario: FixtureScenario, query: string, numResults: number): SearchResult[] {
+  const wanted = query.toLowerCase();
+  const hit = scenario.searches.find((entry) => wanted.includes(entry.match.toLowerCase()));
+  return (hit?.results ?? []).slice(0, numResults);
+}
+
+/**
+ * Page text the fixture search returned for these calls. Fetch calls are not
+ * included. A query with no hit contributes nothing.
+ */
+export function servedPageTexts(scenario: FixtureScenario, calls: readonly FixtureCall[]): string[] {
+  return calls.flatMap((call) =>
+    call.kind === 'search' ? hitsFor(scenario, call.query, call.numResults).map((result) => result.text) : [],
+  );
+}
+
 export class FixtureSearch implements SearchProvider {
   readonly log: FixtureCall[] = [];
 
@@ -49,10 +66,7 @@ export class FixtureSearch implements SearchProvider {
       publishedOnOrAfter: query.publishedOnOrAfter ?? null,
     });
     if (query.signal?.aborted) return [];
-    const wanted = query.query.toLowerCase();
-    const hit = this.scenario.searches.find((entry) => wanted.includes(entry.match.toLowerCase()));
-    const results = hit?.results ?? [];
-    return structuredClone(results.slice(0, query.numResults));
+    return structuredClone(hitsFor(this.scenario, query.query, query.numResults));
   }
 
   async fetchPage(request: { url: string; deadlineMs: number; signal?: AbortSignal }): Promise<FetchedPage> {

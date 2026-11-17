@@ -16,7 +16,8 @@ function checkedLabel(ref: Citation): string {
 
 // Same sentence rule as validateAnswer: a citation covers a number when it
 // sits between the number and the end of its sentence, or right after the
-// sentence's terminator.
+// sentence's terminator. SENTENCE_END and TRAILING_CITATIONS are copied from
+// src/core/search/validate.ts; keep them in step.
 const SENTENCE_END = /[.!?](?=\s|$)|\n/;
 const TRAILING_CITATIONS = /^(?:[ \t]*\[\d+\])+/;
 

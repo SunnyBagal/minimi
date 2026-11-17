@@ -346,6 +346,7 @@ describe('createAiSdkLlm', () => {
     expect(instructions).toContain('no totals, no per-team, per-month or per-year costs, no differences');
     expect(instructions).toContain('say in words how to work it out');
     expect(instructions).toContain('without writing the resulting number');
+    expect(instructions).toContain("That explanation may use only numbers that appear in the evidence or in the user's messages");
   });
 
   it('the recheck summary prompt reports news with dates and never prints status words', async () => {

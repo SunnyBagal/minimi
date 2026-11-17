@@ -20,6 +20,7 @@ import {
   tool,
   type ModelMessage,
 } from 'ai';
+import { DateTime } from 'luxon';
 import { z } from 'zod';
 import type {
   AgentConfig,
@@ -156,15 +157,24 @@ function rowsText(rows: readonly VerdictRow[]): string {
     .join('\n');
 }
 
+/** A calendar date as words, for example "Tue 10 Nov 2026". No ISO form. */
+function formatWriterDate(iso: string): string {
+  return DateTime.fromISO(iso, { zone: 'utc' }).setLocale('en-GB').toFormat('ccc d LLL yyyy');
+}
+
 function triedText(tried: DateCandidates): string {
-  const range = tried.range === null ? '(none)' : `${tried.range.from} to ${tried.range.to}`;
-  return `dates: ${tried.dates.join(', ') || '(none)'}\nrange: ${range}\nambiguous: ${tried.ambiguous}\nrule: ${tried.rule}`;
+  const range =
+    tried.range === null
+      ? '(none)'
+      : `${formatWriterDate(tried.range.from)} to ${formatWriterDate(tried.range.to)}`;
+  const dates = tried.dates.map((date) => formatWriterDate(date)).join(', ') || '(none)';
+  return `dates: ${dates}\nrange: ${range}\nambiguous: ${tried.ambiguous}\nrule: ${tried.rule}`;
 }
 
 function nearestText(nearest: readonly MemoryHit[]): string {
   if (nearest.length === 0) return '(none)';
   return nearest
-    .map((hit) => `${hit.userTurn.localDate} (${hit.matched}): ${hit.userTurn.content}`)
+    .map((hit) => `${formatWriterDate(hit.userTurn.localDate)} (${hit.matched}): ${hit.userTurn.content}`)
     .join('\n');
 }
 
@@ -218,7 +228,7 @@ function writerBody(input: WriteInput): string {
     case 'fresh':
       return `${input.message}\n\n${evidenceText(input.evidence)}`;
     case 'recheck_summary':
-      return `${input.message}\n\nAsked on: ${input.askedOn}\n\n${labeledBlock('Verdict rows', rowsText(input.rows))}\n${evidenceText(input.news)}`;
+      return `${input.message}\n\nAsked on: ${formatWriterDate(input.askedOn)}\n\n${labeledBlock('Verdict rows', rowsText(input.rows))}\n${evidenceText(input.news)}`;
     case 'no_record':
       return `${input.message}\n\n${labeledBlock('Dates tried', triedText(input.tried))}\n${labeledBlock('Nearest matches', nearestText(input.nearest))}`;
     default: {
@@ -241,6 +251,23 @@ function writerInstructions(mode: WriteInput['mode']): string {
     default: {
       const unreachable: never = mode;
       return unreachable;
+    }
+  }
+}
+
+async function* readWriterText(
+  stream: AsyncIterable<{ type: string; text?: string; error?: unknown }>,
+  bucket: { textChars: number; aborted: boolean },
+): AsyncIterable<string> {
+  for await (const part of stream) {
+    if (part.type === 'text-delta' && typeof part.text === 'string') {
+      bucket.textChars += part.text.length;
+      yield part.text;
+    } else if (part.type === 'abort') {
+      bucket.aborted = true;
+      return;
+    } else if (part.type === 'error') {
+      throw part.error instanceof Error ? part.error : new Error(String(part.error));
     }
   }
 }
@@ -296,13 +323,16 @@ export function createAiSdkLlm(apiKey: string, config: AgentConfig, deps?: LlmDe
             }),
           };
 
-    const result = streamText({
+    const shared = {
       model: anthropic(call.modelId),
       instructions: call.instructions,
-      messages: call.messages,
       abortSignal: call.signal,
       timeout: { totalMs: call.timeoutMs },
       onError: () => {},
+    };
+    const result = streamText({
+      ...shared,
+      messages: call.messages,
       ...(webSearch
         ? {
             tools: webSearch,
@@ -316,15 +346,26 @@ export function createAiSdkLlm(apiKey: string, config: AgentConfig, deps?: LlmDe
         : {}),
     });
 
-    for await (const part of result.stream) {
-      if (part.type === 'text-delta') {
-        yield part.text;
-      } else if (part.type === 'abort') {
-        return;
-      } else if (part.type === 'error') {
-        throw part.error instanceof Error ? part.error : new Error(String(part.error));
-      }
-    }
+    // claude-sonnet-5-5 sometimes ends the step after web_search with stop and
+    // an empty text part. One continuation, with the tool turn replayed and
+    // tools off, asks for the answer that step did not write.
+    const bucket = { textChars: 0, aborted: false };
+    yield* readWriterText(result.stream, bucket);
+    if (bucket.aborted || bucket.textChars > 0 || call.signal?.aborted === true) return;
+
+    const steps = await result.steps;
+    const follow = streamText({
+      ...shared,
+      messages: [
+        ...call.messages,
+        ...steps.flatMap((step) => step.response.messages),
+        {
+          role: 'user',
+          content: 'Write the answer now as text. Do not call a tool. Use only the evidence above.',
+        },
+      ],
+    });
+    yield* readWriterText(follow.stream, bucket);
   }
 
   return {

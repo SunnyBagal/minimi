@@ -1,12 +1,15 @@
 import { numbersAllowed, ok } from '../assert';
+import { servedPageTexts } from '../fixtureSearch';
 import { CRM_NAMES, MSG_CASE_1, MSG_NAMES } from '../messages';
 import { scenarioCrmFresh } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
 
+const scenario = scenarioCrmFresh();
+
 export const evalCase: EvalCase = {
   id: 12,
   parts: [
-    { seeds: [], clock: CLOCK, tz: TZ, scenario: scenarioCrmFresh(), messages: [MSG_CASE_1, MSG_NAMES] },
+    { seeds: [], clock: CLOCK, tz: TZ, scenario, messages: [MSG_CASE_1, MSG_NAMES] },
   ],
   check(run) {
     const trace = run.parts[0]?.traces[1];
@@ -31,7 +34,7 @@ export const evalCase: EvalCase = {
         claims.every(() => assistant?.origin === 'live'),
         assistant?.origin ?? null,
       ),
-      numbersAllowed(run, events, []),
+      numbersAllowed(run, events, servedPageTexts(scenario, trace?.log ?? [])),
     ];
   },
 };

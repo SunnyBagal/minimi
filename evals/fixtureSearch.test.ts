@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FakeClock } from '../src/core/testing/fakes';
-import { FixtureSearch } from './fixtureSearch';
-import { URLS } from './pages';
+import { FixtureSearch, servedPageTexts } from './fixtureSearch';
+import { readFixture, URLS } from './pages';
+import { scenarioCrmFresh } from './scenarios';
 
 const clock = new FakeClock('2026-11-13T13:00:00.000Z');
 
@@ -67,5 +68,28 @@ describe('fixtureSearch', () => {
       { kind: 'search', query: 'Closewise news', numResults: 5, publishedOnOrAfter: null },
       { kind: 'search', query: 'Salesyard price', numResults: 5, publishedOnOrAfter: null },
     ]);
+  });
+
+  it('servedPageTexts is the page text search returned for this turn and nothing else', async () => {
+    const scenario = scenarioCrmFresh();
+    const search = new FixtureSearch(clock, scenario);
+    const hits = await search.search({ query: 'Pipeloom pricing per seat', numResults: 5 });
+    await search.fetchPage({ url: URLS.salesyardPricing, deadlineMs: 8000 });
+    await search.search({ query: 'postgres hosting', numResults: 5 });
+    const texts = servedPageTexts(scenario, search.log);
+    expect(texts).toEqual(hits.map((hit) => hit.text));
+    expect(texts).toEqual([readFixture('pipeloom-pricing-v1.txt')]);
+    expect(texts.join('\n')).toContain('18 USD');
+    expect(texts.join('\n')).not.toContain('21 USD');
+    expect(texts.join('\n')).not.toContain('22 USD');
+  });
+
+  it('servedPageTexts keeps the first matching hit and respects numResults', () => {
+    const scenario = scenarioCrmFresh();
+    const texts = servedPageTexts(scenario, [
+      { kind: 'search', query: 'pipeloom and dealbase', numResults: 5, publishedOnOrAfter: null },
+      { kind: 'search', query: 'Salesyard price', numResults: 0, publishedOnOrAfter: null },
+    ]);
+    expect(texts).toEqual([readFixture('pipeloom-pricing-v1.txt')]);
   });
 });

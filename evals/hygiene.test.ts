@@ -8,7 +8,8 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 function filesIn(dir: string): string[] {
   const out: string[] = [];
   for (const name of readdirSync(dir)) {
-    if (name === 'results' || name.endsWith('.test.ts')) continue;
+    // results/ and TRIAGE.md quote model answers. The scan covers fixtures and harness code.
+    if (name === 'results' || name === 'TRIAGE.md' || name.endsWith('.test.ts')) continue;
     const path = join(dir, name);
     if (statSync(path).isDirectory()) out.push(...filesIn(path));
     else out.push(path);

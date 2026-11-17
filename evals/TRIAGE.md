@@ -5,13 +5,16 @@ Source: `evals/results/2026-11-17T21-33-17.517Z.json`, copied to `evals/results/
 Totals: `passAtAll` [], `flaky` [17], `failing` [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19].
 No case is 3 of 3. Every case is below.
 
-`docs/02-evals.md` says the number-subset check has false positives on dates, and that a failure is a prompt to read the answer. The check was not changed.
+`docs/02-evals.md` says the number-subset check has false positives on dates, and that a failure is a prompt to read the answer. The sections below are that first run, under the literal check. The scored check now uses the harness fixes. `strict` totals are the spec's literal check.
 
-The recall line is built in `src/core/pipeline/recall.ts` as `On ${formatLocal(...)}`. `formatLocal` looks like `Tue 10 Nov 2026, 14:05 GMT+5:30`. The number check strips a leading `Checked …` line and then keeps every other digit token. Clock digits in that recall line (`10`, `14`, `05`, `5`, `30`, and the same kind of token on the other seeds) fail the subset check whenever they are not also in the user message. Owner for that text: Bunny (Lane 5).
+The recall line is built in `src/core/pipeline/recall.ts` as `On ${formatLocal(...)}`. `formatLocal` looks like `Tue 10 Nov 2026, 14:05 GMT+5:30`. Before the harness fixes, the number check stripped a leading `Checked …` line and then kept every other digit token. Clock digits in that recall line (`10`, `14`, `05`, `5`, `30`, and the same kind of token on the other seeds) failed the subset check whenever they were not also in the user message. Owner for that text: Bunny (Lane 5).
 
 ## Harness fixes
 
-None. No assertion and no fixture was edited. Nothing below was made to pass by weakening a criterion.
+1. Lines built by code are not the model's numbers. Before: the scored check stripped only a `Checked <time>` line. After: it also drops, whole line by whole line, the recall line (`On <time> you asked: "<question>".` with the optional zone and ` (seeded demo history)`), the ambiguity question block, the from-memory claim lines (`- <entity> <attribute>: <value> (as of <time>; from memory, not re-checked)`), the skipped-claims line, the undated-results line, and the search-failed message. Each pattern is the fixed wording in `src/core/pipeline/*.ts`.
+2. Dates the system emitted are evidence for a date it names. Before: allowed digits came from the user message, stored claims, verdict row text, source text, and the Checked line. After: the scored check also allows the digits of the recall event's candidate dates and range, each hit's `localDate`, `formatLocal` of each hit's `createdAtUtc` in that turn's zone, and `formatLocal` of each verdict row's `claim.asOfUtc` and `check.checkedAtUtc` in the case zone. Nothing else was added.
+
+`strict` totals in the results file are the spec's literal check, with none of those two widenings. No other assertion and no fixture was edited.
 
 ## Case 1 — 0/3 — Bunny (Lane 5)
 

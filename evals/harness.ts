@@ -14,7 +14,8 @@ import { guardVerdict } from '../src/core/pipeline/guards';
 import { createStore } from '../src/core/store/index';
 import { FakeClock, FakeLlm, fakeTime, passThroughGuard } from '../src/core/testing/fakes';
 import { time } from '../src/core/time/index';
-import { answerOf } from './assert';
+import { answerOf, literalAssertions } from './assert';
+import { scoredPass } from './score';
 import { FixtureSearch } from './fixtureSearch';
 import { askJudge, type JudgeAnswer } from './judge';
 import { loadSeeds } from './seeds';
@@ -81,7 +82,7 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
         log: search.log.slice(mark),
       });
     }
-    parts.push({ traces, log: search.log });
+    parts.push({ traces, log: search.log, tz: part.tz });
   }
 
   let judge: JudgeAnswer[] | null = null;
@@ -94,6 +95,6 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
   }
 
   const run: CaseRun = { parts, store, judge };
-  const assertions = evalCase.check(run);
-  return { assertions, judge, passed: assertions.every((item) => item.pass) };
+  const assertions = [...evalCase.check(run), ...literalAssertions(run)];
+  return { assertions, judge, passed: scoredPass(assertions) };
 }

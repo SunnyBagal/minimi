@@ -124,7 +124,7 @@ describe('createAiSdkLlm', () => {
     const drafts = await llm.extractClaims({ answer: 'Nothing cited.', evidence: [] });
     expect(drafts).toEqual([]);
     expect(objectCalls[1]?.modelId).toBe(defaultConfig.models.extractor);
-    expect(objectCalls[1]?.timeoutMs).toBe(defaultConfig.deadlinesMs.judge);
+    expect(objectCalls[1]?.timeoutMs).toBe(defaultConfig.deadlinesMs.extract);
 
     const claim: Claim = claimFixture();
     const judged = await llm.judge({ claim, oldQuote: claim.quote, page: page(''), fresh: [] });
@@ -140,6 +140,33 @@ describe('createAiSdkLlm', () => {
     expect(streamCalls.map((call) => call.mode)).toEqual(['chat', 'fresh', 'recheck_summary', 'no_record']);
     expect(streamCalls.every((call) => call.timeoutMs === defaultConfig.deadlinesMs.turn)).toBe(true);
     expect(streamCalls.every((call) => call.modelId === defaultConfig.models.writer)).toBe(true);
+  });
+
+  it('extractClaims gets deadlinesMs.extract as its timeout', async () => {
+    const timeouts: number[] = [];
+    const config = { ...defaultConfig, deadlinesMs: { ...defaultConfig.deadlinesMs, judge: 1111, extract: 2222 } };
+    const llm = createAiSdkLlm('test-key', config, {
+      generateObject: async (call) => {
+        timeouts.push(call.timeoutMs);
+        return [];
+      },
+    });
+    await llm.extractClaims({ answer: 'Nothing cited.', evidence: [] });
+    expect(timeouts).toEqual([2222]);
+  });
+
+  it('extractClaims falls back to deadlinesMs.judge when extract is absent', async () => {
+    const timeouts: number[] = [];
+    const { extract: _extract, ...withoutExtract } = { ...defaultConfig.deadlinesMs, judge: 1111 };
+    const config = { ...defaultConfig, deadlinesMs: withoutExtract };
+    const llm = createAiSdkLlm('test-key', config, {
+      generateObject: async (call) => {
+        timeouts.push(call.timeoutMs);
+        return [];
+      },
+    });
+    await llm.extractClaims({ answer: 'Nothing cited.', evidence: [] });
+    expect(timeouts).toEqual([1111]);
   });
 
   it('clears queries for chat and recall, caps the rest, and nulls timeText when there is no time', async () => {

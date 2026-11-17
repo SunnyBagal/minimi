@@ -43,6 +43,10 @@ export const defaultConfig: AgentConfig = {
     judge: 10000,
     // Default to tune: the whole turn.
     turn: 45000,
+    // Default to tune: the claim extractor. Two measured runs of claude-haiku-5-5
+    // on one real fresh turn (5 sources, 52520 characters) took 14244 ms and
+    // 15792 ms; the judge's 10000 ms cut both off. About twice the slower run.
+    extract: 30000,
   },
   shelfLifeDays: {
     // Default to tune: a product choice, not a fact about any source.

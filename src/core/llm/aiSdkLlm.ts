@@ -359,7 +359,7 @@ export function createAiSdkLlm(apiKey: string, config: AgentConfig, deps?: LlmDe
           {
             stage: 'extractClaims',
             modelId: config.models.extractor,
-            timeoutMs: config.deadlinesMs.judge,
+            timeoutMs: config.deadlinesMs.extract ?? config.deadlinesMs.judge,
             instructions: prompts.extractor,
             prompt,
             shape: 'array',

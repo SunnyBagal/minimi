@@ -1,16 +1,16 @@
 {
   "mode": "live",
-  "sha": "06e0a656861dbccfcf3607ef3605cabed030340f",
+  "sha": "dcfd6d1bf722cb405e565c75f1385d40d26d2d0d",
   "runs": 3,
   "cases": [
     {
       "id": 1,
       "runs": 3,
-      "passedRuns": 1,
+      "passedRuns": 3,
       "results": [
         {
           "run": 1,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "chosen is 2026-11-09",
@@ -31,8 +31,8 @@
                 "Pipeloom",
                 "Closewise",
                 "Leadharbor",
-                "Salesyard",
-                "Dealbase"
+                "Dealbase",
+                "Salesyard"
               ]
             },
             {
@@ -52,13 +52,13 @@
             },
             {
               "name": "answer says what was tried for Salesyard",
-              "pass": false,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOf the 5 shortlisted tools, only Dealbase has changed pricing: it's now 28 USD/seat/month, up from 22 USD. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, and each quote is still on the live first-party page. Salesyard's pricing page returned not_found, so its 21 USD price can't be verified right now. The rows only cover pricing, so they don't show whether any tool has shipped something big.\n(2 undated search result(s) were set aside.)"
+              "pass": true,
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the only tool with a confirmed price change: its page now states 28 USD per seat per month, up from the 22 USD you had for the same plan. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) still show the same prices on their live first-party pages. For Salesyard, which was 21 USD per seat per month, I tried its pricing page but the page could not be found, so I can't say whether the price has changed.\n\nAs news since your earlier question, Closewise's changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "11 Nov Closewise post is reported with its date",
-              "pass": false,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOf the 5 shortlisted tools, only Dealbase has changed pricing: it's now 28 USD/seat/month, up from 22 USD. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, and each quote is still on the live first-party page. Salesyard's pricing page returned not_found, so its 21 USD price can't be verified right now. The rows only cover pricing, so they don't show whether any tool has shipped something big.\n(2 undated search result(s) were set aside.)"
+              "pass": true,
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the only tool with a confirmed price change: its page now states 28 USD per seat per month, up from the 22 USD you had for the same plan. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) still show the same prices on their live first-party pages. For Salesyard, which was 21 USD per seat per month, I tried its pricing page but the page could not be found, so I can't say whether the price has changed.\n\nAs news since your earlier question, Closewise's changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "2 Nov Leadharbor post is not reported as since Monday",
@@ -108,6 +108,7 @@
                 "9",
                 "16",
                 "40",
+                "11",
                 "2"
               ]
             }
@@ -116,7 +117,7 @@
         },
         {
           "run": 2,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "chosen is 2026-11-09",
@@ -158,13 +159,13 @@
             },
             {
               "name": "answer says what was tried for Salesyard",
-              "pass": false,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOf the 5 shortlisted tools, Dealbase is the one that changed: its pricing page now shows 28 USD/seat/month, up from the 22 USD/seat/month we had stored. Pipeloom, Closewise and Leadharbor are unchanged, but Salesyard's pricing page returned not_found, so its 21 USD/seat/month can't be verified right now. On the product side, Closewise's changelog lists shared inboxes for sales teams under 11 Nov 2026, a date later than your 9 Nov 2026 question, so that entry is worth double-checking.\n(2 undated search result(s) were set aside.)"
+              "pass": true,
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the one that changed: its pricing page now states 28 USD per seat per month, up from the 22 USD you had on Monday. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) still show the same per-seat monthly prices on their live pricing pages. Salesyard (was 21 USD) could not be checked, because its pricing page could not be found when we looked, so its current price is unknown.\n\nClosewise's changelog dated 11 Nov 2026 says it shipped shared inboxes for the sales team, which is news since your earlier question [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "11 Nov Closewise post is reported with its date",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOf the 5 shortlisted tools, Dealbase is the one that changed: its pricing page now shows 28 USD/seat/month, up from the 22 USD/seat/month we had stored. Pipeloom, Closewise and Leadharbor are unchanged, but Salesyard's pricing page returned not_found, so its 21 USD/seat/month can't be verified right now. On the product side, Closewise's changelog lists shared inboxes for sales teams under 11 Nov 2026, a date later than your 9 Nov 2026 question, so that entry is worth double-checking.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the one that changed: its pricing page now states 28 USD per seat per month, up from the 22 USD you had on Monday. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) still show the same per-seat monthly prices on their live pricing pages. Salesyard (was 21 USD) could not be checked, because its pricing page could not be found when we looked, so its current price is unknown.\n\nClosewise's changelog dated 11 Nov 2026 says it shipped shared inboxes for the sales team, which is news since your earlier question [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "2 Nov Leadharbor post is not reported as since Monday",
@@ -266,12 +267,12 @@
             {
               "name": "answer says what was tried for Salesyard",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the only confirmed pricing change. Its Seat price rose from 22 USD to 28 USD per seat per month, while Pipeloom, Closewise and Leadharbor are unchanged. Salesyard's price couldn't be verified because its pricing page returned not_found. Closewise's changelog lists shared inboxes for sales teams, but the entry is dated 11 Nov 2026, later than your 9 Nov 2026 question date, so I'd double-check that date before relying on it.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the one that changed: its pricing page now states 28 USD per seat per month, up from the 22 USD we had stored. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, since each quote is still on the live first-party page. For Salesyard, I tried the pricing page but it could not be found, so I can't confirm whether the earlier 21 USD per seat per month still holds.\n\nThis is news since your earlier question: the Closewise changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "11 Nov Closewise post is reported with its date",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the only confirmed pricing change. Its Seat price rose from 22 USD to 28 USD per seat per month, while Pipeloom, Closewise and Leadharbor are unchanged. Salesyard's price couldn't be verified because its pricing page returned not_found. Closewise's changelog lists shared inboxes for sales teams, but the entry is dated 11 Nov 2026, later than your 9 Nov 2026 question date, so I'd double-check that date before relying on it.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nDealbase is the one that changed: its pricing page now states 28 USD per seat per month, up from the 22 USD we had stored. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, since each quote is still on the live first-party page. For Salesyard, I tried the pricing page but it could not be found, so I can't confirm whether the earlier 21 USD per seat per month still holds.\n\nThis is news since your earlier question: the Closewise changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "2 Nov Leadharbor post is not reported as since Monday",
@@ -347,7 +348,7 @@
             {
               "name": "answer contains Pipeloom and Team",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nThe record from Tue 3 Nov 2026 covers the Pipeloom price, where the answer was 30 USD/seat/month, though I can't see the exact wording of your question. Yes, that answer still holds today: the verdict is unchanged. The quote is still on the live first-party page."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026 the record shows you asked about the Pipeloom price, and the answer then was 30 USD/seat/month. That answer is still correct today, because the quote is still on the live first-party page. Nothing has changed since then."
             },
             {
               "name": "one verdict",
@@ -372,7 +373,7 @@
             {
               "name": "answer shows a check time",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nThe record from Tue 3 Nov 2026 covers the Pipeloom price, where the answer was 30 USD/seat/month, though I can't see the exact wording of your question. Yes, that answer still holds today: the verdict is unchanged. The quote is still on the live first-party page."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026 the record shows you asked about the Pipeloom price, and the answer then was 30 USD/seat/month. That answer is still correct today, because the quote is still on the live first-party page. Nothing has changed since then."
             },
             {
               "name": "flags.uncitedNumbers is empty",
@@ -409,7 +410,7 @@
             {
               "name": "answer contains Pipeloom and Team",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nGoing by the verdict row, your question on Tue 3 Nov 2026 was about Pipeloom's price, and the answer was 30 USD/seat/month. That answer is unchanged today, since the quote is still on the live first-party page. No separate evidence was listed beyond that note."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, the record shows you asked about the Pipeloom price, and the answer was 30 USD/seat/month. That answer is still correct today. The quote is still on the live first-party page, so the verdict is unchanged."
             },
             {
               "name": "one verdict",
@@ -434,7 +435,7 @@
             {
               "name": "answer shows a check time",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nGoing by the verdict row, your question on Tue 3 Nov 2026 was about Pipeloom's price, and the answer was 30 USD/seat/month. That answer is unchanged today, since the quote is still on the live first-party page. No separate evidence was listed beyond that note."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, the record shows you asked about the Pipeloom price, and the answer was 30 USD/seat/month. That answer is still correct today. The quote is still on the live first-party page, so the verdict is unchanged."
             },
             {
               "name": "flags.uncitedNumbers is empty",
@@ -471,7 +472,7 @@
             {
               "name": "answer contains Pipeloom and Team",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, you asked about Pipeloom's price, and the answer was 30 USD/seat/month. That answer is still correct. The verdict is unchanged because the quote is still on the live first-party page. I only have the topic of your question, not its exact wording."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, the record shows you asked about the Pipeloom price, and the answer then was 30 USD/seat/month. That answer is still correct today. The quote is still on the live first-party page, so the verdict is unchanged."
             },
             {
               "name": "one verdict",
@@ -496,7 +497,7 @@
             {
               "name": "answer shows a check time",
               "pass": true,
-              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, you asked about Pipeloom's price, and the answer was 30 USD/seat/month. That answer is still correct. The verdict is unchanged because the quote is still on the live first-party page. I only have the topic of your question, not its exact wording."
+              "observed": "On Tue 3 Nov 2026, 11:20 GMT+5:30 you asked: \"What does Pipeloom's Team plan cost per seat?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nOn Tue 3 Nov 2026, the record shows you asked about the Pipeloom price, and the answer then was 30 USD/seat/month. That answer is still correct today. The quote is still on the live first-party page, so the verdict is unchanged."
             },
             {
               "name": "flags.uncitedNumbers is empty",
@@ -548,7 +549,7 @@
             {
               "name": "answer contains 10 Nov",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed since you asked on Tue 10 Nov 2026. Northwind PG's Starter plan is now 24 USD/month, up from the 19 USD/month I had stored. Basalt DB is unchanged, with its price still at 25 USD/month and its free tier still at 1 project, and both quotes are still on the live first-party page."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed. Northwind PG's Starter plan now costs 24 USD per month, up from the 19 USD/month stored earlier. Basalt DB's price of 25 USD/month and its free tier of 1 project are both unchanged, and the quotes are still on the live first-party page."
             },
             {
               "name": "Northwind Starter is changed",
@@ -609,8 +610,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -636,7 +636,7 @@
             {
               "name": "answer contains 10 Nov",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed. Northwind PG's Starter plan now costs 24 USD per month, up from the 19 USD/month I had stored, according to the page. Basalt DB is unchanged at 25 USD/month, and its free tier is still 1 project, with both quotes still on the live first-party page."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed since your question on Tue 10 Nov 2026. Northwind PG's Starter plan is now 24 USD per month, up from the 19 USD/month we had stored for the same plan and billing period.\n\nBasalt DB is unchanged: the price is still 25 USD/month and the free tier is still 1 project, with both confirmed on the live first-party page."
             },
             {
               "name": "Northwind Starter is changed",
@@ -697,8 +697,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -724,7 +723,7 @@
             {
               "name": "answer contains 10 Nov",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed since you asked on Tue 10 Nov 2026. Northwind PG's Starter plan now costs 24 USD/month, up from the 19 USD/month I had stored. Basalt DB is unchanged, still at 25 USD/month with a free tier of 1 project, and the quotes are still on the live first-party page."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, one price has changed since your earlier question. Northwind PG's Starter plan now costs 24 USD per month on its page, up from the 19 USD/month I had stored. Basalt DB's price of 25 USD/month and its free tier of 1 project are both unchanged, and the quotes are still on the live first-party page."
             },
             {
               "name": "Northwind Starter is changed",
@@ -785,8 +784,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -797,11 +795,11 @@
     {
       "id": 4,
       "runs": 3,
-      "passedRuns": 0,
+      "passedRuns": 3,
       "results": [
         {
           "run": 1,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "recall.hits is empty",
@@ -811,12 +809,12 @@
             {
               "name": "answer names 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked for \"last Tuesday\": Tue 10 Nov 2026 and Tue 3 Nov 2026. No nearby dates turned up either. I also can't see what was discussed then, so I can't compare against earlier pricing from here.\n\nI can look up current Postgres hosting pricing fresh. To make it useful, it would help to know:\n\n- Which providers or plans you were considering (e.g., managed services like AWS RDS, Supabase, Neon, or others)\n- Roughly what the pricing looked like when you last checked, if you have notes or figures\n- Your workload size (storage, connections, region), if relevant\n\nWith that, I can put together a current pricing picture and highlight anything that looks different from what you remember."
+              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. No nearby matches turned up either, and I can't recall the earlier conversation, so I can't say what pricing was mentioned then or compare it to now.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example managed offerings from the major clouds or smaller Postgres specialists), I'll focus on those. If you have notes or figures from your earlier question, share them and I'll check them against current pricing to see what differs."
             },
             {
               "name": "answer names 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked for \"last Tuesday\": Tue 10 Nov 2026 and Tue 3 Nov 2026. No nearby dates turned up either. I also can't see what was discussed then, so I can't compare against earlier pricing from here.\n\nI can look up current Postgres hosting pricing fresh. To make it useful, it would help to know:\n\n- Which providers or plans you were considering (e.g., managed services like AWS RDS, Supabase, Neon, or others)\n- Roughly what the pricing looked like when you last checked, if you have notes or figures\n- Your workload size (storage, connections, region), if relevant\n\nWith that, I can put together a current pricing picture and highlight anything that looks different from what you remember."
+              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. No nearby matches turned up either, and I can't recall the earlier conversation, so I can't say what pricing was mentioned then or compare it to now.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example managed offerings from the major clouds or smaller Postgres specialists), I'll focus on those. If you have notes or figures from your earlier question, share them and I'll check them against current pricing to see what differs."
             },
             {
               "name": "zero verdict events",
@@ -826,12 +824,12 @@
             {
               "name": "no then-price is stated",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked for \"last Tuesday\": Tue 10 Nov 2026 and Tue 3 Nov 2026. No nearby dates turned up either. I also can't see what was discussed then, so I can't compare against earlier pricing from here.\n\nI can look up current Postgres hosting pricing fresh. To make it useful, it would help to know:\n\n- Which providers or plans you were considering (e.g., managed services like AWS RDS, Supabase, Neon, or others)\n- Roughly what the pricing looked like when you last checked, if you have notes or figures\n- Your workload size (storage, connections, region), if relevant\n\nWith that, I can put together a current pricing picture and highlight anything that looks different from what you remember."
+              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. No nearby matches turned up either, and I can't recall the earlier conversation, so I can't say what pricing was mentioned then or compare it to now.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example managed offerings from the major clouds or smaller Postgres specialists), I'll focus on those. If you have notes or figures from your earlier question, share them and I'll check them against current pricing to see what differs."
             },
             {
               "name": "answer offers to look up Postgres hosting pricing",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked for \"last Tuesday\": Tue 10 Nov 2026 and Tue 3 Nov 2026. No nearby dates turned up either. I also can't see what was discussed then, so I can't compare against earlier pricing from here.\n\nI can look up current Postgres hosting pricing fresh. To make it useful, it would help to know:\n\n- Which providers or plans you were considering (e.g., managed services like AWS RDS, Supabase, Neon, or others)\n- Roughly what the pricing looked like when you last checked, if you have notes or figures\n- Your workload size (storage, connections, region), if relevant\n\nWith that, I can put together a current pricing picture and highlight anything that looks different from what you remember."
+              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. No nearby matches turned up either, and I can't recall the earlier conversation, so I can't say what pricing was mentioned then or compare it to now.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example managed offerings from the major clouds or smaller Postgres specialists), I'll focus on those. If you have notes or figures from your earlier question, share them and I'll check them against current pricing to see what differs."
             },
             {
               "name": "J1 answers no",
@@ -845,10 +843,8 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "3"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
@@ -866,13 +862,13 @@
               "question": "Does the answer state or imply that it remembers the earlier conversation?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The answer says it can't see what was discussed earlier (\"I also can't see what was discussed then\"), so it does not claim or imply that it remembers the earlier conversation."
+              "raw": "No. The answer says the opposite: \"I can't recall the earlier conversation.\" It does not claim or imply any memory of it."
             }
           ]
         },
         {
           "run": 2,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "recall.hits is empty",
@@ -882,12 +878,12 @@
             {
               "name": "answer names 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried, Tue 10 Nov 2026 or Tue 3 Nov 2026, and there were no nearby matches. I also can't see what was discussed that day, so I can't compare today's prices against it.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example AWS RDS, Supabase, Neon, or Heroku) and any figures you noted before, I can check current pricing and point out what differs from your notes. Would you like me to do that?"
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and I found nothing saved for both. I also have no nearby dates to offer instead.\n\nWithout a record of that earlier discussion, I can't compare old and new pricing. I can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were looking at, and any figures you remember, I can focus on those and flag anything that looks different from what you recall. Would you like me to do that?"
             },
             {
               "name": "answer names 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried, Tue 10 Nov 2026 or Tue 3 Nov 2026, and there were no nearby matches. I also can't see what was discussed that day, so I can't compare today's prices against it.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example AWS RDS, Supabase, Neon, or Heroku) and any figures you noted before, I can check current pricing and point out what differs from your notes. Would you like me to do that?"
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and I found nothing saved for both. I also have no nearby dates to offer instead.\n\nWithout a record of that earlier discussion, I can't compare old and new pricing. I can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were looking at, and any figures you remember, I can focus on those and flag anything that looks different from what you recall. Would you like me to do that?"
             },
             {
               "name": "zero verdict events",
@@ -897,12 +893,12 @@
             {
               "name": "no then-price is stated",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried, Tue 10 Nov 2026 or Tue 3 Nov 2026, and there were no nearby matches. I also can't see what was discussed that day, so I can't compare today's prices against it.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example AWS RDS, Supabase, Neon, or Heroku) and any figures you noted before, I can check current pricing and point out what differs from your notes. Would you like me to do that?"
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and I found nothing saved for both. I also have no nearby dates to offer instead.\n\nWithout a record of that earlier discussion, I can't compare old and new pricing. I can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were looking at, and any figures you remember, I can focus on those and flag anything that looks different from what you recall. Would you like me to do that?"
             },
             {
               "name": "answer offers to look up Postgres hosting pricing",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried, Tue 10 Nov 2026 or Tue 3 Nov 2026, and there were no nearby matches. I also can't see what was discussed that day, so I can't compare today's prices against it.\n\nI can look up Postgres hosting pricing fresh. If you tell me which providers you were considering (for example AWS RDS, Supabase, Neon, or Heroku) and any figures you noted before, I can check current pricing and point out what differs from your notes. Would you like me to do that?"
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and I found nothing saved for both. I also have no nearby dates to offer instead.\n\nWithout a record of that earlier discussion, I can't compare old and new pricing. I can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were looking at, and any figures you remember, I can focus on those and flag anything that looks different from what you recall. Would you like me to do that?"
             },
             {
               "name": "J1 answers no",
@@ -916,10 +912,8 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "3"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
@@ -937,13 +931,13 @@
               "question": "Does the answer state or imply that it remembers the earlier conversation?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The answer says it can't see what was discussed that day and has no saved answer for either date, so it denies having any memory of the earlier conversation. It also asks the user to supply their earlier figures rather than implying it recalls them."
+              "raw": "No. The answer says it has no record of the earlier discussion (\"Without a record of that earlier discussion, I can't compare old and new pricing.\"), and it offers to look up current pricing fresh instead of claiming to remember anything."
             }
           ]
         },
         {
           "run": 3,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "recall.hits is empty",
@@ -953,12 +947,12 @@
             {
               "name": "answer names 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and nothing is saved for them, so I can't compare against an earlier answer. I also don't have any nearest matches to offer.\n\nI can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were considering, or share any prices you noted before, I can point out what looks different from those.\n\nWould you like me to do that?"
+              "observed": "I don't have a saved answer for either of the dates I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and there are no nearby dates on file either. I also can't recall the earlier conversation, so I don't have the pricing from back then to compare against.\n\nI can look up current Postgres hosting pricing fresh. If you tell me which providers or plans you were looking at (for example, managed services, instance sizes, or storage needs), I'll focus on those. If you have the figures from that earlier discussion, share them and I'll compare them with what's listed now."
             },
             {
               "name": "answer names 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and nothing is saved for them, so I can't compare against an earlier answer. I also don't have any nearest matches to offer.\n\nI can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were considering, or share any prices you noted before, I can point out what looks different from those.\n\nWould you like me to do that?"
+              "observed": "I don't have a saved answer for either of the dates I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and there are no nearby dates on file either. I also can't recall the earlier conversation, so I don't have the pricing from back then to compare against.\n\nI can look up current Postgres hosting pricing fresh. If you tell me which providers or plans you were looking at (for example, managed services, instance sizes, or storage needs), I'll focus on those. If you have the figures from that earlier discussion, share them and I'll compare them with what's listed now."
             },
             {
               "name": "zero verdict events",
@@ -968,12 +962,12 @@
             {
               "name": "no then-price is stated",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and nothing is saved for them, so I can't compare against an earlier answer. I also don't have any nearest matches to offer.\n\nI can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were considering, or share any prices you noted before, I can point out what looks different from those.\n\nWould you like me to do that?"
+              "observed": "I don't have a saved answer for either of the dates I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and there are no nearby dates on file either. I also can't recall the earlier conversation, so I don't have the pricing from back then to compare against.\n\nI can look up current Postgres hosting pricing fresh. If you tell me which providers or plans you were looking at (for example, managed services, instance sizes, or storage needs), I'll focus on those. If you have the figures from that earlier discussion, share them and I'll compare them with what's listed now."
             },
             {
               "name": "answer offers to look up Postgres hosting pricing",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and nothing is saved for them, so I can't compare against an earlier answer. I also don't have any nearest matches to offer.\n\nI can look up Postgres hosting pricing fresh and give you the current numbers. If you tell me which providers or plans you were considering, or share any prices you noted before, I can point out what looks different from those.\n\nWould you like me to do that?"
+              "observed": "I don't have a saved answer for either of the dates I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, and there are no nearby dates on file either. I also can't recall the earlier conversation, so I don't have the pricing from back then to compare against.\n\nI can look up current Postgres hosting pricing fresh. If you tell me which providers or plans you were looking at (for example, managed services, instance sizes, or storage needs), I'll focus on those. If you have the figures from that earlier discussion, share them and I'll compare them with what's listed now."
             },
             {
               "name": "J1 answers no",
@@ -987,10 +981,8 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "3"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
@@ -1008,7 +1000,7 @@
               "question": "Does the answer state or imply that it remembers the earlier conversation?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The block says it has nothing saved for either date and cannot compare against an earlier answer, so it does not claim to remember the earlier conversation. It also asks the user to share any prices they noted before."
+              "raw": "No. The answer explicitly says it cannot recall the earlier conversation (\"I also can't recall the earlier conversation, so I don't have the pricing from back then to compare against\"), so it neither states nor implies that it remembers it."
             }
           ]
         }
@@ -1017,11 +1009,11 @@
     {
       "id": 5,
       "runs": 3,
-      "passedRuns": 0,
+      "passedRuns": 3,
       "results": [
         {
           "run": 1,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "zero verdict events",
@@ -1036,7 +1028,7 @@
             {
               "name": "answer says the shortlist is not saved and asks or offers a fresh one",
               "pass": true,
-              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates on file either. So I can't say whether any of your five CRM tools changed pricing or shipped something big since then.\n\nI can look this up fresh. If you send me the names of the five tools, I'll check each one for pricing changes and major releases since Mon 9 Nov 2026. I'll keep the focus on what matters for a 20-person sales team, such as per-seat costs, plan tiers, and new features."
+              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates on file to offer instead. So I can't say whether any of your shortlisted tools has changed pricing or shipped something big since then.\n\nI can look this up fresh. To do that, I need:\n\n1. **The five CRM tools** on your shortlist, since I don't have them in front of me.\n2. **Anything specific to check**, such as per-seat pricing at 20 users, plan or tier changes, or major feature launches like AI features or integrations.\n\nOnce I have the names, I'll check each one for pricing changes and significant releases since Mon 9 Nov 2026."
             },
             {
               "name": "J3 answers no",
@@ -1050,17 +1042,17 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "9"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
                 "9",
-                "2026"
+                "2026",
+                "1",
+                "2"
               ]
             }
           ],
@@ -1070,13 +1062,13 @@
               "question": "Does the answer tell the user they are wrong, or that no such conversation happened?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The answer doesn't tell the user they are wrong, and it doesn't say that no such conversation happened. It only says there is no saved answer for that date and offers to look the information up fresh."
+              "raw": "No. The block doesn't tell the user they are wrong, and it doesn't say that no such conversation happened. It only says there is no saved answer for that date and asks for the tool names and specifics so it can look things up fresh."
             }
           ]
         },
         {
           "run": 2,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "zero verdict events",
@@ -1091,7 +1083,7 @@
             {
               "name": "answer says the shortlist is not saved and asks or offers a fresh one",
               "pass": true,
-              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates with saved answers either. I also don't have the list of five CRM tools from that shortlist.\n\nI can look this up fresh. If you send me the five tool names, I'll check each one for pricing changes and major releases since Mon 9 Nov 2026. I can focus on what matters for a 20-person sales team, such as per-seat pricing, tier changes, and new features."
+              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates on file either. I also don't have the names of the five CRM tools you shortlisted.\n\nI can look this up fresh if you send me the five tool names. For each one, I'd check for pricing or plan changes and any major feature releases since Mon 9 Nov 2026, with a focus on what matters for a 20-person sales team, such as per-seat costs, tier changes, and new automation or AI features.\n\nIf you meant a different Monday, tell me the date and I'll use that instead."
             },
             {
               "name": "J3 answers no",
@@ -1105,10 +1097,8 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "9"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
@@ -1125,13 +1115,13 @@
               "question": "Does the answer tell the user they are wrong, or that no such conversation happened?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The answer does not tell the user they are wrong or claim that no such conversation happened. It only says it has no saved answer for that date and doesn't have the list of five tools, then asks the user to send the names."
+              "raw": "No. The answer doesn't tell the user they are wrong, and it doesn't say that no such conversation happened. It says it has no saved answer for that date and doesn't have the tool names, then asks for the names or a different date."
             }
           ]
         },
         {
           "run": 3,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "zero verdict events",
@@ -1146,7 +1136,7 @@
             {
               "name": "answer says the shortlist is not saved and asks or offers a fresh one",
               "pass": true,
-              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates with saved answers either.\n\nI can look this up fresh. Which five CRM tools were on your shortlist? Once I have the names, I'll check each one for pricing changes and major releases since Mon 9 Nov 2026, with the 20-person sales team in mind, such as per-seat costs, plan tiers, and new features that affect that team size."
+              "observed": "I don't have a saved answer for the date I tried, Mon 9 Nov 2026, and there are no nearby dates on file either.\n\nI can look this up fresh. Send me the names of the five CRM tools on your shortlist, and I'll check each one for pricing changes and major releases since Mon 9 Nov 2026. I'll keep the focus on what matters for a 20-person sales team, such as per-seat pricing, plan tiers, and new features."
             },
             {
               "name": "J3 answers no",
@@ -1160,10 +1150,8 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "9"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
@@ -1180,7 +1168,7 @@
               "question": "Does the answer tell the user they are wrong, or that no such conversation happened?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The answer doesn't tell the user they are wrong, and it doesn't claim that no such conversation happened. It only says there is no saved answer for that date and asks for the names of the five CRM tools so it can look them up."
+              "raw": "No. The answer says it has no saved answer for that date and offers to look the information up fresh. It does not tell the user they are wrong, and it does not claim that no such conversation happened."
             }
           ]
         }
@@ -1213,17 +1201,17 @@
             {
               "name": "answer names Tue 10 Nov or 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either of the dates tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I checked both.\n\nThe nearest match is dated Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a record of the pricing from then, so I can't compare it against today's.\n\nI can look up current pricing for Northwind PG and Basalt DB fresh and give you a clear snapshot. If you have the earlier figures or know which plan tiers you were considering, send them and I'll check what's changed."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I couldn't pin it down. Without a saved answer, I have nothing to compare against, so I can't say what has changed.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I can work from it.\n\nI can look up current Postgres hosting pricing fresh. Should I start with Northwind PG and Basalt DB, or include other providers? If you remember which plans or tiers you were weighing, tell me and I'll focus on those."
             },
             {
               "name": "answer names Tue 3 Nov or 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either of the dates tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I checked both.\n\nThe nearest match is dated Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a record of the pricing from then, so I can't compare it against today's.\n\nI can look up current pricing for Northwind PG and Basalt DB fresh and give you a clear snapshot. If you have the earlier figures or know which plan tiers you were considering, send them and I'll check what's changed."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I couldn't pin it down. Without a saved answer, I have nothing to compare against, so I can't say what has changed.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I can work from it.\n\nI can look up current Postgres hosting pricing fresh. Should I start with Northwind PG and Basalt DB, or include other providers? If you remember which plans or tiers you were weighing, tell me and I'll focus on those."
             },
             {
               "name": "answer offers Thu 5 Nov by date",
               "pass": true,
-              "observed": "I don't have a saved answer for either of the dates tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I checked both.\n\nThe nearest match is dated Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a record of the pricing from then, so I can't compare it against today's.\n\nI can look up current pricing for Northwind PG and Basalt DB fresh and give you a clear snapshot. If you have the earlier figures or know which plan tiers you were considering, send them and I'll check what's changed."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I couldn't pin it down. Without a saved answer, I have nothing to compare against, so I can't say what has changed.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I can work from it.\n\nI can look up current Postgres hosting pricing fresh. Should I start with Northwind PG and Basalt DB, or include other providers? If you remember which plans or tiers you were weighing, tell me and I'll focus on those."
             },
             {
               "name": "zero verdict events",
@@ -1234,7 +1222,6 @@
               "name": "numbers are in the message, claims, rows or evidence",
               "pass": false,
               "observed": [
-                "3",
                 "5"
               ]
             },
@@ -1273,17 +1260,17 @@
             {
               "name": "answer names Tue 10 Nov or 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't tell which you mean.\n\nThe nearest match is Thu 5 Nov 2026, with the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you're thinking of, I can work from that topic.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. Shall I do that? If you tell me which plan or workload size you care about, I can focus on that."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either, so I checked both.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a saved answer with the earlier pricing to compare against.\n\nI can look up current pricing for Northwind PG and Basalt DB, or for other Postgres hosts you had in mind. Want me to do that? If you remember which plans or figures you saw, tell me and I'll check those first."
             },
             {
               "name": "answer names Tue 3 Nov or 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't tell which you mean.\n\nThe nearest match is Thu 5 Nov 2026, with the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you're thinking of, I can work from that topic.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. Shall I do that? If you tell me which plan or workload size you care about, I can focus on that."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either, so I checked both.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a saved answer with the earlier pricing to compare against.\n\nI can look up current pricing for Northwind PG and Basalt DB, or for other Postgres hosts you had in mind. Want me to do that? If you remember which plans or figures you saw, tell me and I'll check those first."
             },
             {
               "name": "answer offers Thu 5 Nov by date",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I checked: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't tell which you mean.\n\nThe nearest match is Thu 5 Nov 2026, with the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you're thinking of, I can work from that topic.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. Shall I do that? If you tell me which plan or workload size you care about, I can focus on that."
+              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 or Tue 3 Nov 2026. \"Last Tuesday\" could point to either, so I checked both.\n\nThe nearest match is Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I don't have a saved answer with the earlier pricing to compare against.\n\nI can look up current pricing for Northwind PG and Basalt DB, or for other Postgres hosts you had in mind. Want me to do that? If you remember which plans or figures you saw, tell me and I'll check those first."
             },
             {
               "name": "zero verdict events",
@@ -1294,7 +1281,6 @@
               "name": "numbers are in the message, claims, rows or evidence",
               "pass": false,
               "observed": [
-                "3",
                 "5"
               ]
             },
@@ -1333,17 +1319,17 @@
             {
               "name": "answer names Tue 10 Nov or 10 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't say which you meant.\n\nThe nearest match is from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you had in mind, I don't have a saved answer there either, so I can't compare against earlier pricing.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. If you have the earlier numbers or plan tiers, share them and I'll check what has changed."
+              "observed": "I don't have a saved answer for either date that \"last Tuesday\" could point to: Tue 10 Nov 2026 and Tue 3 Nov 2026. Without a record from either, I can't compare earlier pricing against today's to say what has changed.\n\nThere is a nearby entry from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I only have its topic, not the pricing details.\n\nI can look up current Postgres hosting pricing fresh, including Northwind PG and Basalt DB, and lay out the plans and costs as they stand now. If you have the figures you saw earlier, share them and I'll point out any differences. Would you like me to do that?"
             },
             {
               "name": "answer names Tue 3 Nov or 3 Nov",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't say which you meant.\n\nThe nearest match is from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you had in mind, I don't have a saved answer there either, so I can't compare against earlier pricing.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. If you have the earlier numbers or plan tiers, share them and I'll check what has changed."
+              "observed": "I don't have a saved answer for either date that \"last Tuesday\" could point to: Tue 10 Nov 2026 and Tue 3 Nov 2026. Without a record from either, I can't compare earlier pricing against today's to say what has changed.\n\nThere is a nearby entry from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I only have its topic, not the pricing details.\n\nI can look up current Postgres hosting pricing fresh, including Northwind PG and Basalt DB, and lay out the plans and costs as they stand now. If you have the figures you saw earlier, share them and I'll point out any differences. Would you like me to do that?"
             },
             {
               "name": "answer offers Thu 5 Nov by date",
               "pass": true,
-              "observed": "I don't have a saved answer for either date I tried: Tue 10 Nov 2026 and Tue 3 Nov 2026. \"Last Tuesday\" could point to either one, so I can't say which you meant.\n\nThe nearest match is from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you had in mind, I don't have a saved answer there either, so I can't compare against earlier pricing.\n\nI can look up current pricing fresh for Northwind PG and Basalt DB, or for other Postgres hosts you have in mind. If you have the earlier numbers or plan tiers, share them and I'll check what has changed."
+              "observed": "I don't have a saved answer for either date that \"last Tuesday\" could point to: Tue 10 Nov 2026 and Tue 3 Nov 2026. Without a record from either, I can't compare earlier pricing against today's to say what has changed.\n\nThere is a nearby entry from Thu 5 Nov 2026, on the topic \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\" If that's the one you mean, I only have its topic, not the pricing details.\n\nI can look up current Postgres hosting pricing fresh, including Northwind PG and Basalt DB, and lay out the plans and costs as they stand now. If you have the figures you saw earlier, share them and I'll point out any differences. Would you like me to do that?"
             },
             {
               "name": "zero verdict events",
@@ -1354,7 +1340,6 @@
               "name": "numbers are in the message, claims, rows or evidence",
               "pass": false,
               "observed": [
-                "3",
                 "5"
               ]
             },
@@ -1702,7 +1687,7 @@
             {
               "name": "answer states Mon 9 Nov",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nOnly Dealbase has changed pricing, moving from 22 USD/seat/month to 28 USD/seat/month. Pipeloom, Closewise and Leadharbor are unchanged at 18, 15 and 27 USD/seat/month respectively. Salesyard's pricing page returned not_found, so its earlier 21 USD/seat/month can't be checked. The Closewise changelog mentions shared inboxes for sales teams, but the entry is dated after Mon 9 Nov 2026, so I wouldn't treat it as a confirmed release yet.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nDealbase is the one that changed: its page now states 28 USD per seat per month for the same plan and period, up from the 22 USD you had on Monday. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, and each quote is still on the live first-party page. I couldn't check Salesyard, because its pricing page at salesyard.test/pricing could not be found, so the earlier 21 USD figure is unconfirmed.\n\nThis is news since your earlier question: Closewise's changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1715,6 +1700,7 @@
               "observed": [
                 "9",
                 "40",
+                "11",
                 "2"
               ]
             }
@@ -1746,7 +1732,7 @@
             {
               "name": "answer states Mon 9 Nov",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nDealbase is the one that changed: its pricing page now shows 28 USD/seat/month, up from 22 USD/seat/month. Pipeloom, Closewise and Leadharbor are unchanged at 18, 15 and 27 USD/seat/month, while Salesyard's pricing page returned not_found, so its 21 USD/seat/month can't be verified. On the shipping side, the Closewise changelog lists shared inboxes for the sales team under 11 Nov 2026, but that date is later than your 9 Nov 2026 question, so treat it with caution.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nDealbase is the one that changed: its page now states 28 USD/seat/month, up from the 22 USD/seat/month we had on file. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, since each quote is still on the live first-party page. I couldn't check Salesyard, because its pricing page could not be found, so its earlier 21 USD/seat/month price is unconfirmed.\n\nThis is news since your earlier question: Closewise's changelog states that on 11 Nov 2026 it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1791,7 +1777,7 @@
             {
               "name": "answer states Mon 9 Nov",
               "pass": true,
-              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nDealbase is the one that changed: its price went from 22 USD/seat/month to 28 USD/seat/month. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, and each quote is still on the live first-party page. Salesyard's pricing page returned not_found, so its earlier 21 USD/seat/month can't be verified right now. These checks only covered pricing, so I can't say whether any of the five shipped something big.\n(2 undated search result(s) were set aside.)"
+              "observed": "On Mon 9 Nov 2026, 16:40 GMT+5:30 you asked: \"Shortlist 5 CRM tools for a 20-person sales team.\". (seeded demo history)\nChecked Mon 16 Nov 2026, 10:00 GMT+5:30.\nDealbase is the one price change: it was 22 USD/seat/month and its pricing page now states 28 USD per seat per month. Pipeloom (18 USD), Closewise (15 USD) and Leadharbor (27 USD) are unchanged, with each quote still on the live first-party page. For Salesyard I tried its pricing page, but the page could not be found, so I can't confirm whether the 21 USD/seat/month price still holds.\n\nNews since your earlier question: Closewise's changelog states on 11 Nov 2026 that it shipped shared inboxes for the sales team [5].\n(2 undated search result(s) were set aside.)"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1804,6 +1790,7 @@
               "observed": [
                 "9",
                 "40",
+                "11",
                 "2"
               ]
             }
@@ -1815,11 +1802,11 @@
     {
       "id": 10,
       "runs": 3,
-      "passedRuns": 3,
+      "passedRuns": 0,
       "results": [
         {
           "run": 1,
-          "passed": true,
+          "passed": false,
           "assertions": [
             {
               "name": "done.intent is recheck",
@@ -1838,8 +1825,8 @@
             },
             {
               "name": "Basalt DB price is unchanged",
-              "pass": true,
-              "observed": "unchanged"
+              "pass": false,
+              "observed": null
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1856,7 +1843,7 @@
         },
         {
           "run": 2,
-          "passed": true,
+          "passed": false,
           "assertions": [
             {
               "name": "done.intent is recheck",
@@ -1875,8 +1862,8 @@
             },
             {
               "name": "Basalt DB price is unchanged",
-              "pass": true,
-              "observed": "unchanged"
+              "pass": false,
+              "observed": null
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1893,7 +1880,7 @@
         },
         {
           "run": 3,
-          "passed": true,
+          "passed": false,
           "assertions": [
             {
               "name": "done.intent is recheck",
@@ -1912,8 +1899,8 @@
             },
             {
               "name": "Basalt DB price is unchanged",
-              "pass": true,
-              "observed": "unchanged"
+              "pass": false,
+              "observed": null
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1956,7 +1943,7 @@
             {
               "name": "answer does not ask the date question again",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nAs of Tue 10 Nov 2026, both Basalt DB claims are unchanged: the price is still 25 USD/month and the free tier is still 1 project, and the quote is still on the live first-party page. The Northwind PG price has changed. The page states the Starter plan at 24 USD per month, not the stored 19 USD/month for the same plan and period."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nAs of Tue 10 Nov 2026, Basalt DB's price is unchanged at 25 USD/month and its free tier is unchanged at 1 project. Both quotes are still on the live first-party page. Northwind PG's price has changed: the page states the Starter plan now costs 24 USD per month, up from the stored 19 USD/month."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -1967,8 +1954,7 @@
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -1995,7 +1981,7 @@
             {
               "name": "answer does not ask the date question again",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nAs of Tue 10 Nov 2026, the Basalt DB price (25 USD/month) and free tier (1 project) are unchanged, and the quote is still on the live first-party page. The Northwind PG price has changed: the page states the Starter plan now costs 24 USD per month, not the stored 19 USD/month."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nAs of Tue 10 Nov 2026, Basalt DB's price of 25 USD/month and its free tier of 1 project are both still stated on the live first-party page. Northwind PG's price has changed. The page now gives the Starter plan as 24 USD per month, not the stored 19 USD/month."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -2006,8 +1992,7 @@
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2034,7 +2019,7 @@
             {
               "name": "answer does not ask the date question again",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nAs of Tue 10 Nov 2026, both Basalt DB entries are unchanged: the price is still 25 USD/month and the free tier is still 1 project, with the quote still on the live first-party page. Northwind PG's price has changed. The page states the Starter plan now costs 24 USD per month, which differs from the stored 19 USD/month."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nChecked on Tue 10 Nov 2026, Basalt DB's price is unchanged at 25 USD/month, and its free tier is still 1 project. Both figures are still quoted on the live first-party page. Northwind PG's price has changed: the page now says the Starter plan costs 24 USD per month, not the stored 19 USD/month."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
@@ -2045,8 +2030,7 @@
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2057,11 +2041,11 @@
     {
       "id": 12,
       "runs": 3,
-      "passedRuns": 0,
+      "passedRuns": 3,
       "results": [
         {
           "run": 1,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "5 searches at most",
@@ -2086,34 +2070,17 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "1",
-                "600",
-                "360",
-                "2",
-                "440",
-                "3",
-                "300",
-                "4",
-                "540",
-                "420"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
                 "1",
-                "600",
-                "360",
                 "2",
-                "440",
                 "3",
-                "300",
-                "4",
-                "540",
-                "420"
+                "4"
               ]
             }
           ],
@@ -2121,7 +2088,7 @@
         },
         {
           "run": 2,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "5 searches at most",
@@ -2146,34 +2113,17 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "3",
-                "300",
-                "2",
-                "440",
-                "420",
-                "4",
-                "540",
-                "1",
-                "360",
-                "600"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
-                "3",
-                "300",
-                "2",
-                "440",
-                "420",
-                "4",
-                "540",
                 "1",
-                "360",
-                "600"
+                "2",
+                "3",
+                "4"
               ]
             }
           ],
@@ -2181,7 +2131,7 @@
         },
         {
           "run": 3,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "5 searches at most",
@@ -2206,34 +2156,17 @@
             },
             {
               "name": "numbers are in the message, claims, rows or evidence",
-              "pass": false,
-              "observed": [
-                "3",
-                "300",
-                "1",
-                "360",
-                "600",
-                "420",
-                "2",
-                "440",
-                "4",
-                "540"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
               "pass": false,
               "observed": [
-                "3",
-                "300",
                 "1",
-                "360",
-                "600",
-                "420",
                 "2",
-                "440",
-                "4",
-                "540"
+                "3",
+                "4"
               ]
             }
           ],
@@ -2256,7 +2189,7 @@
               "observed": {
                 "verdict": "unverifiable",
                 "newValue": "",
-                "reason": "The page states only an annual price for Basalt DB Pro, not the monthly price the claim covers, so it gives no evidence on the monthly value."
+                "reason": "The page only states an annual price of 240 USD for Pro, which is a different billing period from the monthly claim, so it does not confirm the current monthly value."
               }
             },
             {
@@ -2269,8 +2202,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2286,7 +2218,7 @@
               "observed": {
                 "verdict": "unverifiable",
                 "newValue": "",
-                "reason": "The page only states an annual price of 240 USD billed annually, which is a different billing period from the monthly claim, so it does not show the current monthly value."
+                "reason": "The page states only an annual price for Basalt DB Pro, not the monthly price the claim covers, and a different billing period is not a change."
               }
             },
             {
@@ -2299,8 +2231,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2316,7 +2247,7 @@
               "observed": {
                 "verdict": "unverifiable",
                 "newValue": "",
-                "reason": "The page states only an annual price for Basalt DB Pro (240 USD billed annually), which is a different billing period from the monthly claim, so it does not verify the monthly value."
+                "reason": "The page states only an annual price of 240 USD billed annually, not the monthly price the claim covers, so it gives no evidence either way."
               }
             },
             {
@@ -2329,8 +2260,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2372,8 +2302,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2408,8 +2337,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2444,8 +2372,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2492,8 +2419,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2511,7 +2437,7 @@
             {
               "name": "newValue contains 24",
               "pass": true,
-              "observed": "24 USD per month"
+              "observed": "24 USD/month"
             },
             {
               "name": "source is the vendor page",
@@ -2533,8 +2459,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2574,8 +2499,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2600,12 +2524,12 @@
             {
               "name": "answer says the page could not be reached",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBased on the checks, nothing has changed for Basalt DB: its price is still 25 USD/month and its free tier is still 1 project, with both quotes confirmed on the live first-party page. Northwind PG is the open question. The page fetch timed out, so I can't verify whether its 19 USD/month price from your Tue 10 Nov 2026 question still holds. It's worth rechecking that one later."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nNothing has changed for Basalt DB: the price is still 25 USD/month and the free tier is still 1 project, since both quotes remain on the live first-party page. I couldn't check Northwind PG's earlier price of 19 USD/month. The page took too long to load and the request timed out, so I can't say whether that price has changed."
             },
             {
               "name": "answer gives the last verified value with its date",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBased on the checks, nothing has changed for Basalt DB: its price is still 25 USD/month and its free tier is still 1 project, with both quotes confirmed on the live first-party page. Northwind PG is the open question. The page fetch timed out, so I can't verify whether its 19 USD/month price from your Tue 10 Nov 2026 question still holds. It's worth rechecking that one later."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nNothing has changed for Basalt DB: the price is still 25 USD/month and the free tier is still 1 project, since both quotes remain on the live first-party page. I couldn't check Northwind PG's earlier price of 19 USD/month. The page took too long to load and the request timed out, so I can't say whether that price has changed."
             },
             {
               "name": "answer does not say no change about Northwind",
@@ -2632,8 +2556,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2643,7 +2566,7 @@
               "question": "Does the answer state or imply that Northwind's price is unchanged?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The block says nothing has changed for Basalt DB, not Northwind PG. For Northwind it says the page fetch timed out, so it can't verify whether the 19 USD/month price still holds."
+              "raw": "No. The block says nothing has changed for Basalt DB, but for Northwind PG it says \"I couldn't check Northwind PG's earlier price of 19 USD/month\" and that it can't say whether the price has changed. It neither states nor implies that Northwind's price is unchanged."
             }
           ]
         },
@@ -2659,12 +2582,12 @@
             {
               "name": "answer says the page could not be reached",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBased on the verdict rows, nothing has been confirmed as changed since you asked on Tue 10 Nov 2026. Basalt DB's price is still 25 USD/month and its free tier is still 1 project, and the quotes remain on the live first-party page.\n\nNorthwind PG is the open question: it was 19 USD/month, but the page fetch timed out, so I can't verify its current price right now."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBasalt DB's price is still 25 USD/month and its free tier is still 1 project, since both quotes remain on the live first-party page. I could not confirm whether Northwind PG's earlier price of 19 USD/month has changed. I tried to load its page, but the request timed out, so the current price could not be checked. As far as I could verify, nothing has changed for Basalt DB, and Northwind PG is still unconfirmed."
             },
             {
               "name": "answer gives the last verified value with its date",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBased on the verdict rows, nothing has been confirmed as changed since you asked on Tue 10 Nov 2026. Basalt DB's price is still 25 USD/month and its free tier is still 1 project, and the quotes remain on the live first-party page.\n\nNorthwind PG is the open question: it was 19 USD/month, but the page fetch timed out, so I can't verify its current price right now."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBasalt DB's price is still 25 USD/month and its free tier is still 1 project, since both quotes remain on the live first-party page. I could not confirm whether Northwind PG's earlier price of 19 USD/month has changed. I tried to load its page, but the request timed out, so the current price could not be checked. As far as I could verify, nothing has changed for Basalt DB, and Northwind PG is still unconfirmed."
             },
             {
               "name": "answer does not say no change about Northwind",
@@ -2691,8 +2614,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2702,7 +2624,7 @@
               "question": "Does the answer state or imply that Northwind's price is unchanged?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The block says Northwind PG's price was 19 USD/month but that it couldn't be verified because the page fetch timed out. It doesn't state or imply the price is unchanged.\n\nThe closest sentence is \"Based on the verdict rows, nothing has been confirmed as changed since you asked on Tue 10 Nov 2026.\" It only says no change was confirmed, and the next paragraph makes clear Northwind's current price is unknown."
+              "raw": "No. The block says Northwind PG's price could not be confirmed (\"I could not confirm whether Northwind PG's earlier price of 19 USD/month has changed\"), so it neither states nor implies that the price is unchanged."
             }
           ]
         },
@@ -2718,12 +2640,12 @@
             {
               "name": "answer says the page could not be reached",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBasalt DB hasn't changed since Tue 10 Nov 2026. It is still 25 USD/month with a free tier of 1 project, and the quote is still on the live first-party page. I couldn't verify Northwind PG, which was 19 USD/month, because the page fetch timed out. I can't say whether its price has changed."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nNothing has changed for Basalt DB since your earlier question. The price is still 25 USD/month and the free tier is still 1 project, and both quotes are still on the live first-party page. I couldn't confirm whether Northwind PG has changed. I tried to fetch its page, but the request timed out, so I couldn't check the current price against the 19 USD/month I had stored."
             },
             {
               "name": "answer gives the last verified value with its date",
               "pass": true,
-              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nBasalt DB hasn't changed since Tue 10 Nov 2026. It is still 25 USD/month with a free tier of 1 project, and the quote is still on the live first-party page. I couldn't verify Northwind PG, which was 19 USD/month, because the page fetch timed out. I can't say whether its price has changed."
+              "observed": "On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: \"Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?\". (seeded demo history)\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nNothing has changed for Basalt DB since your earlier question. The price is still 25 USD/month and the free tier is still 1 project, and both quotes are still on the live first-party page. I couldn't confirm whether Northwind PG has changed. I tried to fetch its page, but the request timed out, so I couldn't check the current price against the 19 USD/month I had stored."
             },
             {
               "name": "answer does not say no change about Northwind",
@@ -2750,8 +2672,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -2761,7 +2682,7 @@
               "question": "Does the answer state or imply that Northwind's price is unchanged?",
               "answer": "no",
               "quote": null,
-              "raw": "No. The block says it couldn't verify Northwind PG's price because the page fetch timed out, and it states \"I can't say whether its price has changed.\" It only says Basalt DB is unchanged."
+              "raw": "No. The block says nothing has changed for Basalt DB, but for Northwind PG it says \"I couldn't confirm whether Northwind PG has changed.\" It doesn't state or imply that Northwind's price is unchanged."
             }
           ]
         }
@@ -2770,11 +2691,11 @@
     {
       "id": 17,
       "runs": 3,
-      "passedRuns": 2,
+      "passedRuns": 3,
       "results": [
         {
           "run": 1,
-          "passed": false,
+          "passed": true,
           "assertions": [
             {
               "name": "provider log is empty",
@@ -2834,14 +2755,12 @@
             {
               "name": "mutex does not mention a stored claim",
               "pass": true,
-              "observed": "A **mutex** is a lock that only one thread can hold at a time. It has an owner: the thread that locks it must be the one to unlock it. It's used to protect a shared resource or critical section.\n\nA **semaphore** is a counter that controls access by multiple threads. Threads decrement it to acquire and increment it to release. If the count is zero, they wait. It has no owner, so any thread can signal it.\n\nKey differences:\n- **Count:** A mutex is effectively binary (locked/unlocked). A semaphore can allow N concurrent holders.\n- **Ownership:** A mutex must be released by the thread that acquired it. A semaphore can be released by any thread.\n- **Purpose:** A mutex provides mutual exclusion. A semaphore is for limiting concurrency (e.g., a pool of 5 connections) or signaling between threads (e.g., producer/consumer).\n\nA binary semaphore (count of 1) resembles a mutex, but without ownership, so it lacks protections like preventing a non-owner from unlocking."
+              "observed": "A **mutex** is a lock for mutual exclusion: only one thread can hold it at a time, and the thread that locks it is the one that must unlock it. It protects a critical section or shared resource.\n\nA **semaphore** is a counter that controls access to a limited number of resources. Threads decrement it (wait/acquire) and increment it (signal/release). If the count is zero, a thread waits. Any thread can release it, not just the one that acquired it.\n\nKey differences:\n- **Count:** A mutex is effectively binary (locked/unlocked). A semaphore can allow N concurrent holders.\n- **Ownership:** A mutex has an owner. A semaphore does not.\n- **Use:** Mutexes guard exclusive access. Semaphores handle resource pools or signaling between threads (e.g., producer/consumer).\n\nA binary semaphore (count of 1) resembles a mutex, but it lacks ownership, so it doesn't provide the same safety guarantees."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (mutex)",
-              "pass": false,
-              "observed": [
-                "5"
-              ]
+              "pass": true,
+              "observed": []
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
@@ -2850,10 +2769,8 @@
             },
             {
               "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
-              "pass": false,
-              "observed": [
-                "5"
-              ]
+              "pass": true,
+              "observed": []
             }
           ],
           "judge": null
@@ -2920,7 +2837,7 @@
             {
               "name": "mutex does not mention a stored claim",
               "pass": true,
-              "observed": "A **mutex** is a lock for mutual exclusion: only one thread can hold it at a time, and the thread that locks it must be the one to unlock it. It protects a critical section or shared resource.\n\nA **semaphore** is a counter that controls access by multiple threads. Threads decrement it to acquire and increment it to release. If the count is zero, they wait. Any thread can signal it, not just the one that waited.\n\nKey differences:\n- **Ownership:** A mutex has an owner; a semaphore doesn't.\n- **Count:** A mutex is effectively binary (locked or unlocked); a semaphore can allow N concurrent holders.\n- **Use:** Mutexes guard shared data. Semaphores limit access to a pool of resources or signal between threads (e.g., producer/consumer).\n\nA binary semaphore (count of 1) resembles a mutex, but lacks ownership, so it doesn't provide the same safety guarantees."
+              "observed": "A **mutex** is a lock that only one thread can hold at a time, and only the thread that locked it can unlock it. It's used to protect a shared resource or critical section (mutual exclusion).\n\nA **semaphore** is a counter that allows up to N threads to access a resource at once. Threads decrement it to acquire and increment it to release. Any thread can signal (release) it, not just the one that acquired it.\n\nKey differences:\n- **Concurrency:** A mutex allows one holder. A semaphore allows N (a binary semaphore allows one, but still differs in ownership).\n- **Ownership:** A mutex has an owner. A semaphore does not.\n- **Purpose:** Mutexes guard shared data. Semaphores control access to a pool of resources or signal between threads (e.g., producer/consumer)."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (mutex)",
@@ -3002,7 +2919,7 @@
             {
               "name": "mutex does not mention a stored claim",
               "pass": true,
-              "observed": "A mutex is a lock that only one thread can hold at a time, and only the thread that locked it should unlock it. It's used to protect a shared resource or critical section.\n\nA semaphore is a counter that allows up to N threads to access a resource at once. Threads decrement it to acquire and increment it to release, and any thread can do the release. A binary semaphore (N=1) looks like a mutex but has no ownership, so it's also commonly used for signaling between threads.\n\nIn short: a mutex is for mutual exclusion with ownership, while a semaphore is for controlling access counts or signaling."
+              "observed": "A mutex is a lock that allows only one thread at a time into a critical section, and only the thread that locked it should unlock it. It's about exclusive ownership.\n\nA semaphore is a counter that controls access to a limited number of resources. Threads wait (decrement) and signal (increment), and any thread can signal. A semaphore with a count of 1 (binary semaphore) acts like a mutex but without ownership, so it's also commonly used for signaling between threads.\n\n**Rule of thumb:** use a mutex to protect shared data; use a semaphore to limit concurrent access to a pool or to signal events."
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (mutex)",
@@ -3279,7 +3196,7 @@
             {
               "name": "turn A is not a no-record answer",
               "pass": true,
-              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, all three still hold as of Fri 13 Nov 2026. Northwind PG is still 24 USD/month and Basalt DB is still 25 USD/month. The Basalt DB free tier is still 1 project. Each verdict is unchanged, since the quotes remain on the live first-party page."
+              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, all three items still hold as of your question on Fri 13 Nov 2026. Northwind PG's price is still 24 USD/month, and Basalt DB's price is still 25 USD/month. Basalt DB's free tier still covers 1 project. In each case, the quote is still on the live first-party page."
             },
             {
               "name": "chosen is 2026-11-10",
@@ -3299,12 +3216,12 @@
             {
               "name": "turn B newValue contains 24",
               "pass": true,
-              "observed": "24 USD per month"
+              "observed": "24 USD/month"
             },
             {
               "name": "exactly one claim supersedes the original Northwind claim",
               "pass": true,
-              "observed": "70f4df38-049f-4998-b076-075e8f322891"
+              "observed": "4319a4ed-a1ba-4109-b992-33593b0d4049"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (turn A)",
@@ -3326,8 +3243,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -3359,7 +3275,7 @@
             {
               "name": "turn A Northwind claim.value contains 24",
               "pass": true,
-              "observed": "24 USD/month"
+              "observed": "24 USD per month"
             },
             {
               "name": "turn A Northwind verdict is unchanged",
@@ -3369,7 +3285,7 @@
             {
               "name": "turn A is not a no-record answer",
               "pass": true,
-              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, as of Fri 13 Nov 2026 the verdict is unchanged on every item. Northwind PG is still 24 USD/month and Basalt DB is still 25 USD/month, with the Basalt DB free tier still at 1 project. Each quote is still on the live first-party page."
+              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, all three items still hold as of Fri 13 Nov 2026. Northwind PG is still listed at 24 USD per month, and Basalt DB is still listed at 25 USD/month. Basalt DB's free tier still shows 1 project, and each of these figures was confirmed against the live first-party page."
             },
             {
               "name": "chosen is 2026-11-10",
@@ -3389,12 +3305,12 @@
             {
               "name": "turn B newValue contains 24",
               "pass": true,
-              "observed": "24 USD per month"
+              "observed": "24 USD/month"
             },
             {
               "name": "exactly one claim supersedes the original Northwind claim",
               "pass": true,
-              "observed": "7c8004a6-3366-4629-a135-f31dba9fc111"
+              "observed": "cf5e645a-2182-40de-8c69-4c426e242823"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (turn A)",
@@ -3416,8 +3332,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -3459,7 +3374,7 @@
             {
               "name": "turn A is not a no-record answer",
               "pass": true,
-              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, it still holds. All three items you asked about are unchanged as of Fri 13 Nov 2026: Northwind PG at 24 USD/month, Basalt DB at 25 USD/month, and the Basalt DB free tier at 1 project. The quote for each is still on the live first-party page."
+              "observed": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, everything you asked about still holds as of Fri 13 Nov 2026. Northwind PG is still listed at 24 USD/month, and Basalt DB is still listed at 25 USD/month. Basalt DB's free tier still includes 1 project. In each case the quote is still on the live first-party page, so nothing has changed."
             },
             {
               "name": "chosen is 2026-11-10",
@@ -3484,7 +3399,7 @@
             {
               "name": "exactly one claim supersedes the original Northwind claim",
               "pass": true,
-              "observed": "87b663e6-7199-4223-a7c1-64b9404ad03c"
+              "observed": "1e6f3c87-fdd4-449b-9107-ebd34d50b8d3"
             },
             {
               "name": "numbers are in the message, claims, rows or evidence (turn A)",
@@ -3506,8 +3421,7 @@
               "pass": false,
               "observed": [
                 "10",
-                "14",
-                "05"
+                "14"
               ]
             }
           ],
@@ -3517,37 +3431,34 @@
     }
   ],
   "passAtAll": [
+    1,
     2,
     3,
+    4,
+    5,
     7,
     9,
-    10,
     11,
+    12,
     13,
     14,
     15,
     16,
+    17,
     18,
     19
   ],
-  "flaky": [
-    1,
-    17
-  ],
+  "flaky": [],
   "failing": [
-    4,
-    5,
     6,
     8,
-    12
+    10
   ],
   "strict": {
     "passAtAll": [
-      10
-    ],
-    "flaky": [
       17
     ],
+    "flaky": [],
     "failing": [
       1,
       2,
@@ -3558,6 +3469,7 @@
       7,
       8,
       9,
+      10,
       11,
       12,
       13,

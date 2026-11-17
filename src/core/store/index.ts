@@ -1,10 +1,9 @@
-// Lane 2 replaces this file. The export stays: createStore(dbPath, clock, config).
+// The store entry point: createStore(dbPath, clock, config) on node:sqlite.
 import type { AgentConfig, Clock, MemoryStore } from '../contracts';
-import { InMemoryStore } from '../testing/inMemoryStore';
+import { SqliteStore } from './sqliteStore';
 
-/** Until Lane 2 merges: an in-memory store. `dbPath` and `clock` are not used yet. */
 export function createStore(dbPath: string, clock: Clock, config: AgentConfig): MemoryStore {
-  void dbPath;
-  void clock;
-  return new InMemoryStore(config);
+  return new SqliteStore(dbPath, clock, config);
 }
+
+export { Fts5MissingError, SqliteStore, chooseTextSearch, DATE_RANK_MAX_ROWS } from './sqliteStore';

@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config';
 import { containsQuote } from '../src/core/search/index';
@@ -5,11 +8,15 @@ import { createStore } from '../src/core/store/index';
 import { FakeClock } from '../src/core/testing/fakes';
 import { loadSeeds, type SeedId } from './seeds';
 
+function tempDb(): string {
+  return join(mkdtempSync(join(tmpdir(), 'minimi-eval-')), 'store.db');
+}
+
 const IDS: SeedId[] = ['S-PG', 'S-NOV3', 'S-CRM', 'S-PG-OLD', 'S-LATE', 'S-LA'];
 
 describe('seeds', () => {
   it('every seed claim quote passes containsQuote against its source', () => {
-    const store = createStore('seed-test', new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig);
+    const store = createStore(tempDb(), new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig);
     loadSeeds(store, IDS);
     const hits = store.findTurns({
       dates: ['2026-11-03', '2026-11-05', '2026-11-09', '2026-11-10'],
@@ -32,7 +39,7 @@ describe('seeds', () => {
     );
     expect(claims.some((claim) => claim.entity === 'Salesyard')).toBe(true);
     expect(claims.some((claim) => claim.entity === 'Northwind PG')).toBe(true);
-    const blog = createStore('seed-blog', new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig);
+    const blog = createStore(tempDb(), new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig);
     loadSeeds(blog, ['S-PG'], { northwindFromBlog: true });
     const blogHits = blog.findTurns({ dates: ['2026-11-10'], excludeTurnIds: [], limit: 5 });
     const blogClaims = blog.claimsForTurns(

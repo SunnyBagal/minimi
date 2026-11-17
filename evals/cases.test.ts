@@ -1,9 +1,16 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../src/core/config';
 import { createStore } from '../src/core/store/index';
 import { FakeClock } from '../src/core/testing/fakes';
 import { CASES } from './cases/index';
 import type { CaseRun } from './types';
+
+function tempDb(): string {
+  return join(mkdtempSync(join(tmpdir(), 'minimi-eval-')), 'store.db');
+}
 
 function emptyRun(id: number): CaseRun {
   const evalCase = CASES.find((item) => item.id === id);
@@ -13,7 +20,7 @@ function emptyRun(id: number): CaseRun {
       traces: part.messages.map((message) => ({ message, events: [], answerText: '', log: [] })),
       log: [],
     })),
-    store: createStore('case-names', new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig),
+    store: createStore(tempDb(), new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig),
     judge: null,
   };
 }

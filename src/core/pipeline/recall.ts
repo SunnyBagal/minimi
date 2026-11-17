@@ -114,6 +114,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   let hits: MemoryHit[];
   let chosen: LocalDate | null = null;
   let chosenHit: MemoryHit | null = null;
+  let ambiguousHits: MemoryHit[] = [];
   let referenced: Turn | null = null;
 
   if (plan.refersToPrevious) {
@@ -160,6 +161,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
       const top = Math.max(...choices.map(([, dateHits]) => bestOf(dateHits)));
       choices = choices.filter(([, dateHits]) => bestOf(dateHits) >= top * MIN_SCORE_SHARE);
     }
+    ambiguousHits = choices.flatMap(([, dateHits]) => dateHits);
     if (choices.length === 1) {
       const [date, dateHits] = choices[0] ?? [null, []];
       chosen = date;
@@ -173,8 +175,8 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
 
   if (chosen === null) {
     // Ambiguous: name each candidate with the user's own question as its summary.
-    const qualifyingHits = [...datesWithHits(hits, plan.topic !== null).values()].flat();
-    yield ctx.textEvent(ambiguousLine(qualifyingHits, ctx));
+    // Only the dates still competing after the score-share rule are listed.
+    yield ctx.textEvent(ambiguousLine(ambiguousHits, ctx));
     ctx.saveAssistant({ intent: plan.intent, extraction: 'skipped', targetTurnIds: [] });
     return;
   }

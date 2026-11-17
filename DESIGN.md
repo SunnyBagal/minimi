@@ -2,8 +2,6 @@
 
 A chat agent with one tool, web search. It stores each answer as claims with a source, a quote and a date, so it can re-check what it told you.
 
-[Skeleton. Fill every __ with a measured value and delete bracketed notes before submitting.]
-
 ## How it works
 
 - One Next.js process, two keys (Anthropic, Exa), one SQLite file via `node:sqlite`. Node 22.13+.
@@ -22,8 +20,8 @@ A chat agent with one tool, web search. It stores each answer as claims with a s
 - "Unchanged" needs positive evidence fetched live this turn. A cache hit, a timeout or a third-party page cannot produce it.
 - The user sees one of three states: verified now, from memory (with its date), couldn't verify (with what was tried).
 - The agent core imports no framework. Next.js and the AI SDK sit in two files.
-- Evals: __ of 19 scripted cases pass at 3 of 3 runs. Failing: __.
-- Latency on my machine (dev footer, __ runs): router __ ms, first chat token __ ms, first token on a search turn __ ms, five-claim re-check __ s.
+- Evals: 16 of 19 scripted cases pass at 3 of 3 runs (`evals/results/latest.json`). Under the spec's literal number check, which also counts dates and clock times the app prints itself, 1 of 19. Failing: 6 (names the nearest match's date, which no event carries to the number check), 8 (expects "3 November 2026"; the recall line prints "3 Nov 2026"), 10 (the one verdict row was not labelled "Basalt DB" / "price" in any of the 3 runs).
+- Latency on my machine (`npm run measure`, 3 passes of a chat, a fresh and a re-check turn, medians, `evals/results/latency.json`): router 1524 ms, first chat token 2174 ms, first token on a search turn 4646 ms, re-check of the previous answer (5 to 8 claims) 12827 ms in total. A fresh turn takes 25213 ms in total, most of it claim extraction after the answer has streamed (17773 ms).
 
 ## Considered and rejected
 

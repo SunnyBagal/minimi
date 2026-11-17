@@ -12,6 +12,9 @@ import { allowedNumbersOf, asRef, extractInto, rememberEvidence, saveSource } fr
 const SEARCH_FAILED =
   "Search failed: I could not get any web results for this, so I can't give you current facts on it. Try again, or rephrase the question.";
 
+const EMPTY_ANSWER =
+  "I couldn't write an answer from the search results this time. Ask again and I'll try once more.";
+
 /** Saves a search hit as a source row and appends its numbered ref to evidence. */
 function addHit(ctx: TurnContext, hit: SearchResult, entities: string[], evidence: SourceRef[]): void {
   const source = saveSource(ctx, {
@@ -97,6 +100,18 @@ export async function* fresh(ctx: TurnContext): AsyncIterable<AgentEvent> {
     yield ctx.textEvent(delta);
   }
   for (const text of pendingStatuses.splice(0)) yield { type: 'status', text };
+
+  // A silent writer: report the error, say so in the answer text and skip
+  // validate, citations and extraction. Sources already saved stay saved.
+  if (ctx.answer.trim() === '') {
+    yield { type: 'error', stage: 'write', message: 'The writer returned no text.' };
+    // Whatever whitespace the writer emitted is not part of the saved answer.
+    ctx.answer = '';
+    yield ctx.textEvent(EMPTY_ANSWER);
+    yield doneWrite();
+    ctx.saveAssistant({ intent: 'fresh', extraction: 'skipped', targetTurnIds: [] });
+    return;
+  }
   yield doneWrite();
 
   ctx.stage = 'validate';

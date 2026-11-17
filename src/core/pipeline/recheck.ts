@@ -295,8 +295,12 @@ export async function* recheck(ctx: TurnContext, resolved: Resolved): AsyncItera
   yield doneJudge();
 
   // Dated news, one search per entity; undated results are set aside.
+  // The router's entities can be generic ("CRM"); the baseline claims name
+  // the actual products, so the search runs over the distinct claim
+  // entities in claim order. plan.entities is the fallback when there is
+  // no baseline.
   const newsEntities =
-    ctx.plan.entities.length > 0 ? ctx.plan.entities : [...new Set(claims.map((claim) => claim.entity))];
+    claims.length > 0 ? [...new Set(claims.map((claim) => claim.entity))] : ctx.plan.entities;
   let news: SourceRef[] = [];
   let undatedCount = 0;
   if (ctx.plan.wantsNews) {

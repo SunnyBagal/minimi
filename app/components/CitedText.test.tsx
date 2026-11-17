@@ -45,4 +45,31 @@ describe('CitedText', () => {
     expect(html).toContain('240 USD');
     expect(html).toContain('1.24');
   });
+
+  it('marks only the uncited occurrence when the same number is also cited', () => {
+    const html = renderToStaticMarkup(
+      CitedText({
+        text: 'Pro starts at $25/month [1].\n\nThe page says "from $25/month", so the total varies.',
+        citations: CITATIONS,
+        uncited: ['$25'],
+      }),
+    );
+    expect(html.match(/<mark/g) ?? []).toHaveLength(1);
+    expect(html.indexOf('<mark')).toBeGreaterThan(html.indexOf('href='));
+  });
+
+  it('a citation right after the full stop covers the sentence; one in the next sentence does not', () => {
+    const covered = renderToStaticMarkup(CitedText({ text: 'It costs 24 USD. [1]', citations: CITATIONS, uncited: ['24'] }));
+    expect(covered).not.toContain('<mark');
+    const notCovered = renderToStaticMarkup(
+      CitedText({ text: 'It costs 24 USD. Plans vary [1].', citations: CITATIONS, uncited: ['24'] }),
+    );
+    expect(notCovered).toContain('<mark');
+  });
+
+  it('never marks a digit inside a citation', () => {
+    const html = renderToStaticMarkup(CitedText({ text: 'Free tier [1].', citations: CITATIONS, uncited: ['1'] }));
+    expect(html).not.toContain('<mark');
+    expect(html).toContain('href="https://neon.test/pricing"');
+  });
 });

@@ -90,10 +90,13 @@ export function evidenceFor(store: MemoryStore, turnId: Id): SourceRef[] | null 
 // ------------------------------------------------------- claim extraction
 
 /**
- * Runs extractClaims for `answer` against `evidence` and saves the claims
- * that pass the code checks: the draft's `sourceN` must point at a real
- * evidence item, its quote must sit in that source's text, and every number
- * in the value must be inside the quote. Claims get `asOfUtc` and
+ * Runs extractClaims for `answer` against the evidence items the answer
+ * cites and saves the claims that pass the code checks: the draft's
+ * `sourceN` must point at a cited evidence item, its quote must sit in that
+ * source's text, and every number in the value must be inside the quote.
+ * Only cited items go to the extractor (with their original numbers),
+ * because a claim needs a [n] citation; an answer that cites nothing makes
+ * no extractor call and is marked `done`. Claims get `asOfUtc` and
  * `lastVerifiedAtUtc` from the cited source's fetch time, not the clock.
  * Marks the turn's extraction `done`, or `failed` on any error or abort —
  * extraction never breaks the turn.
@@ -109,10 +112,19 @@ export async function extractInto(
     ctx.store.setExtraction(turnId, 'failed');
     return done();
   };
+  const citedNumbers = new Set<number>();
+  for (const match of answer.matchAll(/\[(\d+)\]/g)) {
+    citedNumbers.add(Number(match[1]));
+  }
+  const cited = evidence.filter((item) => citedNumbers.has(item.n));
+  if (cited.length === 0) {
+    ctx.store.setExtraction(turnId, 'done');
+    return done();
+  }
   let drafts: ClaimDraft[];
   try {
     drafts = await Promise.race([
-      ctx.deps.llm.extractClaims({ answer, evidence }),
+      ctx.deps.llm.extractClaims({ answer, evidence: cited }),
       new Promise<never>((_, reject) => {
         if (ctx.signal.aborted) reject(new Error('turn deadline'));
         ctx.signal.addEventListener('abort', () => reject(new Error('turn deadline')), { once: true });
@@ -123,7 +135,7 @@ export async function extractInto(
   }
 
   const kept = drafts.filter((draft) => {
-    const source = evidence.find((item) => item.n === draft.sourceN);
+    const source = cited.find((item) => item.n === draft.sourceN);
     if (source === undefined) return false;
     if (!containsQuote(source.text, draft.quote)) return false;
     const quoteNumbers = numbersIn(draft.quote);

@@ -233,4 +233,112 @@ describe('recall', () => {
     expect(recalled.chosen).toBe('2026-11-10');
     expect(recalled.hits[0]?.assistantTurn?.id).toBe(answer.id);
   });
+
+  const LAST_TUESDAY = { kind: 'weekday', weekday: 2, modifier: 'last' } as const;
+  const CASE19_PLAN = {
+    intent: 'recheck' as const,
+    timeRef: { ...LAST_TUESDAY },
+    topic: 'Postgres hosting pricing',
+    entities: ['Postgres', 'Northwind PG', 'Basalt DB'],
+  };
+
+  function seedCase19(store: InMemoryStore) {
+    // The two stored conversations exactly as the real eval case wrote them.
+    const pgUser = userTurn(store, {
+      content: 'Compare Postgres hosting for a small SaaS: Northwind PG or Basalt DB?',
+      localDate: '2026-11-10',
+      topic: 'Postgres hosting',
+    });
+    const pgAnswer = assistantTurn(store, {
+      localDate: '2026-11-10',
+      topic: 'Postgres hosting',
+      content:
+        'Northwind PG Starter is 19 USD per month. Basalt DB Pro is 25 USD per month. Basalt DB free tier includes 1 project.',
+    });
+    const pgSource = source(store, {
+      url: 'https://northwind.test/pricing',
+      firstParty: true,
+      text: 'Starter: 19 USD per month',
+    });
+    claim(store, pgAnswer.id, pgSource.id, {
+      entity: 'Northwind PG',
+      attribute: 'Starter price',
+      value: '19 USD/month',
+      quote: 'Starter: 19 USD per month',
+    });
+    const nov3User = userTurn(store, {
+      content: "What does Pipeloom's Team plan cost per seat?",
+      localDate: '2026-11-03',
+      topic: 'Pipeloom pricing',
+      entities: ['Pipeloom'],
+    });
+    assistantTurn(store, {
+      localDate: '2026-11-03',
+      content: 'Pipeloom Team is 30 USD per seat per month.',
+    });
+    return { pgUser, pgAnswer, nov3User };
+  }
+
+  function case19Rig(store: InMemoryStore) {
+    return rig({
+      store,
+      timeTable: [
+        {
+          ref: { ...LAST_TUESDAY },
+          result: { dates: ['2026-11-10', '2026-11-03'], range: null, ambiguous: true, rule: 'last Tuesday' },
+        },
+      ],
+      llm: { route: plan(CASE19_PLAN), write: ['Summary.'] },
+      search: {
+        pages: {
+          'https://northwind.test/pricing': { status: 'ok', live: true, text: 'Starter: 19 USD per month' },
+        },
+      },
+    });
+  }
+
+  it('a date that shares only one word of the topic does not make the choice ambiguous', async () => {
+    const store = new InMemoryStore();
+    const { nov3User } = seedCase19(store);
+    const { run } = case19Rig(store);
+    const events = await run({
+      message: 'Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?',
+    });
+    const recalled = recallEvent(events);
+    // The reproduction: the 3 Nov Pipeloom pair still comes back 'date+topic'
+    // (score 1 on the shared word "pricing"), it just cannot compete with 4.
+    expect(recalled.hits.find((hit) => hit.userTurn.id === nov3User.id)?.matched).toBe('date+topic');
+    expect(recalled.chosen).toBe('2026-11-10');
+    const verdicts = events.filter((e) => e.type === 'verdict');
+    expect(verdicts).toHaveLength(1);
+    if (verdicts[0]?.type === 'verdict') {
+      expect(verdicts[0].row.claim.entity).toBe('Northwind PG');
+    }
+  });
+
+  it('two dates with comparable topic matches stay ambiguous', async () => {
+    const store = new InMemoryStore();
+    seedCase19(store);
+    // A genuinely on-topic second conversation on 3 Nov: scores 3 vs 4.
+    userTurn(store, {
+      content: 'Is managed Postgres worth it over a VPS?',
+      localDate: '2026-11-03',
+      topic: 'Postgres hosting',
+      entities: ['Northwind PG'],
+    });
+    assistantTurn(store, {
+      localDate: '2026-11-03',
+      content: 'Northwind PG Starter is 19 USD per month.',
+    });
+    const { run } = case19Rig(store);
+    const events = await run({
+      message: 'Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?',
+    });
+    const recalled = recallEvent(events);
+    // The on-topic pairs score 4 and 3; the Pipeloom pair is still there at 1.
+    expect(recalled.hits.map((hit) => hit.score).sort((a, b) => b - a)).toEqual([4, 3, 1]);
+    expect(recalled.chosen).toBeNull();
+    expect(textOf(events)).toContain('Which one do you mean?');
+    expect(events.filter((e) => e.type === 'verdict')).toHaveLength(0);
+  });
 });

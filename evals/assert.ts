@@ -48,9 +48,47 @@ export function hasDate(text: string, pattern: RegExp): boolean {
   return pattern.test(text);
 }
 
-/** Digit tokens, so "19" and "2026" both count. Commas inside a token are kept out. */
-export function numbersIn(text: string): string[] {
-  return [...text.matchAll(/\d+(?:[.,]\d+)*/g)].map((match) => match[0].replace(/,/g, ''));
+/**
+ * Digit tokens, so "19" and "2026" both count. Commas inside a token are kept out.
+ * A list marker (`1.` or `1)` at the start of a line, then whitespace) is dropped
+ * only when `ignoreListMarkers` is set. That is the scored reading. The rule is
+ * the one in `validateAnswer`.
+ */
+export function numbersIn(text: string, ignoreListMarkers = false): string[] {
+  const tokens: string[] = [];
+  for (const match of text.matchAll(/\d+(?:[.,]\d+)*/g)) {
+    const start = match.index ?? 0;
+    const raw = match[0];
+    if (ignoreListMarkers && isListMarker(text, start, start + raw.length)) continue;
+    tokens.push(raw.replace(/,/g, ''));
+  }
+  return tokens;
+}
+
+/** Same shape as `isListMarker` in `src/core/search/validate.ts`. */
+function isListMarker(text: string, start: number, end: number): boolean {
+  const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+  if (text.slice(lineStart, start).trim() !== '') return false;
+  const next = text[end];
+  return (next === '.' || next === ')') && /\s/.test(text[end + 1] ?? '');
+}
+
+/** `03` equals `3`, `24.00` equals `24`, `1200` equals `1200`. `30` does not equal `03`. */
+function tokenValue(token: string): number {
+  return Number(token);
+}
+
+function extras(wanted: readonly string[], allowed: Iterable<string>): string[] {
+  const allowedValues = new Set<number>();
+  for (const token of allowed) allowedValues.add(tokenValue(token));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const token of wanted) {
+    if (seen.has(token)) continue;
+    seen.add(token);
+    if (!allowedValues.has(tokenValue(token))) out.push(token);
+  }
+  return out;
 }
 
 function claimNumbers(claims: readonly Claim[]): string[] {
@@ -135,10 +173,6 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
   return texts.flatMap((text) => numbersIn(text));
 }
 
-function extras(wanted: Set<string>, allowed: Set<string>): string[] {
-  return [...wanted].filter((token) => !allowed.has(token));
-}
-
 function recordLiteral(run: CaseRun, assertion: Assertion): void {
   const list = literalByRun.get(run) ?? [];
   list.push(assertion);
@@ -160,9 +194,9 @@ export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: stri
   const literalBody = withoutChecked(answer);
   const scoredBody = withoutCodeBuiltLines(literalBody);
   const allowed = baseAllowed(run, events, sources, answer);
-  const literalExtra = extras(new Set(numbersIn(literalBody)), allowed);
+  const literalExtra = extras(numbersIn(literalBody), allowed);
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, caseZone(run, events))]);
-  const scoredExtra = extras(new Set(numbersIn(scoredBody)), scoredAllowed);
+  const scoredExtra = extras(numbersIn(scoredBody, true), scoredAllowed);
   const suffix = label === '' ? '' : ` (${label})`;
   recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
   return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);

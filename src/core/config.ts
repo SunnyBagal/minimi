@@ -41,12 +41,17 @@ export const defaultConfig: AgentConfig = {
     recheckFetch: 8000,
     // Default to tune.
     judge: 10000,
-    // Default to tune: the whole turn.
-    turn: 45000,
-    // Default to tune: the claim extractor. Two measured runs of claude-haiku-5-5
-    // on one real fresh turn (5 sources, 52520 characters) took 14244 ms and
-    // 15792 ms; the judge's 10000 ms cut both off. About twice the slower run.
-    extract: 30000,
+    // Default to tune: the whole turn, extraction included. Two measured CRM
+    // shortlist turns with the deadlines lifted took 56024 ms and 67119 ms in
+    // total (docs/handoff/fix-lane-5-r1.md); 45000 ms cut extraction off.
+    // About 1.34x the slower turn, and room for this extract value after the
+    // 24300 ms that turn spent before extraction.
+    turn: 90000,
+    // Default to tune: the claim extractor. Two measured CRM shortlist runs of
+    // claude-haiku-5-5 on cited evidence only (9 sources / 150987 characters and
+    // 11 sources / 205843 characters) took 35160 ms and 42819 ms
+    // (docs/handoff/fix-lane-5-r1.md). About 1.4x the slower run.
+    extract: 60000,
   },
   shelfLifeDays: {
     // Default to tune: a product choice, not a fact about any source.

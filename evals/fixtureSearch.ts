@@ -1,0 +1,88 @@
+/**
+ * SearchProvider for the evals. It serves fixture pages and scripted search
+ * hits. It never calls the network. Every call is appended to `log`.
+ */
+import type { Clock, FetchedPage, LocalDate, SearchProvider, SearchResult } from '../src/core/contracts';
+import { readFixture } from './pages';
+
+export type FixtureFailure = 'timeout' | 'not_found';
+
+export type FixturePageSpec = { file: string } | { failure: FixtureFailure };
+
+export interface FixtureSearchHit {
+  match: string;
+  results: SearchResult[];
+}
+
+/** Which fixture file or scripted failure each URL uses, plus search hits. */
+export interface FixtureScenario {
+  pages: Record<string, FixturePageSpec>;
+  searches: FixtureSearchHit[];
+}
+
+export type FixtureCall =
+  | { kind: 'search'; query: string; numResults: number; publishedOnOrAfter: LocalDate | null }
+  | { kind: 'fetchPage'; url: string; deadlineMs: number };
+
+function isFailure(spec: FixturePageSpec): spec is { failure: FixtureFailure } {
+  return 'failure' in spec;
+}
+
+export class FixtureSearch implements SearchProvider {
+  readonly log: FixtureCall[] = [];
+
+  constructor(
+    private readonly clock: Clock,
+    private readonly scenario: FixtureScenario,
+  ) {}
+
+  async search(query: {
+    query: string;
+    numResults: number;
+    publishedOnOrAfter?: LocalDate;
+    signal?: AbortSignal;
+  }): Promise<SearchResult[]> {
+    this.log.push({
+      kind: 'search',
+      query: query.query,
+      numResults: query.numResults,
+      publishedOnOrAfter: query.publishedOnOrAfter ?? null,
+    });
+    if (query.signal?.aborted) return [];
+    const wanted = query.query.toLowerCase();
+    const hit = this.scenario.searches.find((entry) => wanted.includes(entry.match.toLowerCase()));
+    const results = hit?.results ?? [];
+    return structuredClone(results.slice(0, query.numResults));
+  }
+
+  async fetchPage(request: { url: string; deadlineMs: number; signal?: AbortSignal }): Promise<FetchedPage> {
+    this.log.push({ kind: 'fetchPage', url: request.url, deadlineMs: request.deadlineMs });
+    const fetchedAtUtc = this.clock.now().toISOString();
+    const base = {
+      url: request.url,
+      finalUrl: request.url,
+      title: null as string | null,
+      text: '',
+      fetchedAtUtc,
+      httpStatus: null as number | null,
+    };
+    if (request.signal?.aborted) {
+      return { ...base, status: 'timeout', live: false };
+    }
+    const spec = this.scenario.pages[request.url];
+    if (spec === undefined || (isFailure(spec) && spec.failure === 'not_found')) {
+      return { ...base, status: 'not_found', httpStatus: 404, live: false };
+    }
+    if (isFailure(spec)) {
+      return { ...base, status: 'timeout', live: false };
+    }
+    return {
+      ...base,
+      status: 'ok',
+      httpStatus: 200,
+      live: true,
+      title: new URL(request.url).hostname,
+      text: readFixture(spec.file),
+    };
+  }
+}

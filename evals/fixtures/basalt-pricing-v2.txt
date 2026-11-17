@@ -1,0 +1,3 @@
+# Invented prices. Not a real vendor.
+Basalt DB Pro is 25 USD per month.
+Basalt DB free tier includes 1 project.

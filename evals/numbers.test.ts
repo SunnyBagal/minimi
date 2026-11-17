@@ -44,6 +44,49 @@ describe('numbers', () => {
     expect(strict?.observed).toEqual(['10', '2026', '14', '05', '5', '30']);
   });
 
+  it('passes both readings when Tue 3 Nov is allowed by 2026-11-03, and fails both when 30 is checked against 03', () => {
+    const dated = runWith('When?', textEvents('Tue 3 Nov'));
+    const datedEvents = dated.parts[0]?.traces[0]?.events ?? [];
+    const datedScored = numbersAllowed(dated, datedEvents, ['2026-11-03']);
+    const datedStrict = literalAssertions(dated)[0];
+    expect(datedScored.pass).toBe(true);
+    expect(datedScored.observed).toEqual([]);
+    expect(datedStrict?.pass).toBe(true);
+    expect(datedStrict?.observed).toEqual([]);
+
+    const price = runWith('When?', textEvents('30'));
+    const priceEvents = price.parts[0]?.traces[0]?.events ?? [];
+    const priceScored = numbersAllowed(price, priceEvents, ['03']);
+    const priceStrict = literalAssertions(price)[0];
+    expect(priceScored.pass).toBe(false);
+    expect(priceScored.observed).toEqual(['30']);
+    expect(priceStrict?.pass).toBe(false);
+    expect(priceStrict?.observed).toEqual(['30']);
+
+    const decimal = runWith('Price?', textEvents('24.00'));
+    const decimalEvents = decimal.parts[0]?.traces[0]?.events ?? [];
+    const decimalScored = numbersAllowed(decimal, decimalEvents, ['24']);
+    expect(decimalScored.pass).toBe(true);
+    expect(literalAssertions(decimal)[0]?.pass).toBe(true);
+
+    const commas = runWith('Price?', textEvents('1,200'));
+    const commaEvents = commas.parts[0]?.traces[0]?.events ?? [];
+    const commaScored = numbersAllowed(commas, commaEvents, ['1200']);
+    expect(commaScored.pass).toBe(true);
+    expect(literalAssertions(commas)[0]?.pass).toBe(true);
+  });
+
+  it('passes the scored check and fails the literal one when the only extra number is a list marker', () => {
+    const run = runWith('Name a tool.', textEvents('1. Pipeloom is one tool.'));
+    const events = run.parts[0]?.traces[0]?.events ?? [];
+    const scored = numbersAllowed(run, events, []);
+    const strict = literalAssertions(run)[0];
+    expect(scored.pass).toBe(true);
+    expect(scored.observed).toEqual([]);
+    expect(strict?.pass).toBe(false);
+    expect(strict?.observed).toEqual(['1']);
+  });
+
   it('fails both checks when the model writes a price that is in no evidence', () => {
     const run = runWith('What does it cost?', textEvents('The plan costs 19 USD.'));
     const scored = numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], []);

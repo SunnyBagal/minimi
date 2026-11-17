@@ -434,6 +434,119 @@ describe('SqliteStore', () => {
     }
   });
 
+  it('deleteSeed removes seed turns, claims, checks, sources and their sessions', () => {
+    const db = tmpDb();
+    const store = new SqliteStore(db, clock, config);
+    stores.push(store);
+    const user = userTurn(store, { content: 'seed q', sessionId: 'seed-session', origin: 'seed' });
+    const assistant = assistantTurn(store, { sessionId: 'seed-session', origin: 'seed' });
+    const src = sourceFixture(store);
+    store.markSeedSource(src.id);
+    const claim = claimFixture(store, assistant.id, src.id);
+    store.saveCheck({
+      claimId: claim.id,
+      checkedAtUtc: '2026-11-10T09:00:00.000Z',
+      verdict: 'unchanged',
+      newValue: null,
+      newSourceId: null,
+      newQuote: null,
+      reason: 'ok',
+      decidedBy: 'judge',
+    });
+
+    const counts = store.deleteSeed();
+    expect(counts).toEqual({ turns: 2, claims: 1, checks: 1, sources: 1 });
+    expect(store.getTurns([user.id, assistant.id])).toEqual([]);
+    expect(store.getSources([src.id])).toEqual([]);
+    expect(store.claimsForTurns([assistant.id], 'as_stated')).toEqual([]);
+
+    const probe = new DatabaseSync(db);
+    const sessions = probe.prepare('SELECT count(*) n FROM sessions').get() as { n: number };
+    const marked = probe.prepare('SELECT count(*) n FROM seed_sources').get() as { n: number };
+    probe.close();
+    expect(sessions.n).toBe(0);
+    expect(marked.n).toBe(0);
+  });
+
+  it('deleteSeed keeps live rows: a live turn survives, and a live claim superseding a seed claim keeps its row with supersedes_id null', () => {
+    const store = makeStore();
+    const seedUser = userTurn(store, { content: 'seed q', sessionId: 'seed-s', origin: 'seed' });
+    const seedAssistant = assistantTurn(store, { sessionId: 'seed-s', origin: 'seed' });
+    const seedSource = sourceFixture(store);
+    store.markSeedSource(seedSource.id);
+    const seedClaim = claimFixture(store, seedAssistant.id, seedSource.id);
+
+    const liveUser = userTurn(store, { content: 'live q', sessionId: 'live-s' });
+    const liveAssistant = assistantTurn(store, { sessionId: 'live-s' });
+    const liveSource = sourceFixture(store, { url: 'https://live.test/p', finalUrl: 'https://live.test/p' });
+    const liveClaim = claimFixture(store, liveAssistant.id, liveSource.id, { supersedesId: seedClaim.id });
+
+    store.deleteSeed();
+    expect(store.getTurns([liveUser.id, liveAssistant.id])).toHaveLength(2);
+    expect(store.getTurns([seedUser.id, seedAssistant.id])).toEqual([]);
+    const [kept] = store.claimsForTurns([liveAssistant.id], 'as_stated');
+    expect(kept?.id).toBe(liveClaim.id);
+    expect(kept?.supersedesId).toBeNull();
+    expect(store.getSources([liveSource.id])).toHaveLength(1);
+  });
+
+  for (const mode of ['fts', 'like'] as const) {
+    it(`deleteSeed removes a seed turn from undated findTurns (${mode} mode)`, () => {
+      if (mode === 'fts' && !ftsAvailable()) {
+        expect(() => makeStore({ textSearch: 'fts' })).toThrow(Fts5MissingError);
+        return;
+      }
+      const store = makeStore({ textSearch: mode });
+      userTurn(store, {
+        content: 'seed question about postgres hosting',
+        sessionId: 'seed-s',
+        origin: 'seed',
+        topic: 'postgres hosting',
+      });
+      assistantTurn(store, { sessionId: 'seed-s', origin: 'seed' });
+      const hitsBefore = store.findTurns({ topic: 'postgres hosting', excludeTurnIds: [], limit: 5 });
+      expect(hitsBefore).toHaveLength(1);
+      store.deleteSeed();
+      const hitsAfter = store.findTurns({ topic: 'postgres hosting', excludeTurnIds: [], limit: 5 });
+      expect(hitsAfter).toEqual([]);
+    });
+  }
+
+  it('deleteSeed with an only scope removes just that session and those sources', () => {
+    const store = makeStore();
+    const aUser = userTurn(store, { content: 'a', sessionId: 'seed-a', origin: 'seed' });
+    const aAssistant = assistantTurn(store, { sessionId: 'seed-a', origin: 'seed' });
+    const aSource = sourceFixture(store, { url: 'https://a.test', finalUrl: 'https://a.test' });
+    claimFixture(store, aAssistant.id, aSource.id);
+    const bUser = userTurn(store, { content: 'b', sessionId: 'seed-b', origin: 'seed' });
+    const bAssistant = assistantTurn(store, { sessionId: 'seed-b', origin: 'seed' });
+    const bSource = sourceFixture(store, { url: 'https://b.test', finalUrl: 'https://b.test' });
+    claimFixture(store, bAssistant.id, bSource.id);
+    store.markSeedSource(aSource.id);
+    store.markSeedSource(bSource.id);
+
+    const counts = store.deleteSeed({ sessionId: 'seed-a', sourceIds: [aSource.id] });
+    expect(counts).toEqual({ turns: 2, claims: 1, checks: 0, sources: 1 });
+    expect(store.getTurns([aUser.id, aAssistant.id])).toEqual([]);
+    expect(store.getSources([aSource.id])).toEqual([]);
+    expect(store.getTurns([bUser.id, bAssistant.id])).toHaveLength(2);
+    expect(store.getSources([bSource.id])).toHaveLength(1);
+  });
+
+  it('deleteSeed keeps a seed source still referenced by a remaining claim', () => {
+    const store = makeStore();
+    const liveUser = userTurn(store, { content: 'live', sessionId: 'live-s' });
+    const liveAssistant = assistantTurn(store, { sessionId: 'live-s' });
+    const sharedSource = sourceFixture(store);
+    store.markSeedSource(sharedSource.id);
+    claimFixture(store, liveAssistant.id, sharedSource.id);
+    void liveUser;
+
+    const counts = store.deleteSeed();
+    expect(counts.sources).toBe(0);
+    expect(store.getSources([sharedSource.id])).toHaveLength(1);
+  });
+
   it('parity with InMemoryStore: staleClaims', () => {
     const sqlite = makeStore();
     const memory = new InMemoryStore();

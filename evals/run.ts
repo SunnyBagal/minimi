@@ -6,6 +6,7 @@
  *   npm run evals -- --selftest
  *   npm run evals -- --case 17 --runs 3
  */
+import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,11 +65,18 @@ function summaryLine(passAtAll: number, flaky: number, failing: number): string 
   return `passAtAll ${passAtAll} flaky ${flaky} failing ${failing}`;
 }
 
+/** The commit the run is scoring. `systemClock` is not involved. */
+function headSha(): string {
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+  return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+}
+
 function fail(exitCode: number, networkCalls: number): ExecuteResult {
   return { exitCode, stdout: '', networkCalls, resultsFile: null };
 }
 
 export async function execute(argv: string[], options: ExecuteOptions = {}): Promise<ExecuteResult> {
+  const sha = headSha();
   const selftest = argv.includes('--selftest');
   const caseFlag = readFlag(argv, '--case');
   const runsFlag = readFlag(argv, '--runs');
@@ -113,12 +121,9 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
         const result = await runHarness(evalCase, { selftest, apiKey });
         results.push({ run, passed: result.passed, assertions: result.assertions, judge: result.judge });
       }
-      records.push({
-        id,
-        runs,
-        passedRuns: results.filter((result) => result.passed).length,
-        results,
-      });
+      const passedRuns = results.filter((result) => result.passed).length;
+      records.push({ id, runs, passedRuns, results });
+      console.error(`evals: case ${id} ${passedRuns}/${runs}`);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -131,6 +136,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   const totals = classify(records);
   const body = {
     mode: selftest ? 'selftest' : 'live',
+    sha,
     runs,
     cases: records,
     passAtAll: totals.passAtAll,

@@ -329,6 +329,46 @@ describe('createAiSdkLlm', () => {
     }
   });
 
+  it('the fresh writer prompt forbids computing new figures from the evidence', async () => {
+    const calls: StreamCall[] = [];
+    const llm = createAiSdkLlm('test-key', defaultConfig, {
+      stream: async function* (call) {
+        calls.push(call);
+        yield 'ok';
+      },
+    });
+    const fresh = modes().find((input) => input.mode === 'fresh');
+    if (fresh === undefined) throw new Error('no fresh mode input');
+    for await (const _ of llm.write(fresh)) void _;
+    const instructions = calls[0]?.instructions ?? '';
+    expect(instructions).toContain('State each figure as the evidence states it, with its [n].');
+    expect(instructions).toContain('Do not compute new figures from the evidence');
+    expect(instructions).toContain('no totals, no per-team, per-month or per-year costs, no differences');
+    expect(instructions).toContain('say in words how to work it out');
+    expect(instructions).toContain('without writing the resulting number');
+    expect(instructions).toContain("That explanation may use only numbers that appear in the evidence or in the user's messages");
+  });
+
+  it('the recheck summary prompt reports news with dates and never prints status words', async () => {
+    const calls: StreamCall[] = [];
+    const llm = createAiSdkLlm('test-key', defaultConfig, {
+      stream: async function* (call) {
+        calls.push(call);
+        yield 'ok';
+      },
+    });
+    const summary = modes().find((input) => input.mode === 'recheck_summary');
+    if (summary === undefined) throw new Error('no recheck_summary mode input');
+    for await (const _ of llm.write(summary)) void _;
+    const instructions = calls[0]?.instructions ?? '';
+    expect(instructions).toContain('Write two or three sentences from the verdict rows.');
+    expect(instructions).toContain('say in plain words what was tried and what happened');
+    expect(instructions).toContain('Never print internal status words such as not_found, blocked, timeout, source_unavailable or unverifiable.');
+    expect(instructions).toContain('news published since the user\'s earlier question');
+    expect(instructions).toContain('Report each news item in one sentence of its own, in addition to the two or three sentences for the rows.');
+    expect(instructions).toContain('Give the date the item states');
+  });
+
   it('names tried dates, a nearest hit and askedOn as words, with no ISO form', async () => {
     const calls: StreamCall[] = [];
     const llm = createAiSdkLlm('test-key', defaultConfig, {

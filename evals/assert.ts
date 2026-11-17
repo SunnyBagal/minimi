@@ -3,8 +3,9 @@
  */
 import type { AgentEvent, Claim, MemoryStore, Verdict, VerdictRow } from '../src/core/contracts';
 import { containsQuote } from '../src/core/search/index';
+import { formatLocal } from '../src/core/time/format';
 import type { JudgeAnswer, JudgeId } from './judge';
-import type { Assertion, CaseRun, TurnTrace } from './types';
+import { TZ, type Assertion, type CaseRun, type TurnTrace } from './types';
 
 export function ok(name: string, pass: boolean, observed: unknown): Assertion {
   return { name, pass, observed };
@@ -56,16 +57,42 @@ function claimNumbers(claims: readonly Claim[]): string[] {
   return claims.flatMap((claim) => numbersIn(`${claim.value} ${claim.quote}`));
 }
 
-/**
- * Numbers in the answer must also appear in the user messages, the stored
- * claims, the verdict rows, the fetched source text, or the pipeline's own
- * "Checked <local time>" line. The last of those is code, not the model.
- */
-export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
-  const answer = answerOf(events);
-  const body = answer.replace(/^Checked [^\n]*\n?/gm, '');
-  const wanted = new Set(numbersIn(body));
-  const allowed = new Set<string>([
+/** The spec's literal number check. It is recorded, and it does not score the run. */
+export const LITERAL_NUMBERS_PREFIX =
+  'numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message';
+
+export const SCORED_NUMBERS_PREFIX = 'numbers are in the message, claims, rows or evidence';
+
+const SEARCH_FAILED_LINE =
+  "Search failed: I could not get any web results for this, so I can't give you current facts on it. Try again, or rephrase the question.";
+
+/** Whole lines the pipeline builds in code. Anchored to the fixed wording. */
+const CODE_LINE: readonly RegExp[] = [
+  /^On .+ you asked: ".*"\.(?: \(seeded demo history\))?$/,
+  /^I found more than one conversation that could match:$/,
+  /^Which one do you mean\?$/,
+  /^- .+?, \d{2}:\d{2} .+: ".*"$/,
+  /^- .+ \(as of .+; from memory, not re-checked\)$/,
+  /^Skipped \d+ lower-priority claim\(s\) over the limit of \d+: .+\.$/,
+  /^\(\d+ undated search result\(s\) were set aside\.\)$/,
+];
+
+const literalByRun = new WeakMap<CaseRun, Assertion[]>();
+
+function withoutChecked(answer: string): string {
+  return answer.replace(/^Checked [^\n]*\n?/gm, '');
+}
+
+/** Drops the code-built lines. The Checked line is removed by the caller. */
+export function withoutCodeBuiltLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => line !== SEARCH_FAILED_LINE && !CODE_LINE.some((pattern) => pattern.test(line)))
+    .join('\n');
+}
+
+function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], answer: string): Set<string> {
+  return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
     ...claimNumbers(allClaims(run.store)),
     ...verdictsOf(events).flatMap((row) =>
@@ -78,12 +105,67 @@ export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: stri
     ...sources.flatMap((text) => numbersIn(text)),
     ...numbersIn(answer.match(/^Checked [^\n]*/gm)?.join(' ') ?? ''),
   ]);
-  const extra = [...wanted].filter((token) => !allowed.has(token));
-  const name =
-    label === ''
-      ? 'numbers are in the message, claims, rows or evidence'
-      : `numbers are in the message, claims, rows or evidence (${label})`;
-  return ok(name, extra.length === 0, extra);
+}
+
+function caseZone(run: CaseRun, events: AgentEvent[]): string {
+  for (const part of run.parts) {
+    if (part.traces.some((trace) => trace.events === events)) return part.tz;
+  }
+  return TZ;
+}
+
+/** Digits of the dates the system itself emitted on this turn. Nothing else. */
+function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
+  const recall = recallOf(events);
+  const texts: string[] = [];
+  if (recall !== undefined) {
+    texts.push(...recall.candidates.dates);
+    if (recall.candidates.range !== null) {
+      texts.push(recall.candidates.range.from, recall.candidates.range.to);
+    }
+    for (const hit of recall.hits) {
+      texts.push(hit.userTurn.localDate);
+      texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
+    }
+  }
+  for (const row of verdictsOf(events)) {
+    texts.push(formatLocal(row.claim.asOfUtc, zone));
+    texts.push(formatLocal(row.check.checkedAtUtc, zone));
+  }
+  return texts.flatMap((text) => numbersIn(text));
+}
+
+function extras(wanted: Set<string>, allowed: Set<string>): string[] {
+  return [...wanted].filter((token) => !allowed.has(token));
+}
+
+function recordLiteral(run: CaseRun, assertion: Assertion): void {
+  const list = literalByRun.get(run) ?? [];
+  list.push(assertion);
+  literalByRun.set(run, list);
+}
+
+/** Literal number checks recorded while `numbersAllowed` ran. The harness appends them. */
+export function literalAssertions(run: CaseRun): Assertion[] {
+  return literalByRun.get(run) ?? [];
+}
+
+/**
+ * Scored reading: code-built lines are not the model's numbers, and digits of
+ * dates the system emitted are allowed. The spec's literal reading is recorded
+ * beside it and does not decide `passed`.
+ */
+export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
+  const answer = answerOf(events);
+  const literalBody = withoutChecked(answer);
+  const scoredBody = withoutCodeBuiltLines(literalBody);
+  const allowed = baseAllowed(run, events, sources, answer);
+  const literalExtra = extras(new Set(numbersIn(literalBody)), allowed);
+  const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, caseZone(run, events))]);
+  const scoredExtra = extras(new Set(numbersIn(scoredBody)), scoredAllowed);
+  const suffix = label === '' ? '' : ` (${label})`;
+  recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
+  return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);
 }
 
 function allClaims(store: MemoryStore): Claim[] {

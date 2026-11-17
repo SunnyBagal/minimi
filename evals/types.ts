@@ -31,6 +31,8 @@ export interface CasePart {
 export interface PartTrace {
   traces: TurnTrace[];
   log: FixtureCall[];
+  /** Zone of this part. Verdict timestamps are formatted in it. */
+  tz: string;
 }
 
 export interface CaseRun {

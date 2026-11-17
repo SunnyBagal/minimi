@@ -33,6 +33,7 @@ describe('selftest', () => {
       passAtAll: number[];
       flaky: number[];
       failing: number[];
+      strict: { passAtAll: number[]; flaky: number[]; failing: number[] };
     };
     expect(written.mode).toBe('selftest');
     const chat = written.cases.find((item) => item.id === 17);
@@ -40,6 +41,8 @@ describe('selftest', () => {
     expect(written.passAtAll).toContain(17);
     expect(written.passAtAll).not.toContain(1);
     expect(written.flaky).not.toContain(17);
+    expect(written.strict.passAtAll).toContain(17);
+    expect(written.strict.passAtAll).not.toContain(1);
     expect(existsSync(join(dir, 'latest.json'))).toBe(false);
   });
 

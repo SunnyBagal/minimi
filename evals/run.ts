@@ -14,7 +14,7 @@ import { systemClock } from '../src/core/systemClock';
 import { CASES, caseById } from './cases/index';
 import { runHarness } from './harness';
 import type { JudgeAnswer } from './judge';
-import { classify } from './score';
+import { classify, literalPass } from './score';
 import type { Assertion } from './types';
 
 const repoResultsDir = join(dirname(fileURLToPath(import.meta.url)), 'results');
@@ -134,6 +134,13 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   }
 
   const totals = classify(records);
+  const strict = classify(
+    records.map((record) => ({
+      id: record.id,
+      runs: record.runs,
+      passedRuns: record.results.filter((result) => literalPass(result.assertions)).length,
+    })),
+  );
   const body = {
     mode: selftest ? 'selftest' : 'live',
     sha,
@@ -142,6 +149,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     passAtAll: totals.passAtAll,
     flaky: totals.flaky,
     failing: totals.failing,
+    strict,
   };
   const dir = options.resultsDir ?? repoResultsDir;
   mkdirSync(dir, { recursive: true });

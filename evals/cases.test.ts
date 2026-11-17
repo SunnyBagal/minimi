@@ -19,6 +19,7 @@ function emptyRun(id: number): CaseRun {
     parts: evalCase.parts.map((part) => ({
       traces: part.messages.map((message) => ({ message, events: [], answerText: '', log: [] })),
       log: [],
+      tz: part.tz,
     })),
     store: createStore(tempDb(), new FakeClock('2026-11-13T13:00:00.000Z'), defaultConfig),
     judge: null,

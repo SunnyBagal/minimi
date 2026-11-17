@@ -26,6 +26,7 @@ import type {
   ExtractionState,
   IanaTz,
   Id,
+  Llm,
   LocalDate,
   MemoryHit,
   MemoryStore,
@@ -37,7 +38,6 @@ import type {
   TimeFns,
   Turn,
 } from '../src/core/contracts';
-import type { Llm } from '../src/core/contracts';
 import { createLlm } from '../src/core/llm/index';
 import { runTurn } from '../src/core/pipeline/runTurn';
 import { SqliteStore } from '../src/core/store/sqliteStore';

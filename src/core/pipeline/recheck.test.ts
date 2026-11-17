@@ -138,6 +138,41 @@ describe('recheck', () => {
     expect(r.store.allClaims()).toHaveLength(1);
   });
 
+  it('extraction on demand sends only the cited evidence to the extractor', async () => {
+    const r = recheckRig({
+      llm: {
+        extractClaims: [
+          { entity: 'Neon', attribute: 'price', value: '19 USD', scope: {}, quote: 'costs 19 USD per month', volatility: 'high', sourceN: 2 },
+        ],
+      },
+      search: { pages: { [NEON_PAGE]: { status: 'ok', live: true, text: 'costs 19 USD per month' } } },
+    });
+    userTurn(r.store, { content: 'Neon pricing?', localDate: '2026-11-09' });
+    const answer = assistantTurn(r.store, {
+      localDate: '2026-11-09',
+      extraction: 'pending',
+      content: 'It costs 19 USD [2].',
+    });
+    const other = source(r.store, { url: 'https://neon.test/other', firstParty: true, text: 'Other page.' });
+    const src = source(r.store, { url: NEON_PAGE, firstParty: true, text: 'costs 19 USD per month' });
+    // The answer cites [2], the second of its two evidence items.
+    const refs = [other, src].map((s, index) => ({
+      n: index + 1,
+      sourceId: s.id,
+      url: s.url,
+      title: s.title,
+      fetchedAtUtc: s.fetchedAtUtc,
+      live: s.live,
+      firstParty: s.firstParty,
+      text: s.text,
+    }));
+    rememberEvidence(r.store, answer.id, refs);
+    await r.run({ message: 'is that still right?' });
+    const calls = r.llm.calls('extractClaims');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.input.evidence.map((item) => item.n)).toEqual([2]);
+  });
+
   // Eval case 19: a dated re-check changes one of three claims; the follow-up
   // "is that still right?" re-checks the report; a second dated re-check must
   // not write a second superseding claim. One session, three turns.

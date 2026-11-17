@@ -145,6 +145,48 @@ describe('fresh', () => {
     expect(search.searchCalls[0]?.query).toBe('my literal question');
   });
 
+  const HIT_B = { url: 'https://neon.test/b', title: 'B', publishedAt: null, text: 'Second page.' };
+  const HIT_C = { url: 'https://neon.test/c', title: 'C', publishedAt: null, text: 'Third page.' };
+
+  it('extraction sends only the cited evidence, with original numbers', async () => {
+    const { run, llm } = freshRig({
+      llm: { write: ['Launch is 19 USD [1], and the extra note holds [3].'] },
+      search: { results: { '*': [HIT, HIT_B, HIT_C] } },
+    });
+    await run({ message: 'q' });
+    const calls = llm.calls('extractClaims');
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.input.evidence.map((item) => item.n)).toEqual([1, 3]);
+    expect(calls[0]?.input.evidence.map((item) => item.text)).toEqual([HIT.text, HIT_C.text]);
+  });
+
+  it('an answer with no citation makes no extractClaims call and marks extraction done', async () => {
+    const { run, store, llm } = freshRig({
+      llm: { write: ['A plain answer with no citations.'] },
+    });
+    await run({ message: 'q' });
+    expect(llm.calls('extractClaims')).toHaveLength(0);
+    expect(lastAssistant(store)?.extraction).toBe('done');
+    expect(store.allClaims()).toHaveLength(0);
+  });
+
+  it('a draft citing an uncited source is not saved', async () => {
+    const { run, store } = freshRig({
+      llm: {
+        write: ['Only the first source is cited [1].'],
+        extractClaims: [
+          { entity: 'Neon', attribute: 'price', value: '19 USD', scope: {}, quote: 'costs 19 USD per month', volatility: 'high', sourceN: 1 },
+          { entity: 'Other', attribute: 'price', value: 'second', scope: {}, quote: 'Second page.', volatility: 'high', sourceN: 2 },
+        ],
+      },
+      search: { results: { '*': [HIT, HIT_B] } },
+    });
+    await run({ message: 'q' });
+    const claims = store.allClaims();
+    expect(claims).toHaveLength(1);
+    expect(claims[0]?.entity).toBe('Neon');
+  });
+
   it('extraction done is marked on the saved turn', async () => {
     const { run, store } = freshRig();
     await run({ message: 'q' });

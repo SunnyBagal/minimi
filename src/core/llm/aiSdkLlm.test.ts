@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultConfig } from '../config';
-import type { Claim, FetchedPage, RouterPlan, SourceRef, VerdictRow, WriteInput } from '../contracts';
+import type { Claim, FetchedPage, MemoryHit, RouterPlan, SourceRef, Turn, VerdictRow, WriteInput } from '../contracts';
 import { claimFixture } from '../testing/fakes';
 import { DATA_CLOSE, DATA_OPEN, unescapeData } from './promptBlocks';
 import { SchemaInvalidError, createAiSdkLlm, type GenerateObjectCall, type StreamCall } from './aiSdkLlm';
@@ -327,6 +327,84 @@ describe('createAiSdkLlm', () => {
       expect(call.webSearch).toBeNull();
       expect(call.stopSteps).toBeNull();
     }
+  });
+
+  it('names tried dates, a nearest hit and askedOn as words, with no ISO form', async () => {
+    const calls: StreamCall[] = [];
+    const llm = createAiSdkLlm('test-key', defaultConfig, {
+      stream: async function* (call) {
+        calls.push(call);
+        yield 'ok';
+      },
+    });
+    const nearestTurn: Turn = {
+      id: 'user-near',
+      sessionId: 's',
+      role: 'user',
+      content: 'What does Postgres hosting cost?',
+      createdAtUtc: '2026-11-05T08:35:00.000Z',
+      tz: 'Asia/Kolkata',
+      localDate: '2026-11-05',
+      origin: 'seed',
+      topic: 'Postgres',
+      entities: [],
+      summary: null,
+      extraction: 'skipped',
+      intent: null,
+      targetTurnIds: [],
+    };
+    const nearest: MemoryHit = {
+      userTurn: nearestTurn,
+      assistantTurn: null,
+      matched: 'topic',
+      score: 1,
+    };
+    const inputs: WriteInput[] = [
+      {
+        mode: 'no_record',
+        message: 'Last Tuesday I asked about Postgres.',
+        tried: { dates: ['2026-11-10', '2026-11-03'], range: null, ambiguous: true, rule: 'two Tuesdays' },
+        nearest: [],
+      },
+      {
+        mode: 'no_record',
+        message: 'Last Tuesday I asked about Postgres.',
+        tried: { dates: ['2026-11-10', '2026-11-03'], range: null, ambiguous: true, rule: 'two Tuesdays' },
+        nearest: [nearest],
+      },
+      {
+        mode: 'recheck_summary',
+        message: 'Has the price changed?',
+        askedOn: '2026-11-10',
+        rows: [row],
+        news: [],
+      },
+    ];
+    for (const input of inputs) {
+      for await (const _delta of llm.write(input)) {
+        // drain
+      }
+    }
+    const body = (call: StreamCall | undefined): string => {
+      const content = call?.messages.at(-1)?.content;
+      return typeof content === 'string' ? content : '';
+    };
+    const triedOnly = body(calls[0]);
+    expect(triedOnly).toContain('Tue 10 Nov 2026');
+    expect(triedOnly).toContain('Tue 3 Nov 2026');
+    expect(triedOnly).not.toContain('2026-11-');
+    expect(calls[0]?.instructions).toContain('Name dates exactly as they are written in the input.');
+
+    const withNearest = body(calls[1]);
+    expect(withNearest).toContain('Thu 5 Nov 2026');
+    expect(withNearest).toContain('Tue 10 Nov 2026');
+    expect(withNearest).toContain('Tue 3 Nov 2026');
+    expect(withNearest).not.toContain('2026-11-');
+
+    const asked = body(calls[2]);
+    expect(asked).toContain('Asked on: Tue 10 Nov 2026');
+    expect(asked).not.toContain('2026-11-');
+    expect(calls[2]?.instructions).toContain('Name dates exactly as they are written in the input.');
   });
 
   it('puts page text and fresh result text through data blocks', async () => {

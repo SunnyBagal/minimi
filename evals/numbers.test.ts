@@ -87,6 +87,29 @@ describe('numbers', () => {
     expect(strict?.observed).toEqual(['1']);
   });
 
+  it('passes the scored check and fails the literal one when the only extra numbers are citation markers', () => {
+    const run = runWith(
+      'Name the tools.',
+      textEvents('Pipeloom [1]. Dealbase [2]. Closewise [3]. Leadharbor [4].'),
+    );
+    const events = run.parts[0]?.traces[0]?.events ?? [];
+    const scored = numbersAllowed(run, events, []);
+    const strict = literalAssertions(run)[0];
+    expect(scored.pass).toBe(true);
+    expect(scored.observed).toEqual([]);
+    expect(strict?.pass).toBe(false);
+    expect(strict?.observed).toEqual(['1', '2', '3', '4']);
+
+    const priced = runWith('What does it cost?', textEvents('The plan costs 19 [1].'));
+    const pricedEvents = priced.parts[0]?.traces[0]?.events ?? [];
+    const pricedScored = numbersAllowed(priced, pricedEvents, []);
+    const pricedStrict = literalAssertions(priced)[0];
+    expect(pricedScored.pass).toBe(false);
+    expect(pricedScored.observed).toEqual(['19']);
+    expect(pricedStrict?.pass).toBe(false);
+    expect(pricedStrict?.observed).toEqual(['19', '1']);
+  });
+
   it('fails both checks when the model writes a price that is in no evidence', () => {
     const run = runWith('What does it cost?', textEvents('The plan costs 19 USD.'));
     const scored = numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], []);

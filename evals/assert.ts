@@ -48,18 +48,31 @@ export function hasDate(text: string, pattern: RegExp): boolean {
   return pattern.test(text);
 }
 
+/** `[n]` spans. Same pattern `validateAnswer` uses to skip digits inside a citation. */
+function citationSpans(text: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = [];
+  for (const match of text.matchAll(/\[(\d+)\]/g)) {
+    const start = match.index ?? 0;
+    spans.push({ start, end: start + match[0].length });
+  }
+  return spans;
+}
+
 /**
  * Digit tokens, so "19" and "2026" both count. Commas inside a token are kept out.
- * A list marker (`1.` or `1)` at the start of a line, then whitespace) is dropped
- * only when `ignoreListMarkers` is set. That is the scored reading. The rule is
- * the one in `validateAnswer`.
+ * When `scored` is set, drop a list marker (`1.` or `1)` at the start of a line,
+ * then whitespace) and drop a token that sits entirely inside `[n]`. Both rules
+ * are the ones in `validateAnswer`. The literal reading leaves them in.
  */
-export function numbersIn(text: string, ignoreListMarkers = false): string[] {
+export function numbersIn(text: string, scored = false): string[] {
+  const citations = scored ? citationSpans(text) : [];
   const tokens: string[] = [];
   for (const match of text.matchAll(/\d+(?:[.,]\d+)*/g)) {
     const start = match.index ?? 0;
     const raw = match[0];
-    if (ignoreListMarkers && isListMarker(text, start, start + raw.length)) continue;
+    const end = start + raw.length;
+    if (scored && isListMarker(text, start, end)) continue;
+    if (scored && citations.some((span) => start >= span.start && end <= span.end)) continue;
     tokens.push(raw.replace(/,/g, ''));
   }
   return tokens;

@@ -326,6 +326,24 @@ describe('recheck', () => {
     expect(textOf(events)).toContain('1 undated search result(s) were set aside');
   });
 
+  it('wantsNews searches one news query per baseline claim entity, not the router entities', async () => {
+    const r = recheckRig({
+      llm: {
+        route: plan({ intent: 'recheck', refersToPrevious: true, wantsNews: true, entities: ['CRM'] }),
+        write: ['Summary.'],
+      },
+      search: { results: { 'closewise news': [], 'leadharbor news': [] } },
+    });
+    storedAnswer(r, [
+      { entity: 'Closewise', attribute: 'price', value: '12 USD' },
+      { entity: 'Leadharbor', attribute: 'price', value: '15 USD' },
+      { entity: 'Closewise', attribute: 'free tier', value: 'no' },
+    ]);
+    await r.run({ message: 'anything new since?' });
+    const newsQueries = r.search.searchCalls.map((call) => call.query).filter((query) => query.endsWith(' news'));
+    expect(newsQueries).toEqual(['Closewise news', 'Leadharbor news']);
+  });
+
   it('the judge gets one retry on a rate-limit error', async () => {
     let judgeCalls = 0;
     const r = recheckRig({

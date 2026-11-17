@@ -187,6 +187,37 @@ describe('fresh', () => {
     expect(claims[0]?.entity).toBe('Neon');
   });
 
+  const EMPTY_ANSWER =
+    "I couldn't write an answer from the search results this time. Ask again and I'll try once more.";
+
+  it('an empty writer answer reports a write error and saves the fallback text', async () => {
+    const { run, store, llm } = freshRig({ llm: { write: [] } });
+    const events = await run({ message: 'q' });
+    expect(events.filter((e) => e.type === 'error')).toEqual([
+      { type: 'error', stage: 'write', message: 'The writer returned no text.' },
+    ]);
+    const tail = types(events, ['status']);
+    expect(tail.slice(-4)).toEqual(['error', 'text', 'timing', 'done']);
+    const textEvents = events.filter((e) => e.type === 'text');
+    expect(textEvents).toHaveLength(1);
+    if (textEvents[0]?.type === 'text') expect(textEvents[0].delta).toBe(EMPTY_ANSWER);
+    expect(events.some((e) => e.type === 'citations')).toBe(false);
+    expect(events.some((e) => e.type === 'flags')).toBe(false);
+    expect(llm.calls('extractClaims')).toHaveLength(0);
+    const saved = lastAssistant(store);
+    expect(saved?.content).toBe(EMPTY_ANSWER);
+    expect(saved?.intent).toBe('fresh');
+    expect(saved?.extraction).toBe('skipped');
+  });
+
+  it('a whitespace-only writer answer takes the same empty-answer path', async () => {
+    const { run, store } = freshRig({ llm: { write: ['  ', '\n'] } });
+    const events = await run({ message: 'q' });
+    expect(events.filter((e) => e.type === 'error')).toHaveLength(1);
+    expect(events.some((e) => e.type === 'citations')).toBe(false);
+    expect(lastAssistant(store)?.content).toBe(EMPTY_ANSWER);
+  });
+
   it('extraction done is marked on the saved turn', async () => {
     const { run, store } = freshRig();
     await run({ message: 'q' });

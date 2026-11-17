@@ -6,7 +6,9 @@
  *
  * Choosing: group the store's hits by their user turn's local date. When the
  * plan names a topic, only dates with a 'date+topic' hit qualify; otherwise
- * any hit qualifies. One qualifying date → the highest-scoring hit on it.
+ * any hit qualifies. With more than one qualifying date and a plan topic,
+ * dates whose best hit scores below MIN_SCORE_SHARE of the top score are
+ * dropped first. One remaining date → the highest-scoring hit on it.
  * More than one → ambiguous. None → no record.
  */
 import type {
@@ -41,6 +43,14 @@ function previousAnswerHits(recent: Turn[], referenced: Turn): MemoryHit[] {
   if (userTurn === undefined || userTurn.role !== 'user') return [];
   return [{ userTurn, assistantTurn: referenced, matched: 'date', score: 0 }];
 }
+
+/**
+ * A date that shares one generic word ("pricing") with the question while
+ * another date shares most of its terms is not a competing match; two dates
+ * with comparable scores stay ambiguous. The choosing step drops every date
+ * whose best hit scores less than this fraction of the top best score.
+ */
+const MIN_SCORE_SHARE = 0.5;
 
 /** The user turns of `hits`, grouped by local date, in the order they appear. */
 function datesWithHits(hits: MemoryHit[], withTopic: boolean): Map<LocalDate, MemoryHit[]> {
@@ -104,6 +114,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   let hits: MemoryHit[];
   let chosen: LocalDate | null = null;
   let chosenHit: MemoryHit | null = null;
+  let ambiguousHits: MemoryHit[] = [];
   let referenced: Turn | null = null;
 
   if (plan.refersToPrevious) {
@@ -143,8 +154,16 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
       yield doneResolve();
       return;
     }
-    if (qualifying.length === 1) {
-      const [date, dateHits] = qualifying[0] ?? [null, []];
+    let choices = qualifying;
+    if (plan.topic !== null && choices.length > 1) {
+      const bestOf = (dateHits: MemoryHit[]): number =>
+        dateHits.reduce((best, hit) => Math.max(best, hit.score), 0);
+      const top = Math.max(...choices.map(([, dateHits]) => bestOf(dateHits)));
+      choices = choices.filter(([, dateHits]) => bestOf(dateHits) >= top * MIN_SCORE_SHARE);
+    }
+    ambiguousHits = choices.flatMap(([, dateHits]) => dateHits);
+    if (choices.length === 1) {
+      const [date, dateHits] = choices[0] ?? [null, []];
       chosen = date;
       chosenHit = dateHits.reduce((a, b) => (b.score > a.score ? b : a));
       referenced = chosenHit.assistantTurn;
@@ -156,8 +175,8 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
 
   if (chosen === null) {
     // Ambiguous: name each candidate with the user's own question as its summary.
-    const qualifyingHits = [...datesWithHits(hits, plan.topic !== null).values()].flat();
-    yield ctx.textEvent(ambiguousLine(qualifyingHits, ctx));
+    // Only the dates still competing after the score-share rule are listed.
+    yield ctx.textEvent(ambiguousLine(ambiguousHits, ctx));
     ctx.saveAssistant({ intent: plan.intent, extraction: 'skipped', targetTurnIds: [] });
     return;
   }

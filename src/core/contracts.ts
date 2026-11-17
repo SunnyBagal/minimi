@@ -426,7 +426,15 @@ export interface AgentConfig {
     /** Searches the answer model may start itself per turn through web_search. Default 1. */
     toolSearches: number;
   };
-  deadlinesMs: { router: number; search: number; recheckFetch: number; judge: number; turn: number };
+  deadlinesMs: {
+    router: number;
+    search: number;
+    recheckFetch: number;
+    judge: number;
+    turn: number;
+    /** The claim extractor's deadline. When absent, extractClaims uses `judge`. */
+    extract?: number;
+  };
   /** Days before a claim counts as stale, per volatility. Product defaults, not facts. */
   shelfLifeDays: Record<Volatility, number>;
 }

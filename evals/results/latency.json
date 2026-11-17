@@ -1,0 +1,193 @@
+{
+  "runs": 9,
+  "generatedAtUtc": "2026-11-17T22:53:27.096Z",
+  "passes": 3,
+  "stages": {
+    "persist": {
+      "ms": [
+        20,
+        0,
+        0,
+        1,
+        5,
+        3,
+        1,
+        1,
+        1
+      ],
+      "medianMs": 1
+    },
+    "route": {
+      "ms": [
+        1765,
+        1451,
+        1852,
+        1356,
+        1524,
+        1691,
+        1446,
+        1419,
+        1684
+      ],
+      "medianMs": 1524
+    },
+    "write": {
+      "ms": [
+        1861,
+        4695,
+        1798,
+        5001,
+        1712,
+        4673
+      ],
+      "medianMs": 3267
+    },
+    "search": {
+      "ms": [
+        3462,
+        324,
+        343
+      ],
+      "medianMs": 343
+    },
+    "validate": {
+      "ms": [
+        2,
+        0,
+        1
+      ],
+      "medianMs": 1
+    },
+    "extract": {
+      "ms": [
+        17309,
+        17773,
+        18765
+      ],
+      "medianMs": 17773
+    },
+    "resolve": {
+      "ms": [
+        0,
+        0,
+        0
+      ],
+      "medianMs": 0
+    },
+    "fetch": {
+      "ms": [
+        2260,
+        541,
+        608
+      ],
+      "medianMs": 608
+    },
+    "judge": {
+      "ms": [
+        11258,
+        8734,
+        5304
+      ],
+      "medianMs": 8734
+    },
+    "summary": {
+      "ms": [
+        1962,
+        1849,
+        2721
+      ],
+      "medianMs": 1962
+    }
+  },
+  "turns": [
+    {
+      "pass": 1,
+      "message": "Explain what a connection pooler does in two sentences.",
+      "intent": "chat",
+      "firstTextMs": 2559.588708,
+      "totalMs": 3646.862458,
+      "verdicts": 0
+    },
+    {
+      "pass": 1,
+      "message": "What does Neon's Launch plan cost per month right now?",
+      "intent": "fresh",
+      "firstTextMs": 7130.385292000001,
+      "totalMs": 26936.53725,
+      "verdicts": 0
+    },
+    {
+      "pass": 1,
+      "message": "Is that still right?",
+      "intent": "recheck",
+      "firstTextMs": 1854.7994580000013,
+      "totalMs": 17351.969833000003,
+      "verdicts": 6
+    },
+    {
+      "pass": 2,
+      "message": "Explain what a connection pooler does in two sentences.",
+      "intent": "chat",
+      "firstTextMs": 2106.884874999996,
+      "totalMs": 3158.248625,
+      "verdicts": 0
+    },
+    {
+      "pass": 2,
+      "message": "What does Neon's Launch plan cost per month right now?",
+      "intent": "fresh",
+      "firstTextMs": 4646.263834000005,
+      "totalMs": 24631.201416999997,
+      "verdicts": 0
+    },
+    {
+      "pass": 2,
+      "message": "Is that still right?",
+      "intent": "recheck",
+      "firstTextMs": 1696.8568340000056,
+      "totalMs": 12827.377667000008,
+      "verdicts": 5
+    },
+    {
+      "pass": 3,
+      "message": "Explain what a connection pooler does in two sentences.",
+      "intent": "chat",
+      "firstTextMs": 2174.213208999994,
+      "totalMs": 3161.9372920000023,
+      "verdicts": 0
+    },
+    {
+      "pass": 3,
+      "message": "What does Neon's Launch plan cost per month right now?",
+      "intent": "fresh",
+      "firstTextMs": 4012.3094580000034,
+      "totalMs": 25212.983416999996,
+      "verdicts": 0
+    },
+    {
+      "pass": 3,
+      "message": "Is that still right?",
+      "intent": "recheck",
+      "firstTextMs": 1687.677165999994,
+      "totalMs": 10333.462332999989,
+      "verdicts": 8
+    }
+  ],
+  "messages": [
+    {
+      "message": "Explain what a connection pooler does in two sentences.",
+      "medianFirstTextMs": 2174.213208999994,
+      "medianTotalMs": 3161.9372920000023
+    },
+    {
+      "message": "What does Neon's Launch plan cost per month right now?",
+      "medianFirstTextMs": 4646.263834000005,
+      "medianTotalMs": 25212.983416999996
+    },
+    {
+      "message": "Is that still right?",
+      "medianFirstTextMs": 1696.8568340000056,
+      "medianTotalMs": 12827.377667000008
+    }
+  ]
+}

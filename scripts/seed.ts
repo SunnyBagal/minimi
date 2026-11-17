@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url';
 import { DateTime } from 'luxon';
 import { getDeps } from '../src/compose';
 import type {
+  AgentConfig,
   AgentDeps,
   AgentEvent,
   Check,
@@ -36,6 +37,8 @@ import type {
   TimeFns,
   Turn,
 } from '../src/core/contracts';
+import type { Llm } from '../src/core/contracts';
+import { createLlm } from '../src/core/llm/index';
 import { runTurn } from '../src/core/pipeline/runTurn';
 import { SqliteStore } from '../src/core/store/sqliteStore';
 import { systemClock } from '../src/core/systemClock';
@@ -81,6 +84,20 @@ export function seedDates(
   // before; on 3 Nov the previous year is used so the two never conflict.
   const nov3 = `${year}-11-03` < today ? `${year}-11-03` : `${year - 1}-11-03`;
   return { monday, tuesday, nov3 };
+}
+
+/**
+ * Batch deadlines for seed runs: no user is waiting, and the interactive
+ * budgets are too tight. Measured real run of the CRM seed message: write
+ * 14426 ms, evidence 10 sources / 151682 chars, extractClaims 33554 ms —
+ * past both the 30000 extract and 45000 turn defaults. 90000 is about 2.7×
+ * the measured extraction; 180000 leaves room for that plus the write.
+ */
+export function seedConfig(config: AgentConfig): AgentConfig {
+  return {
+    ...config,
+    deadlinesMs: { ...config.deadlinesMs, extract: 90000, turn: 180000 },
+  };
 }
 
 /** A clock pinned at one instant — written here, not imported from testing. */
@@ -217,12 +234,27 @@ export async function seed(deps: AgentDeps, today: Clock, tz: IanaTz): Promise<S
     const sessionId = crypto.randomUUID();
     const instant = DateTime.fromISO(`${date}T11:00`, { zone: tz }).toUTC().toJSDate();
     const wrapper = new SeedStore(store, deps.clock);
+    // extractInto swallows the extractor's error, so record it here to say why.
+    let extractError: string | null = null;
+    const llm: Llm = {
+      route: (input) => deps.llm.route(input),
+      extractClaims: async (input) => {
+        try {
+          return await deps.llm.extractClaims(input);
+        } catch (error) {
+          extractError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+          throw error;
+        }
+      },
+      judge: (input) => deps.llm.judge(input),
+      write: (input, signal) => deps.llm.write(input, signal),
+    };
     const events: AgentEvent[] = [];
     let runError: string | null = null;
     try {
       for await (const event of runTurn(
         { sessionId, message, tz, origin: 'seed' },
-        { ...deps, clock: fixedClock(instant), store: wrapper },
+        { ...deps, clock: fixedClock(instant), store: wrapper, llm },
       )) {
         events.push(event);
       }
@@ -243,7 +275,11 @@ export async function seed(deps: AgentDeps, today: Clock, tz: IanaTz): Promise<S
     else if (assistant === undefined) reason = 'turn did not finish';
     else if (assistant.intent !== 'fresh') reason = `routed to ${assistant.intent ?? 'none'}`;
     else if (cited === 0) reason = 'search returned nothing';
-    else if (assistant.extraction !== 'done') reason = `claim extraction ${assistant.extraction}`;
+    else if (assistant.extraction !== 'done')
+      reason =
+        extractError !== null
+          ? `claim extraction failed (${extractError})`
+          : `claim extraction ${assistant.extraction}`;
 
     if (reason !== null || assistant === undefined) {
       store.deleteSeed({ sessionId, sourceIds: wrapper.savedSourceIds });
@@ -270,7 +306,14 @@ export async function seed(deps: AgentDeps, today: Clock, tz: IanaTz): Promise<S
 
 async function main(): Promise<void> {
   if (existsSync('.env')) process.loadEnvFile('.env');
-  const deps = getDeps();
+  const base = getDeps();
+  // The Llm closes over its config at creation, so it is rebuilt, not patched.
+  const config = seedConfig(base.config);
+  const deps: AgentDeps = {
+    ...base,
+    config,
+    llm: createLlm(process.env.ANTHROPIC_API_KEY ?? '', config),
+  };
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const result = await seed(deps, systemClock, tz);
   process.exitCode = result.failures.length > 0 ? 1 : 0;

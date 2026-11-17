@@ -12,7 +12,7 @@ import { SqliteStore } from '../src/core/store/sqliteStore';
 import type { FakeLlmScript, FakeSearchScript, RouteInput } from '../src/core/testing/fakes';
 import { FakeClock, FakeLlm, FakeSearch, chatPlan, passThroughGuard } from '../src/core/testing/fakes';
 import { time } from '../src/core/time/index';
-import { seed, seedDates } from './seed';
+import { seed, seedConfig, seedDates } from './seed';
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -128,6 +128,18 @@ describe('seedDates', () => {
     // The ambiguous day: on 3 Nov the 3-Nov seed must be last year's.
     expect(seedDates(new Date('2026-11-03T12:00:00Z'), 'UTC', time).nov3).toBe('2025-11-03');
     expect(seedDates(new Date('2026-11-04T12:00:00Z'), 'UTC', time).nov3).toBe('2026-11-03');
+  });
+});
+
+describe('seedConfig', () => {
+  it('raises only the extract and turn deadlines', () => {
+    const before = structuredClone(defaultConfig);
+    const config = seedConfig(defaultConfig);
+    expect(defaultConfig).toEqual(before);
+    expect(config).toEqual({
+      ...before,
+      deadlinesMs: { ...before.deadlinesMs, extract: 90000, turn: 180000 },
+    });
   });
 });
 
@@ -305,7 +317,7 @@ describe('seed', () => {
     // Conversations run oldest first: nov3, tuesday, monday — call 1 is tuesday.
     expect(result.failures).toHaveLength(1);
     expect(result.failures[0]?.key).toBe('tuesday');
-    expect(result.failures[0]?.reason).toBe('claim extraction failed');
+    expect(result.failures[0]?.reason).toBe('claim extraction failed (Error: extractor exploded)');
     const leftovers = store.findTurns({ dates: ['2026-11-10'], excludeTurnIds: [], limit: 10 });
     expect(leftovers).toEqual([]);
   });

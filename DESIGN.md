@@ -4,7 +4,7 @@ A chat agent with one tool, web search. It stores each answer as claims with a s
 
 ## How it works
 
-- One Next.js process, two keys (Anthropic, Exa), one SQLite file via `node:sqlite`. the Node version in `package.json` `engines`.
+- One Next.js process, two keys (Anthropic, Exa), one SQLite file via `node:sqlite`, on the Node version in `package.json` `engines`.
 - Every turn is saved with UTC time, timezone and the date on the user's clock.
 - A small model returns a plan: intent, the time phrase as typed, topic, queries. It never computes a date.
 - Code resolves the phrase to candidate dates. "Last Tuesday" on a Friday gives two; memory decides, and the answer states the date.

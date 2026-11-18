@@ -9,6 +9,8 @@ Ask about anything that changes (a price, a plan, a release) and minimi searches
   <img src="docs/images/recheck-light.png" alt="Is that still right? The recalled question and the verdict table" width="48%">
 </p>
 
+**Live demo:** https://minimi-nine.vercel.app (Vercel). The demo's memory is temporary: Vercel functions can only write to a short-lived temp folder per instance, so recall and "Is that still right?" may not find earlier answers there. Run it locally for the full memory.
+
 ## Try it
 
 Needs Node 26.13 or later (the current LTS; `.nvmrc` pins 26.13.1), an Anthropic key and an Exa key.

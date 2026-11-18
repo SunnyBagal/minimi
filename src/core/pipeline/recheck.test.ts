@@ -132,6 +132,31 @@ describe('recheck', () => {
     }
   });
 
+  it('a third-party page never yields unchanged or changed, even live with the quote on it (held-out case 116)', async () => {
+    const BLOG = 'https://reviews.example.test/neon-pricing-roundup';
+    for (const verdict of ['unchanged', 'changed'] as const) {
+      const r = recheckRig({
+        llm: {
+          route: plan({ intent: 'recheck', refersToPrevious: true }),
+          judge: {
+            verdict,
+            newValue: verdict === 'changed' ? '24 USD/month' : null,
+            quote: verdict === 'changed' ? 'costs 24 USD per month' : 'costs 19 USD per month',
+            quoteUrl: BLOG,
+            scope: {},
+            reason: 'From the blog.',
+          },
+          write: ['Summary.'],
+        },
+        search: { pages: { [BLOG]: { status: 'ok', live: true, text: 'costs 19 USD per month, now costs 24 USD per month' } }, results: {} },
+      });
+      storedAnswer(r, [{ firstParty: false, url: BLOG }]);
+      const row = verdicts(await r.run({ message: 'Is that still right?' }))[0];
+      expect(row?.check.verdict).toBe('unverifiable');
+      expect(row?.check.reason).toContain('third-party');
+    }
+  });
+
   it('a page with live: false never yields a fast-path unchanged', async () => {
     const r = recheckRig({
       search: { pages: { [NEON_PAGE]: { status: 'ok', live: false, text: 'costs 19 USD per month' } } },

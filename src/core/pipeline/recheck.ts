@@ -158,9 +158,21 @@ async function judgeClaim(ctx: TurnContext, work: ClaimWork): Promise<VerdictRow
         page = fetched;
       }
     }
+    // The page the judge reads must be the vendor's own for its verdict to stand: a third-party
+    // page (a blog, a review site) can repeat an old price long after the vendor changed it.
+    const judgedFirstParty = judgedSource !== null ? judgedSource.firstParty : oldSource?.firstParty === true;
     try {
       const output = await judgeOnce(ctx, claim, page, fresh);
       decision = ctx.guardVerdict(output, { claim, page, fresh, now: ctx.now, containsQuote });
+      if (!judgedFirstParty && (decision.verdict === 'unchanged' || decision.verdict === 'changed')) {
+        decision = {
+          verdict: 'unverifiable',
+          newValue: null,
+          newQuote: null,
+          reason: "Only a third-party page was available, and it can't confirm the vendor's current value.",
+          decidedBy: 'guard',
+        };
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       decision = {

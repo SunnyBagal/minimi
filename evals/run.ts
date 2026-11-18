@@ -1,6 +1,8 @@
 /**
  * Eval runner. `npm run evals -- --selftest` proves the harness with no network.
- * A full run of all 19 cases writes `latest.json`. A partial run does not.
+ * `latest.json` is only a live run of all 19 cases with at least 3 runs.
+ * A full run with fewer runs writes `full.json` and a dated stamp.
+ * A partial run writes a dated stamp and does not replace either file.
  * It does not round 2 of 3 up.
  *
  * Usage:
@@ -44,6 +46,11 @@ export interface ExecuteOptions {
    * so a gate run never touches `evals/results/` in the repo.
    */
   resultsDir?: string;
+  /**
+   * Replaces the eval harness. A test passes a stub so a live-mode run can
+   * write results with no network and no API key.
+   */
+  runHarness?: typeof runHarness;
 }
 
 export interface ExecuteResult {
@@ -65,10 +72,15 @@ export interface EvalSelection {
   error: string | null;
 }
 
-function readFlag(argv: string[], name: string): string | undefined {
+/** The value after a flag. `error` is set when the flag is present and has no value. */
+function readFlag(argv: string[], name: string): { value: string | undefined; error: string | null } {
   const index = argv.indexOf(name);
-  if (index === -1) return undefined;
-  return argv[index + 1];
+  if (index === -1) return { value: undefined, error: null };
+  const next = argv[index + 1];
+  if (next === undefined || next.startsWith('--') || next.trim() === '') {
+    return { value: undefined, error: `evals: ${name} needs a value` };
+  }
+  return { value: next, error: null };
 }
 
 function loadKey(): string {
@@ -99,6 +111,16 @@ function parseIdList(text: string): number[] {
   return text.split(',').map((part) => Number(part.trim()));
 }
 
+function emptySelection(selftest: boolean, quick: boolean, error: string): EvalSelection {
+  return { selftest, quick, runs: 0, ids: [], error };
+}
+
+function isFullSet(ids: number[]): boolean {
+  const all = allIds();
+  const got = new Set(ids);
+  return ids.length === all.length && all.every((id) => got.has(id));
+}
+
 /** Reads `--runs`, `--case`, `--cases`, `--quick` and `--selftest`. Default runs is 1. */
 export function parseEvalArgs(argv: string[]): EvalSelection {
   const selftest = argv.includes('--selftest');
@@ -106,33 +128,45 @@ export function parseEvalArgs(argv: string[]): EvalSelection {
   const caseFlag = readFlag(argv, '--case');
   const casesFlag = readFlag(argv, '--cases');
   const runsFlag = readFlag(argv, '--runs');
-  const runs = runsFlag === undefined ? 1 : Number(runsFlag);
-  if (!Number.isInteger(runs) || runs < 1) {
-    return { selftest, quick, runs: 0, ids: [], error: 'evals: --runs must be a positive integer' };
+  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error;
+  if (missing !== null) return emptySelection(selftest, quick, missing);
+  if (quick && (caseFlag.value !== undefined || casesFlag.value !== undefined || runsFlag.value !== undefined)) {
+    return emptySelection(selftest, quick, 'evals: --quick does not take --case, --cases or --runs');
   }
-  if (caseFlag !== undefined && casesFlag !== undefined) {
-    return { selftest, quick, runs, ids: [], error: 'evals: pass --case or --cases, not both' };
+  const runs = runsFlag.value === undefined ? 1 : Number(runsFlag.value);
+  if (!Number.isInteger(runs) || runs < 1) {
+    return emptySelection(selftest, quick, 'evals: --runs must be a positive integer');
+  }
+  if (caseFlag.value !== undefined && casesFlag.value !== undefined) {
+    return emptySelection(selftest, quick, 'evals: pass --case or --cases, not both');
   }
 
   let ids: number[];
-  if (caseFlag !== undefined) ids = [Number(caseFlag)];
-  else if (casesFlag !== undefined) ids = parseIdList(casesFlag);
+  if (caseFlag.value !== undefined) ids = [Number(caseFlag.value)];
+  else if (casesFlag.value !== undefined) ids = parseIdList(casesFlag.value);
   else if (selftest) ids = [1, 4, 17];
   else if (quick) ids = [...QUICK_IDS];
   else ids = allIds();
 
   if (ids.length === 0 || ids.some((id) => !Number.isInteger(id) || caseById(id) === undefined)) {
-    return { selftest, quick, runs, ids: [], error: 'evals: --case must be an integer from 1 to 19' };
+    return emptySelection(selftest, quick, 'evals: --case must be an integer from 1 to 19');
+  }
+  if (new Set(ids).size !== ids.length) {
+    return emptySelection(selftest, quick, 'evals: --cases lists a case more than once');
   }
   return { selftest, quick, runs, ids, error: null };
 }
 
-/** `latest.json` is replaced only by a live run of every case. Quick and partial runs never write it. */
-export function writesLatest(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'ids'>): boolean {
-  if (selection.selftest || selection.quick) return false;
-  const all = allIds();
-  const got = new Set(selection.ids);
-  return selection.ids.length === all.length && all.every((id) => got.has(id));
+/** `latest.json` is the 3-of-3 reading: a live run of every case, at least 3 runs. */
+export function writesLatest(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
+  if (selection.selftest || selection.quick || selection.runs < 3) return false;
+  return isFullSet(selection.ids);
+}
+
+/** A live run of every case with fewer than 3 runs. It never replaces `latest.json`. */
+export function writesFull(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
+  if (selection.selftest || selection.quick || selection.runs >= 3) return false;
+  return isFullSet(selection.ids);
 }
 
 /** A quick live run stays in `quick.json`. Every other run keeps a dated stamp. */
@@ -151,10 +185,12 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     return fail(1, 0);
   }
   const { selftest, runs, ids } = selection;
+  const harness = options.runHarness ?? runHarness;
+  const offline = selftest || options.runHarness !== undefined;
 
   let networkCalls = 0;
   const originalFetch = globalThis.fetch;
-  if (selftest) {
+  if (offline) {
     globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
       networkCalls += 1;
       throw new Error(`selftest blocked a network call to ${String(input)}`);
@@ -162,7 +198,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   }
 
   let apiKey = '';
-  if (!selftest) {
+  if (!offline) {
     apiKey = loadKey();
     if (apiKey === '') {
       console.error('evals: ANTHROPIC_API_KEY is missing');
@@ -177,7 +213,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
       if (evalCase === undefined) continue;
       const results: RunRecord[] = [];
       for (let run = 1; run <= runs; run += 1) {
-        const result = await runHarness(evalCase, { selftest, apiKey });
+        const result = await harness(evalCase, { selftest, apiKey });
         results.push({ run, passed: result.passed, assertions: result.assertions, judge: result.judge });
       }
       const passedRuns = results.filter((result) => result.passed).length;
@@ -189,7 +225,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     console.error(`evals: ${apiKey === '' ? message : message.replaceAll(apiKey, '[redacted]')}`);
     return fail(1, networkCalls);
   } finally {
-    if (selftest) globalThis.fetch = originalFetch;
+    if (offline) globalThis.fetch = originalFetch;
   }
 
   const totals = classify(records);
@@ -215,12 +251,13 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   const stamp = systemClock.now().toISOString().replaceAll(':', '-');
   const file = join(dir, resultsFileName(selection, stamp));
   writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`);
-  // latest.json is what a full reading is compared against. A selftest, a
-  // quick run, or any run that is not all 19 cases leaves it alone.
+  // latest.json is the 3-of-3 reading. A one-run full pass goes to full.json.
+  // A selftest, a quick run, or any run that is not all 19 cases leaves both alone.
   if (writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
+  if (writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
 
   const stdout = summaryLine(totals.passAtAll.length, totals.flaky.length, totals.failing.length);
-  if (selftest && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
+  if (offline && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
   return { exitCode: 0, stdout, networkCalls, resultsFile: file };
 }
 

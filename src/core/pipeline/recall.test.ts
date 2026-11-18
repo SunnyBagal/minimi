@@ -179,15 +179,21 @@ describe('recall', () => {
     expect(textOf(events)).not.toContain('I have nothing saved');
   });
 
-  it('the "I read" line is not added on the previous-answer path, even if the plan also carries a numeric date', async () => {
+  it('a stated date wins over refersToPrevious: the date is looked up, not the last answer (held-out case 113)', async () => {
     const store = new InMemoryStore();
-    userTurn(store, { content: 'Pipeloom Team price?', localDate: '2026-11-09', createdAtUtc: '2026-11-09T05:50:00.000Z', session: SESSION } as never);
+    userTurn(store, { content: 'What does Ivyledger Desk cost?', localDate: '2026-11-09', createdAtUtc: '2026-11-09T10:30:00.000Z', topic: 'Ivyledger' });
+    assistantTurn(store, { localDate: '2026-11-09', topic: 'Ivyledger' });
     const { run } = rig({
       store,
-      llm: { route: plan({ intent: 'recheck', refersToPrevious: true, timeRef: { kind: 'numeric', first: 3, second: 11 }, timeText: '3/11' }), write: ['Summary.'] },
+      timeTable: [{ ref: { kind: 'calendar', day: 9, month: 11 }, result: { dates: ['2026-11-09'], range: null, ambiguous: false, rule: 'calendar date' } }],
+      llm: {
+        route: plan({ intent: 'recall', refersToPrevious: true, timeRef: { kind: 'calendar', day: 9, month: 11 }, timeText: '9 November' }),
+        write: ['Summary.'],
+      },
     });
-    const text = textOf(await run({ message: 'Is that still right for 3/11?' }));
-    expect(text).not.toContain('I read');
+    const events = await run({ message: 'On 9 November I asked about Ivyledger. Is that price still correct?' });
+    expect(recallEvent(events).chosen).toBe('2026-11-09');
+    expect(recallEvent(events).candidates.rule).not.toBe('no previous answer in this session');
   });
 
   it('a numeric date is stated in words: I read "3/11" as 3 November 2026', async () => {

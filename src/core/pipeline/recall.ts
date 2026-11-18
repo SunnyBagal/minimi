@@ -124,7 +124,10 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   let ambiguousHits: MemoryHit[] = [];
   let referenced: Turn | null = null;
 
-  if (plan.refersToPrevious) {
+  // A message that names a date ("On 9 November … is that still correct?") is about that date, even
+  // when the router also set refersToPrevious: code enforces the router's own rule (router.md).
+  const previousAnswer = plan.refersToPrevious && plan.timeRef.kind === 'none';
+  if (previousAnswer) {
     // "Is that still right?" names the last assistant turn in the session.
     referenced = [...recent].reverse().find((turn) => turn.role === 'assistant') ?? null;
     if (referenced === null) {
@@ -184,7 +187,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   // A numeric date ("3/11") reads two ways; say in words which one was used (design review 2.7).
   // Only when the date came from the numeric lookup, never on the previous-answer path.
   if (
-    !plan.refersToPrevious &&
+    !previousAnswer &&
     chosen !== null &&
     plan.timeRef.kind === 'numeric' &&
     plan.timeText !== null &&

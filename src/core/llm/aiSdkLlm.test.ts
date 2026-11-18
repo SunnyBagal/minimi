@@ -433,7 +433,8 @@ describe('createAiSdkLlm', () => {
     expect(triedOnly).toContain('Tue 10 Nov 2026');
     expect(triedOnly).toContain('Tue 3 Nov 2026');
     expect(triedOnly).not.toContain('2026-11-');
-    expect(calls[0]?.instructions).toContain('Name dates exactly as they are written in the input.');
+    // Code now prints the tried dates and nearest matches above the writer's text (noRecord.ts), so the writer must not repeat them.
+    expect(calls[0]?.instructions).toContain('do not repeat any date');
 
     const withNearest = body(calls[1]);
     expect(withNearest).toContain('Thu 5 Nov 2026');
@@ -442,9 +443,10 @@ describe('createAiSdkLlm', () => {
     expect(withNearest).not.toContain('2026-11-');
 
     const asked = body(calls[2]);
-    expect(asked).toContain('Asked on: Tue 10 Nov 2026');
+    expect(asked).toContain('Earlier question asked on: Tue 10 Nov 2026');
     expect(asked).not.toContain('2026-11-');
-    expect(calls[2]?.instructions).toContain('Name dates exactly as they are written in the input.');
+    // Code prints when the user asked (recall card) and when the check ran (Checked line); the summary writes no dates.
+    expect(calls[2]?.instructions).toContain('Do not write any date or time');
   });
 
   it('puts page text and fresh result text through data blocks', async () => {

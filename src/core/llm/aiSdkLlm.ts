@@ -231,7 +231,7 @@ function writerBody(input: WriteInput): string {
     case 'fresh':
       return `${input.message}\n\n${evidenceText(input.evidence)}`;
     case 'recheck_summary':
-      return `${input.message}\n\nAsked on: ${formatWriterDate(input.askedOn)}\n\n${labeledBlock('Verdict rows', rowsText(input.rows))}\n${evidenceText(input.news)}`;
+      return `${input.message}\n\nEarlier question asked on: ${formatWriterDate(input.askedOn)}\n\n${labeledBlock('Verdict rows', rowsText(input.rows))}\n${evidenceText(input.news)}`;
     case 'no_record':
       return `${input.message}\n\n${labeledBlock('Dates tried', triedText(input.tried))}\n${labeledBlock('Nearest matches', nearestText(input.nearest))}`;
     default: {

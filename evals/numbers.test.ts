@@ -154,7 +154,8 @@ describe('numbers', () => {
     expect(strict?.observed).toEqual(['1']);
   });
 
-  it('passes the scored check and fails the literal one when the only extra numbers are citation markers', () => {
+  it('fails both readings on citation markers that name no evidence item of the turn', () => {
+    // No citations event: [1]..[4] point at nothing, so both readings report them.
     const run = runWith(
       'Name the tools.',
       textEvents('Pipeloom [1]. Dealbase [2]. Closewise [3]. Leadharbor [4].'),
@@ -162,19 +163,19 @@ describe('numbers', () => {
     const events = run.parts[0]?.traces[0]?.events ?? [];
     const scored = numbersAllowed(run, events, []);
     const strict = literalAssertions(run)[0];
-    expect(scored.pass).toBe(true);
-    expect(scored.observed).toEqual([]);
+    expect(scored.pass).toBe(false);
+    expect(scored.observed).toEqual(['[1]', '[2]', '[3]', '[4]']);
     expect(strict?.pass).toBe(false);
-    expect(strict?.observed).toEqual(['1', '2', '3', '4']);
+    expect(strict?.observed).toEqual(['[1]', '[2]', '[3]', '[4]']);
 
     const priced = runWith('What does it cost?', textEvents('The plan costs 19 [1].'));
     const pricedEvents = priced.parts[0]?.traces[0]?.events ?? [];
     const pricedScored = numbersAllowed(priced, pricedEvents, []);
     const pricedStrict = literalAssertions(priced)[0];
     expect(pricedScored.pass).toBe(false);
-    expect(pricedScored.observed).toEqual(['19']);
+    expect(pricedScored.observed).toEqual(['[1]', '19']);
     expect(pricedStrict?.pass).toBe(false);
-    expect(pricedStrict?.observed).toEqual(['19', '1']);
+    expect(pricedStrict?.observed).toEqual(['[1]', '19']);
   });
 
   it('case 6: the scored reading allows the date of a nearest turn the no-record writer was given', () => {
@@ -220,6 +221,66 @@ describe('numbers', () => {
     ];
     const timed = runWith('Last Tuesday I asked you about Postgres hosting.', hidden);
     expect(numbersAllowed(timed, hidden, []).observed).toEqual(['14']);
+  });
+
+  it('the literal reading counts every number in a verdict row, its dates included, and the evidence numbers', () => {
+    const row = {
+      claim: {
+        id: 'c1', turnId: 't1', entity: 'Northwind PG', attribute: 'price', value: '19 USD/month', scope: {},
+        sourceId: 's1', quote: 'Starter 19 USD/month', asOfUtc: '2026-11-10T08:35:00.000Z', volatility: 'high' as const,
+        lastVerifiedAtUtc: '2026-11-10T08:35:00.000Z', supersedesId: null,
+      },
+      check: {
+        id: 'k1', claimId: 'c1', turnId: 't2', checkedAtUtc: '2026-11-13T13:00:00.000Z', verdict: 'changed' as const,
+        newValue: '24 USD/month', newQuote: 'Starter 24 USD/month', sourceId: 's2', reason: 'The page now says 24.', decidedBy: 'judge' as const,
+      },
+      provenance: 'verified_now' as const,
+    };
+    const events = [
+      { type: 'verdict', row },
+      { type: 'citations', items: [{ n: 1, sourceId: 's2', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'Northwind PG went from 19 to 24 USD/month [1], as of 13 Nov 2026 (it was 19 on 10 Nov 2026).' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('Has it changed?', events);
+    const scored = numbersAllowed(run, events, []);
+    expect(scored.observed).toEqual([]);
+    expect(literalAssertions(run)[0]?.observed).toEqual([]);
+    // A number in none of those fields still fails.
+    const invented = [...events.slice(0, 2), { type: 'text', delta: 'It is now 31 USD.' }] as unknown as AgentEvent[];
+    const bad = runWith('Has it changed?', invented);
+    numbersAllowed(bad, invented, []);
+    expect(literalAssertions(bad)[0]?.observed).toEqual(['31']);
+  });
+
+  it('a timestamp gives only its date: a price matching a clock minute fails both readings', () => {
+    // 08:35 is the claim's time of day; 35 is not a figure anywhere.
+    const events = [
+      { type: 'verdict', row: { claim: { value: '19 USD/month', quote: 'Starter 19 USD/month', asOfUtc: '2026-11-10T08:35:00.000Z' }, check: { checkedAtUtc: '2026-11-13T13:00:00.000Z', newValue: null, newQuote: null, reason: 'Same.' } } },
+      { type: 'text', delta: 'The price is 35 USD.' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('Has it changed?', events);
+    expect(numbersAllowed(run, events, []).observed).toEqual(['35']);
+    expect(literalAssertions(run)[0]?.observed).toEqual(['35']);
+  });
+
+  it('an evidence number counts only inside a marker that names a real item, never as a free figure', () => {
+    const cited = [
+      { type: 'citations', items: [{ n: 1, sourceId: 's', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'The price is 1 USD [1]. See also [7].' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('What does it cost?', cited);
+    numbersAllowed(run, cited, []);
+    // "1 USD" is a figure (fails); "[1]" names evidence item 1 (skipped); "[7]" names no item (reported as a bad marker).
+    expect(literalAssertions(run)[0]?.observed).toEqual(['[7]', '1']);
+  });
+
+  it('removing a valid marker keeps token boundaries: "1[1]9 USD" is two numbers, not 19', () => {
+    const events = [
+      { type: 'citations', items: [{ n: 1, sourceId: 's', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'It costs 1[1]9 USD.' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('What does it cost?', events);
+    expect(numbersAllowed(run, events, ['19 USD']).observed).toEqual(['1', '9']);
   });
 
   it('fails both checks when the model writes a price that is in no evidence', () => {

@@ -1,4 +1,4 @@
-import { judgeSaysNo, noVerdicts, numbersAllowed, ok, recallOf } from '../assert';
+import { judgeSaysNo, noVerdicts, numbersAllowed, offersIn, ok, recallOf, writerTextOf } from '../assert';
 import { MSG_CASE_3 } from '../messages';
 import { scenarioPgChanged } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
@@ -20,7 +20,7 @@ export const evalCase: EvalCase = {
       ok('no then-price is stated', !prices, answer),
       ok(
         'answer offers to look up Postgres hosting pricing',
-        /postgres/i.test(answer) && /look up|look this up|check now|fresh/i.test(answer),
+        offersIn(writerTextOf(run, events), /postgres[\s\S]*\b(look (it |this |that )?up|check|fresh)\b|\b(look (it |this |that )?up|check|fresh)\b[\s\S]*postgres/i),
         answer,
       ),
       ...judgeSaysNo(run, 'J1'),

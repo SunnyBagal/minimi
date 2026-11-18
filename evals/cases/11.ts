@@ -30,6 +30,7 @@ export const evalCase: EvalCase = {
       ),
       ok('answer does not ask the date question again', !/which one do you mean/i.test(answer), answer),
       numbersAllowed(run, events, []),
+      numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], [], 'first turn'),
     ];
   },
 };

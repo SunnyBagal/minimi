@@ -24,6 +24,7 @@ import type {
   Turn,
 } from '../contracts';
 import { claimLabel } from '../claimLabel';
+import { dateWords } from '../dateWords';
 import { noRecord } from './noRecord';
 import { recheck } from './recheck';
 import { evidenceFor, extractInto } from './evidence';
@@ -127,8 +128,8 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
     // "Is that still right?" names the last assistant turn in the session.
     referenced = [...recent].reverse().find((turn) => turn.role === 'assistant') ?? null;
     if (referenced === null) {
-      // No previous answer at all: nothing was tried, so this is a no record.
-      yield* noRecord(ctx, previousAnswerCandidates(ctx.time.toLocalDate(ctx.now, ctx.tz)));
+      // No previous answer at all: no date was looked up, so no date is tried.
+      yield* noRecord(ctx, { dates: [], range: null, ambiguous: false, rule: 'no previous answer in this session' });
       yield doneResolve();
       return;
     }
@@ -179,6 +180,18 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   const asked = chosen !== null && chosenHit !== null ? askedOf(chosenHit.userTurn) : null;
   yield { type: 'recall', candidates, hits, chosen, asked };
   yield doneResolve();
+
+  // A numeric date ("3/11") reads two ways; say in words which one was used (design review 2.7).
+  // Only when the date came from the numeric lookup, never on the previous-answer path.
+  if (
+    !plan.refersToPrevious &&
+    chosen !== null &&
+    plan.timeRef.kind === 'numeric' &&
+    plan.timeText !== null &&
+    candidates.dates.includes(chosen)
+  ) {
+    yield ctx.textEvent(`I read "${plan.timeText}" as ${dateWords(chosen, 'long')}.\n`);
+  }
 
   if (chosen === null) {
     // Ambiguous: name each candidate with the user's own question as its summary.

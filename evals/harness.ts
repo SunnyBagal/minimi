@@ -14,7 +14,7 @@ import { guardVerdict } from '../src/core/pipeline/guards';
 import { createStore } from '../src/core/store/index';
 import { FakeClock, FakeLlm, fakeTime, passThroughGuard } from '../src/core/testing/fakes';
 import { time } from '../src/core/time/index';
-import { allClaims, literalAssertions, shownAnswerOf } from './assert';
+import { allClaims, checkNotDatedToQuestion, claimsQuoteTheirValues, literalAssertions, shownAnswerOf, turnsFinished } from './assert';
 import { RecordingLlm } from './recordingLlm';
 import { scoredPass } from './score';
 import { FixtureSearch } from './fixtureSearch';
@@ -128,7 +128,13 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
   }
 
   const run: CaseRun = { parts, store, judge };
-  const assertions = [...evalCase.check(run), ...literalAssertions(run)];
+  const assertions = [
+    ...evalCase.check(run),
+    turnsFinished(run),
+    claimsQuoteTheirValues(run),
+    checkNotDatedToQuestion(run),
+    ...literalAssertions(run),
+  ];
   const trace: RunTrace = {
     parts: parts.map((part) => ({
       tz: part.tz,

@@ -1,4 +1,4 @@
-import { chosenIs, intentIs, numbersAllowed, ok, verdictFor, verdictsOf } from '../assert';
+import { allClaims, chosenIs, intentIs, numbersAllowed, ok, verdictFor, verdictsOf } from '../assert';
 import { MSG_CASE_3, MSG_STILL } from '../messages';
 import { scenarioPgChanged } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
@@ -34,11 +34,14 @@ export const evalCase: EvalCase = {
     const originalNorth = stated.find((claim) => claim.entity === 'Northwind PG' && claim.attribute === 'price');
     const current = original == null ? [] : run.store.claimsForTurns([original.id], 'current');
     const currentNorth = current.find((claim) => claim.entity === 'Northwind PG' && claim.attribute === 'price');
+    const replacements =
+      originalNorth === undefined ? [] : allClaims(run.store).filter((claim) => claim.supersedesId === originalNorth.id);
     const oneSupersede =
       originalNorth !== undefined &&
       currentNorth !== undefined &&
       currentNorth.id !== originalNorth.id &&
-      currentNorth.supersedesId === originalNorth.id;
+      currentNorth.supersedesId === originalNorth.id &&
+      replacements.length === 1;
     return [
       intentIs(againEvents, 'recheck'),
       ok('turn A has three verdict rows', againRows.length === 3, againRows.length),
@@ -65,6 +68,7 @@ export const evalCase: EvalCase = {
       ok('turn B Northwind verdict is changed', repeatNorth?.check.verdict === 'changed', repeatNorth?.check.verdict ?? null),
       ok('turn B newValue contains 24', (repeatNorth?.check.newValue ?? '').includes('24'), repeatNorth?.check.newValue ?? null),
       ok('exactly one claim supersedes the original Northwind claim', oneSupersede, currentNorth?.supersedesId ?? null),
+      numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], [], 'first turn'),
       numbersAllowed(run, againEvents, [], 'turn A'),
       numbersAllowed(run, repeatEvents, [], 'turn B'),
     ];

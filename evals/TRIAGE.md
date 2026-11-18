@@ -97,3 +97,65 @@ Codex review of this round (`docs/review/fix-prompts-r1-codex.md`), all fixed of
 - With the plan in `scope.plan`, fallback searches, the summary rows, the verdict table and recall rows name the plan through one helper (`src/core/claimLabel.ts`), so a Basic and a Pro price never read the same.
 - The chat rule keeps numbers already present in text it is asked to quote, rewrite or check (the eval judge quotes through the chat writer).
 These changes came after the 19 × 3 run on `a423aec` and were not re-measured live.
+
+## Round eval-fix-r2 (19 Nov 2026): toward 19 of 19 on both readings
+
+Replay of `evals/results/latest.json` (19 × 3 on `a423aec`, scored 17 of 19, literal 4 of 19) against its traces, offline:
+
+| # | Change | Kind | Before | After |
+| --- | --- | --- | --- | --- |
+| 12 | The literal (and scored) allowed set reads every number the spec's sources hold: a verdict row's claim value, quote **and date** (`asOfUtc`) and its check's values, reason **and time** (`checkedAtUtc`); a stored claim's value, quote **and date**; and the evidence numbers [1]…[n] of this turn's citations. Before, only the rows' and claims' value/quote/reason text was read. This is the spec's own wording ("numbers in evidence, verdict rows, stored claims and the user message"), not a looser check. Note: ISO time digits (for example 08, 35) are now in the set too. | harness | Literal rejected `["13","2026"]` (an "as of 13 Nov 2026" from the row's check time) and `["1","2","3","4"]` (citation numbers) in 12 cases. | Replay: cases 1, 2, 3, 9, 10, 11, 14, 15, 16, 19 and runs 2–3 of 12 clear. `numbers.test.ts` › "the literal reading counts every number in a verdict row, its dates included, and the evidence numbers" (an invented 31 still fails). |
+| 13 | **No-record answers: code states the dates.** `noRecord.ts` prints "I found no saved answer for 10 Nov 2026 or 3 Nov 2026." and the nearest matches with their dates; the writer explains in words and repeats no date. Code does date work (DESIGN.md, "Why"). | product | Cases 4, 5, 6: the writer wrote the tried dates, rejected by the literal reading. | Dates are app-injected (outside the literal check by provenance); the case assertions still see them in the shown answer. `recall.test.ts` › "no record: code states the dates tried …". The Lane 4 test that pinned "Name dates exactly as they are written in the input" in the writer prompt now pins "Do not repeat any date", because code names them. |
+| 14 | **A numeric date is stated in words:** "I read "3/11" as 3 November 2026." The design review (2.7) requires that the answer states the date used for an ambiguous numeric date. The app's date format is unchanged. | product | Case 8 failed every run: "answer says 3 November 2026". | `recall.test.ts` › "a numeric date is stated in words". |
+| 15 | The fresh writer never turns a relative day ("on Monday") into a calendar date. | product | Case 12 run 1 wrote "Monday 9 Nov 2026". | Measured live only. |
+
+### Round eval-fix-r3 (19 Nov 2026)
+
+The 19 × 3 run on `0ad1520` (eval-fix-r2): scored 18 of 19 and literal 18 of 19 at 3 of 3, $0.34. The one failure: case 5 run 3, judge J3 answered "yes", quoting the code-built line "I found no saved answer for 9 Nov 2026." as implying the conversation never happened.
+
+Codex review of eval-fix-r2 (`docs/review/eval-fix-r2-codex.md`) and that failure, fixed offline:
+- Change 12 tightened: a timestamp field contributes only its date (year, month, day, in UTC and in the case's zone), never its clock digits; an evidence number counts only inside a `[n]` marker that names one of this turn's evidence items, never as a free figure. `numbers.test.ts` › "a timestamp gives only its date …", "an evidence number counts only inside a marker …".
+- The no-record line is worded about what is saved, not whether the conversation happened: "I have nothing saved about Postgres hosting from 10 Nov 2026 or 3 Nov 2026, so I can't look that conversation up." It names the topic, as case 6 asks ("nothing about Postgres hosting").
+- With no previous answer in the session, no date is claimed as tried; the writer is told whether dates were shown. Nearest matches are shown as literal text (inline code, one line) and the writer, the user and the recall event get the same three.
+- The "I read "3/11" as …" line only appears when the date came from the numeric lookup.
+- Stronger assertions (spec wording): case 5 must ask for the names or offer a fresh shortlist; case 6 checks the emitted `recall.nearest` topic hit and an actual offer to confirm.
+
+### Round eval-fix-r4 (19 Nov 2026): stronger checks from the research
+
+The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19, $0.43 (one aborted request charged at its reservation). Only case 6 failed, on my narrowed offer check: all three answers did ask to confirm ("Is that match the conversation you meant?"), in wording the regex missed. Research: `docs/research/grok-grounding.md` (Grok, web sources), `docs/research/codex-flake-evidence.md` (Codex, our own results).
+
+- Case 6: the offer check accepts any question that asks the user to confirm which conversation they meant (`asksToConfirm`), tested on those three real answers and two negatives.
+- Every case: **every turn finished** (one `done`, no `error`, a non-empty shown answer) — closes the empty-answer pass Codex found in case 17 after a router timeout.
+- Every case: **every stored claim's quote contains its value's numbers** (Grok, rec. 2: claim-level support). All 183 claims of the `596b1eb` run pass it.
+- Judge: J3 now says that "nothing is saved" is not "it did not happen" (the case 5 false positive); the verdict is the reply's first word ("Not"/"Nope" are not "no"); a yes must quote a sentence that is in the shown answer.
+- Case 2 needs an actual flags event (empty); case 19 needs exactly one stored claim superseding the original.
+- Case 16 and product: for every row that could not be verified, code prints "Couldn't verify Northwind PG price this time (its page could not be fetched live); last verified 19 USD/month on 10 Nov 2026." (Grok, rec. 1: render figures and dates from quote-backed fields). Case 16 now needs one Northwind line pairing 19 with 10 Nov, not the old question's header.
+- The no-record writer never mentions "the app" (one run echoed "The app has shown the dates it checked").
+
+### Round eval-fix-r5 (19 Nov 2026): wrong prose that passed, and the checks that let it
+
+The 19 × 3 run on `07453de` (r4) scored 19 of 19 on both readings, $0.35. Codex's read of its traces (`docs/review/eval-fix-r34-codex.md`) found wrong prose that passed and check gaps. Fixed:
+
+Product
+- Case 11 (all 3 runs): the re-check writer wrote "As of Tue 10 Nov 2026" about a check run on 13 Nov, because its prompt said "Name dates exactly as they are written in the input" and its only date was the earlier question's. The writer now writes no dates or times (code prints when the user asked, on the recall card, and when the check ran, on the Checked line), except the date a news item states; its input labels the date "Earlier question asked on". The Lane 4 pin on the old sentence now pins the new rule.
+- Case 2 (runs 1 and 3): the writer said it did not have the user's earlier wording while the card showed it. The prompt now says the user sees the question word for word and the writer must never say it lacks it.
+- "last verified" only for a claim whose source was live or that a later re-check verified; otherwise "last seen in a search-index copy as …". Tests for both.
+- No-record prompt: dates **or** a range count as a lookup.
+
+Checks
+- Every case: **the writer does not date the check to the earlier question's date** (no writer sentence pairs that date with "as of", "checked", "verified").
+- Case 6: the confirming question must be in the writer's own text (the code-built prefix alone satisfied it); the 5 Nov candidate must be visible.
+- Cases 4 and 5: an offer must be a sentence that is not a refusal ("I cannot look this up" no longer counts), in the writer's text.
+- Number checks: dates the system emitted add only their date, never the clock (a displayed "14:05" no longer licenses "14 USD"); a citation marker that names no evidence item of the turn is reported as a failure in both readings; removing a valid marker keeps token boundaries ("1[1]9" is not 19).
+- First turns are now number-checked in cases 10, 11, 12 and 19.
+- Case 2: the Checked line must be this check's own time. Case 12: per vendor, a stored claim plus a sentence naming it with a cited USD price, or a sentence saying it could not be verified; the live-origin check needs at least one claim. Case 16: the Northwind line must carry that row's own value and last-verified date and say it could not be verified.
+- Judge: the verdict is a whole first word ("No123", "no_idea" are unparsed); a yes must quote a sentence of at least three words that is in the shown answer.
+
+### Round eval-fix-r6 (19 Nov 2026)
+
+Codex's r5 review (`docs/review/eval-fix-r5-codex.md`) supports reporting 19 of 19 on both readings for `77fe8b4` and lists remaining edge cases, all fixed offline and replayed against the `77fe8b4` traces (cases 4–6 still pass; no saved sentence dates a verification wrongly):
+- Offers must be phrased to the user ("I can …", "Want me to …?", "If you send me …") and not negated; a confirming question must itself carry the confirm wording, not borrow it from an earlier "I can't tell which one you meant."
+- The check-date assertion compares any date a verification sentence names (any format) with the day the check actually ran.
+- A judge "yes" must quote most of one sentence of the answer, not a fragment.
+- Case 16 checks both the row binding and the fixture's own 19 USD/month on 10 Nov 2026. Case 12 binds each vendor's sentence to that vendor's own claim amount and a valid citation; an all-abstention reply is allowed.
+- Prose: the fresh writer says what the sources state rather than asserting the price right now; the re-check writer names each row for what it is (price, free tier), and does not describe the screen.

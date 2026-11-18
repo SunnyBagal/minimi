@@ -184,6 +184,98 @@ export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: Reg
   return false;
 }
 
+/** The writer's own text for a turn (what the model wrote, without code-built lines); all text when unrecorded. */
+export function writerTextOf(run: CaseRun, events: AgentEvent[]): string {
+  return modelTextOf(run, events);
+}
+
+const REFUSAL = /\b(can't|cannot|can not|unable|won't|will not|not able|don't|do not|never)\b/i;
+/** An offer is made to the user: "I can …", "I'll …", "Want me to …?", "Would you like …?", "Let me …", or a request to them. */
+const OFFER_FORM = /\b(I can|I could|I'll|I will|I'd be happy|happy to|let me|want me to|shall I|should I|would you like|do you want|if you (tell|send|share|give|list)|tell me|send me|share|give me|list them)\b/i;
+
+/** Some sentence matches `pattern`, is phrased as an offer or request to the user, and does not refuse or negate. */
+export function offersIn(text: string, pattern: RegExp): boolean {
+  return sentencesOf(text).some((sentence) => pattern.test(sentence) && OFFER_FORM.test(sentence) && !REFUSAL.test(sentence));
+}
+
+/** A sentence that asks the user to confirm which conversation they meant. */
+export function asksToConfirm(answer: string): boolean {
+  return sentencesOf(answer)
+    .filter((sentence) => sentence.endsWith('?') && !REFUSAL.test(sentence))
+    .some((question) =>
+      /\b(meant|mean|thinking of|had in mind|the one|that match|that conversation|this conversation|is it|was it|confirm)\b/i.test(
+        question,
+      ),
+    );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Calendar dates a sentence names, as "10 Nov": "10 Nov", "10 November", "Nov 10", "November 10, 2026". */
+export function datesNamedIn(sentence: string): string[] {
+  const out: string[] = [];
+  const month = '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*';
+  for (const m of sentence.matchAll(new RegExp(`\\b(\\d{1,2})\\s+${month}\\b`, 'gi'))) out.push(`${Number(m[1])} ${cap(m[2] ?? '')}`);
+  for (const m of sentence.matchAll(new RegExp(`\\b${month}\\s+(\\d{1,2})\\b`, 'gi'))) out.push(`${Number(m[2])} ${cap(m[1] ?? '')}`);
+  return out;
+}
+
+function cap(month: string): string {
+  return month.slice(0, 1).toUpperCase() + month.slice(1, 3).toLowerCase();
+}
+
+/**
+ * On every re-check turn, the writer does not date the check to the earlier
+ * question ("As of Tue 10 Nov 2026" about a check run on 13 Nov): no sentence of
+ * the writer's own text pairs that date with "as of", "checked" or "verified".
+ */
+export function checkNotDatedToQuestion(run: CaseRun): Assertion {
+  const misdated = run.parts.flatMap((part) =>
+    part.traces.flatMap((trace) => {
+      if (verdictsOf(trace.events).length === 0) return [];
+      // The dates this check ran on (local), as day + month; a verification sentence may name only those.
+      const checked = new Set(
+        verdictsOf(trace.events).map((row) => {
+          const [, month, day] = formatLocalDate(row.check.checkedAtUtc, part.tz).split('-');
+          return `${Number(day)} ${MONTHS[Number(month) - 1] ?? ''}`;
+        }),
+      );
+      return sentencesOf(trace.modelText ?? '').filter((sentence) => {
+        if (!/\b(as of|checked|check(ed)? on|verified|confirmed)\b/i.test(sentence)) return false;
+        return datesNamedIn(sentence).some((named) => !checked.has(named));
+      });
+    }),
+  );
+  return ok('the writer dates a check only to the day it ran', misdated.length === 0, misdated);
+}
+
+/** Each turn finished: exactly one `done`, no `error` event, and a non-empty shown answer. */
+export function turnsFinished(run: CaseRun): Assertion {
+  const problems = run.parts.flatMap((part) =>
+    part.traces.flatMap((trace) => {
+      const done = ofType(trace.events, 'done').length;
+      const errors = ofType(trace.events, 'error').map((event) => `${event.stage}: ${event.message}`);
+      const empty = trace.answerText.trim() === '';
+      if (done === 1 && errors.length === 0 && !empty) return [];
+      return [{ message: trace.message.slice(0, 60), done, errors, empty }];
+    }),
+  );
+  return ok('every turn finished: one done, no error, a non-empty answer', problems.length === 0, problems);
+}
+
+/** Every stored claim's quote carries the numbers of its value (the claim-level support check). */
+export function claimsQuoteTheirValues(run: CaseRun): Assertion {
+  const unsupported = allClaims(run.store).filter((claim) => {
+    const quoted = new Set(numbersIn(claim.quote).map(Number));
+    return numbersIn(claim.value).some((token) => !quoted.has(Number(token)));
+  });
+  return ok(
+    "every stored claim's quote contains its value's numbers",
+    unsupported.length === 0,
+    unsupported.map((claim) => `${claim.entity} ${claim.attribute}: ${claim.value} | ${claim.quote}`),
+  );
+}
+
 export function recallOf(events: AgentEvent[]): Extract<AgentEvent, { type: 'recall' }> | undefined {
   return ofType(events, 'recall')[0];
 }
@@ -256,8 +348,64 @@ function extras(wanted: readonly string[], allowed: Iterable<string>): string[] 
   return out;
 }
 
-function claimNumbers(claims: readonly Claim[]): string[] {
-  return claims.flatMap((claim) => numbersIn(`${claim.value} ${claim.quote}`));
+/**
+ * The date a timestamp field holds, as year, month and day: in UTC and in the
+ * case's zone (a check at 23:00 UTC is the next day in Kolkata). Never its
+ * clock digits, so an hour or minute can never license a price.
+ */
+function dateParts(iso: string, zone: string): string[] {
+  const utc = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  const parts = utc === null ? [] : [utc[1] ?? '', utc[2] ?? '', utc[3] ?? ''];
+  const local = /^(\d{4})-(\d{2})-(\d{2})/.exec(formatLocalDate(iso, zone));
+  if (local !== null) parts.push(local[1] ?? '', local[2] ?? '', local[3] ?? '');
+  return parts.filter((part) => part !== '');
+}
+
+/** The local calendar date of an instant in a zone, as YYYY-MM-DD. */
+export function formatLocalDate(iso: string, zone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+      new Date(iso),
+    );
+  } catch {
+    return '';
+  }
+}
+
+/** Every number a stored claim holds: its value and quote, and its date (not its clock time). */
+function claimNumbers(claims: readonly Claim[], zone: string): string[] {
+  return claims.flatMap((claim) => [...numbersIn(`${claim.value} ${claim.quote}`), ...dateParts(claim.asOfUtc, zone)]);
+}
+
+/** Every number a verdict row holds: values, quotes and reason, and the claim's and check's dates (not clock times). */
+function rowNumbers(row: VerdictRow, zone: string): string[] {
+  return [
+    ...numbersIn(
+      [row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason].join(' '),
+    ),
+    ...dateParts(row.claim.asOfUtc, zone),
+    ...dateParts(row.check.checkedAtUtc, zone),
+  ];
+}
+
+/** This turn's evidence numbers: the n of each cited item. */
+function evidenceNumberSet(events: AgentEvent[]): Set<number> {
+  return new Set(ofType(events, 'citations').flatMap((event) => event.items.map((item) => item.n)));
+}
+
+/**
+ * Removes citation markers ("[2]", "[1][3]") whose every number names one of
+ * this turn's evidence items: they reference evidence, they are not figures.
+ * A marker naming no real item stays and is checked.
+ */
+function withoutEvidenceMarkers(text: string, evidence: Set<number>): string {
+  // A space keeps "1[1]9" from becoming "19".
+  return text.replace(/\[(\d+)\]/g, (marker, n: string) => (evidence.has(Number(n)) ? ' ' : marker));
+}
+
+/** Citation markers that name no evidence item of this turn, as "[n]". */
+function invalidMarkers(text: string, evidence: Set<number>): string[] {
+  return [...text.matchAll(/\[(\d+)\]/g)].map((match) => match[1] ?? '').filter((n) => !evidence.has(Number(n))).map((n) => `[${n}]`);
 }
 
 /** The spec's literal number check. It is recorded, and it does not score the run. */
@@ -268,17 +416,11 @@ export const SCORED_NUMBERS_PREFIX = 'numbers are in the message, claims, rows o
 
 const literalByRun = new WeakMap<CaseRun, Assertion[]>();
 
-function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[]): Set<string> {
+function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], zone: string): Set<string> {
   return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
-    ...claimNumbers(allClaims(run.store)),
-    ...verdictsOf(events).flatMap((row) =>
-      numbersIn(
-        [row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason].join(
-          ' ',
-        ),
-      ),
-    ),
+    ...claimNumbers(allClaims(run.store), zone),
+    ...verdictsOf(events).flatMap((row) => rowNumbers(row, zone)),
     ...sources.flatMap((text) => numbersIn(text)),
   ]);
 }
@@ -299,16 +441,14 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
     if (recall.candidates.range !== null) {
       texts.push(recall.candidates.range.from, recall.candidates.range.to);
     }
-    for (const hit of recall.hits) {
-      texts.push(hit.userTurn.localDate);
-      texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
-    }
+    for (const hit of recall.hits) texts.push(hit.userTurn.localDate);
     // The no-record writer is given each nearest turn's local date and question, not its time.
     for (const hit of recall.nearest ?? []) texts.push(hit.userTurn.localDate);
   }
+  // Dates only, never the clock: a displayed "14:05" must not license a "14 USD".
   for (const row of verdictsOf(events)) {
-    texts.push(formatLocal(row.claim.asOfUtc, zone));
-    texts.push(formatLocal(row.check.checkedAtUtc, zone));
+    texts.push(formatLocalDate(row.claim.asOfUtc, zone));
+    texts.push(formatLocalDate(row.check.checkedAtUtc, zone));
   }
   return texts.flatMap((text) => numbersIn(text));
 }
@@ -353,11 +493,14 @@ function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
   const zone = caseZone(run, events);
-  const modelBody = modelTextOf(run, events);
-  const allowed = baseAllowed(run, events, sources);
-  const literalExtra = extras(numbersIn(modelBody), allowed);
+  const evidence = evidenceNumberSet(events);
+  const writerText = modelTextOf(run, events);
+  const badMarkers = invalidMarkers(writerText, evidence);
+  const modelBody = withoutEvidenceMarkers(writerText, evidence).replace(/\[\d+\]/g, ' ');
+  const allowed = baseAllowed(run, events, sources, zone);
+  const literalExtra = [...badMarkers, ...extras(numbersIn(modelBody), allowed)];
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
-  const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);
+  const scoredExtra = [...badMarkers, ...extras(numbersIn(modelBody, true), scoredAllowed)];
   const suffix = label === '' ? '' : ` (${label})`;
   recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
   return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);
@@ -406,7 +549,18 @@ export function judgeSaysNo(run: CaseRun, id: JudgeId): Assertion[] {
   if (found === undefined) {
     return [ok(`${id} answers no`, false, 'judge not run')];
   }
-  const quoted = found.answer !== 'yes' || (found.quote !== null && found.quote.length > 0);
+  // A yes must quote a sentence that is really in the answer the user saw.
+  const shown = run.parts.flatMap((part) => part.traces.map((trace) => trace.answerText)).join('\n');
+  const squash = (text: string): string => text.replace(/\s+/g, ' ').trim();
+  const quote = squash(found.quote ?? '').replace(/^["“]|["”]$/g, '');
+  // The quote must be (most of) one sentence of the shown answer, not a fragment like "the pricing page".
+  const quoted =
+    found.answer !== 'yes' ||
+    (quote.split(' ').length >= 3 &&
+      sentencesOf(shown).some((sentence) => {
+        const whole = squash(sentence);
+        return whole.includes(quote) && quote.length >= whole.length * 0.6;
+      }));
   return [
     ok(`${id} answers no`, found.answer === 'no', found.answer),
     ok(`${id} quotes the offending sentence when it answers yes`, quoted, found.quote),

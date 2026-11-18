@@ -30,7 +30,7 @@ import {
   TerminalIcon,
   XCircleIcon,
 } from './icons';
-import { STATUS_LABEL, suiteView, usd, type CaseCell } from './suiteEvals';
+import { heldoutView, STATUS_LABEL, suiteView, usd, type CaseCell, type LoadedSet } from './suiteEvals';
 
 export const SUITE_COMMAND = 'npm run evals -- --runs 3';
 /** How long the copy button says "Copied". */
@@ -311,11 +311,7 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
   );
 }
 
-type SuiteState =
-  | { kind: 'loading' }
-  | { kind: 'missing'; message: string }
-  | { kind: 'error'; message: string }
-  | { kind: 'ready'; summary: EvalSummary };
+type SuiteState = { kind: 'loading' } | LoadedSet;
 
 function Squares({ title, cells }: { title: string; cells: CaseCell[] }) {
   return (
@@ -342,6 +338,22 @@ function Squares({ title, cells }: { title: string; cells: CaseCell[] }) {
   );
 }
 
+/** One result set from /api/evals?set=…, as ready, missing (404) or error. Never rejects. */
+async function loadSet(set: 'main' | 'heldout' | 'heldout-first', signal: AbortSignal): Promise<LoadedSet> {
+  try {
+    const response = await fetch(`/api/evals?set=${set}`, { signal, cache: 'no-store' });
+    const body: unknown = await response.json().catch(() => null);
+    const message =
+      typeof body === 'object' && body !== null && 'error' in body ? String((body as { error: unknown }).error) : '';
+    if (response.status === 404) return { kind: 'missing', message: message || 'No eval results yet.' };
+    if (!response.ok)
+      return { kind: 'error', message: message || `The summary could not be loaded (${response.status}).` };
+    return { kind: 'ready', summary: body as EvalSummary };
+  } catch (error) {
+    return { kind: 'error', message: error instanceof Error ? error.message : 'The summary could not be loaded.' };
+  }
+}
+
 export function SuiteContent({ titleId, active }: { titleId: string; active: boolean }) {
   const [state, setState] = useState<SuiteState>({ kind: 'loading' });
   const [copied, setCopied] = useState(false);
@@ -349,35 +361,19 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
   const copiedTimer = useRef(0);
   useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
+  const [heldout, setHeldout] = useState<{ first: LoadedSet; latest: LoadedSet } | null>(null);
+
   useEffect(() => {
     if (!active) return;
     const controller = new AbortController();
-    fetch('/api/evals', { signal: controller.signal, cache: 'no-store' })
-      .then(async (response) => {
-        const body: unknown = await response.json().catch(() => null);
-        const message =
-          typeof body === 'object' && body !== null && 'error' in body
-            ? String((body as { error: unknown }).error)
-            : '';
-        if (response.status === 404)
-          setState({
-            kind: 'missing',
-            message: message || 'No eval results yet.',
-          });
-        else if (!response.ok)
-          setState({
-            kind: 'error',
-            message: message || `The summary could not be loaded (${response.status}).`,
-          });
-        else setState({ kind: 'ready', summary: body as EvalSummary });
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted)
-          setState({
-            kind: 'error',
-            message: error instanceof Error ? error.message : 'The summary could not be loaded.',
-          });
-      });
+    loadSet('main', controller.signal).then((main) => {
+      if (!controller.signal.aborted) setState(main);
+    });
+    Promise.all([loadSet('heldout-first', controller.signal), loadSet('heldout', controller.signal)]).then(
+      ([first, latest]) => {
+        if (!controller.signal.aborted) setHeldout({ first, latest });
+      },
+    );
     return () => controller.abort();
   }, [active]);
 
@@ -536,8 +532,66 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
         <p className="mb-caption">Case ids only: the summary does not carry assertion names.</p>
       </MenuRow>
 
+      <HeldoutSection sets={heldout} />
+
       <hr className="mb-divider" />
       {runLine}
+    </>
+  );
+}
+
+/** The held-out set (cases 101–119): first run, after fixes, and the latest run's squares. */
+function HeldoutSection({ sets }: { sets: { first: LoadedSet; latest: LoadedSet } | null }) {
+  return (
+    <section aria-labelledby="heldout-title">
+      <hr className="mb-divider" />
+      <h3 className="mb-section" id="heldout-title">
+        Held-out set (cases nobody tuned against)
+      </h3>
+      {sets === null ? (
+        <p className="mb-empty mb-pad">Loading the held-out runs…</p>
+      ) : (
+        <HeldoutBody view={heldoutView(sets.first, sets.latest)} />
+      )}
+    </section>
+  );
+}
+
+function HeldoutBody({ view }: { view: ReturnType<typeof heldoutView> }) {
+  return (
+    <>
+      <p className="mb-note mb-pad-x">First run is the honest number; later runs follow fixes.</p>
+      <SliderMeter
+        label="First-run pass rate"
+        share={view.firstShare}
+        valueText={view.sliderText}
+        left={<XCircleIcon />}
+        right={<CheckCircleIcon />}
+        caption={view.caption}
+      />
+      <div className="mb-tiles mb-tiles-2">
+        <RingTile
+          label="First run"
+          share={view.firstShare}
+          valueText={view.firstTile}
+          icon={<FlaskIcon size={16} />}
+          reason={view.firstReason ?? undefined}
+        />
+        <RingTile
+          label="After fixes"
+          share={view.afterShare}
+          valueText={view.afterTile}
+          icon={<CheckCircleIcon size={16} />}
+          reason={view.afterReason ?? undefined}
+        />
+      </div>
+      <MenuRow icon={<GridIcon />} title="Held-out cases" summary={view.cellsSummary}>
+        {view.cells.length === 0 ? (
+          <p className="mb-empty">{view.cellsLabel}</p>
+        ) : (
+          <Squares title={view.cellsLabel} cells={view.cells} />
+        )}
+      </MenuRow>
     </>
   );
 }

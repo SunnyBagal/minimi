@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { EvalSummary } from '../api/evals/summary';
-import { suiteView, usd } from './suiteEvals';
+import { heldoutView, sameRun, suiteView, usd, type LoadedSet } from './suiteEvals';
 
 const SUMMARY: EvalSummary = {
   sha: 'a423aec',
@@ -86,5 +86,94 @@ describe('suiteView', () => {
   it('formats the metered cost, with "—" when none was recorded', () => {
     expect(usd(0.357843)).toBe('$0.36');
     expect(usd(null)).toBe('—');
+  });
+});
+
+describe('heldoutView', () => {
+  const ids = Array.from({ length: 19 }, (_, i) => 101 + i);
+  // The real first held-out run: 15 of 19, 111 flaky, 104, 116 and 118 failing.
+  const FIRST: EvalSummary = {
+    sha: '20e0b11',
+    runs: 3,
+    cases: 19,
+    passAtAll: ids.filter((id) => ![104, 111, 116, 118].includes(id)),
+    flaky: [111],
+    failing: [104, 116, 118],
+    strict: {
+      passAtAll: ids.filter((id) => ![104, 111, 116, 118].includes(id)),
+      flaky: [111],
+      failing: [104, 116, 118],
+    },
+    incomplete: [],
+    spentUsd: 0.1857253,
+  };
+  const ready = (summary: EvalSummary): LoadedSet => ({ kind: 'ready', summary });
+  const AFTER: EvalSummary = {
+    ...FIRST,
+    sha: '44c4247',
+    passAtAll: ids.filter((id) => id !== 116),
+    flaky: [],
+    failing: [116],
+    spentUsd: 0.19,
+  };
+
+  it('first run is the honest number: 15/19, on the slider and its tile', () => {
+    const view = heldoutView(ready(FIRST), ready(FIRST));
+    expect(view.firstTile).toBe('15/19');
+    expect(view.firstShare).toBeCloseTo(15 / 19);
+    expect(view.sliderText).toBe('15 / 19');
+    expect(view.caption).toBe('15 of 19 cases passed all 3 runs on the first run (commit 20e0b11), before any fix.');
+  });
+
+  it('after fixes is "—" while heldout.json is still the first run', () => {
+    const view = heldoutView(ready(FIRST), ready({ ...FIRST }));
+    expect(view.afterTile).toBe('—');
+    expect(view.afterShare).toBeNull();
+    expect(view.afterReason).toBe('no run after fixes yet');
+    expect(view.cells).toHaveLength(19);
+    expect(view.cells[0]).toEqual({ id: 101, status: 'pass' });
+    expect(view.cells.find((cell) => cell.id === 111)?.status).toBe('flaky');
+    expect(view.cellsSummary).toBe('15 pass · 1 flaky · 3 fail');
+  });
+
+  it('after fixes shows the latest run once it differs from the first', () => {
+    const view = heldoutView(ready(FIRST), ready(AFTER));
+    expect(view.afterTile).toBe('18/19');
+    expect(view.afterShare).toBeCloseTo(18 / 19);
+    expect(view.afterReason).toBeNull();
+    expect(view.firstTile).toBe('15/19'); // the first run is not replaced
+    expect(view.cellsLabel).toContain('after fixes (commit 44c4247)');
+    expect(view.cells.find((cell) => cell.id === 116)?.status).toBe('fail');
+  });
+
+  it('a missing file shows "—" with a reason, never a made-up figure', () => {
+    const missingFirst = heldoutView(
+      { kind: 'missing', message: 'No eval results yet: evals/results/heldout-first.json is missing.' },
+      ready(AFTER),
+    );
+    expect([missingFirst.firstTile, missingFirst.sliderText]).toEqual(['—', '—']);
+    expect(missingFirst.firstReason).toBe('no first-run file');
+    expect(missingFirst.caption).toContain('heldout-first.json is missing');
+    expect(missingFirst.afterTile).toBe('—');
+    expect(missingFirst.afterReason).toBe('no first run to compare');
+
+    const missingLatest = heldoutView(ready(FIRST), {
+      kind: 'missing',
+      message: 'No eval results yet: evals/results/heldout.json is missing.',
+    });
+    expect(missingLatest.firstTile).toBe('15/19');
+    expect(missingLatest.afterTile).toBe('—');
+    expect(missingLatest.afterReason).toBe('no held-out run file');
+    expect(missingLatest.cells).toEqual([]);
+    expect(missingLatest.cellsLabel).toContain('heldout.json is missing');
+
+    const broken = heldoutView({ kind: 'error', message: 'bad' }, { kind: 'error', message: 'bad' });
+    expect([broken.firstReason, broken.afterReason]).toEqual(['could not load', 'could not load']);
+  });
+
+  it('sameRun compares the whole summary', () => {
+    expect(sameRun(FIRST, { ...FIRST })).toBe(true);
+    expect(sameRun(FIRST, { ...FIRST, spentUsd: 0.2 })).toBe(false);
+    expect(sameRun(FIRST, AFTER)).toBe(false);
   });
 });

@@ -118,3 +118,12 @@ describe('offersIn and asksToConfirm: not a refusal, not a negation, not a remar
     expect(offersIn('If you send me the names of the tools, I will check each one.', /names?/i)).toBe(true);
   });
 });
+
+describe('offersIn: a polite request with "paste" (main case 5, run 2 on 94f69ea)', () => {
+  it('accepts "Could you paste the names or list them in your own words?" and rejects a negated one', async () => {
+    const { offersIn } = await import('./assert');
+    const ask = /\b(tell|send|share|give|list|paste)\b[^.?!]*\b(names?|tools?)\b/i;
+    expect(offersIn('Could you paste the names or list them in your own words?', ask)).toBe(true);
+    expect(offersIn("Don't paste the names here.", ask)).toBe(false);
+  });
+});

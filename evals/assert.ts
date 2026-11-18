@@ -191,7 +191,7 @@ export function writerTextOf(run: CaseRun, events: AgentEvent[]): string {
 
 const REFUSAL = /\b(can't|cannot|can not|unable|won't|will not|not able|don't|do not|never)\b/i;
 /** An offer is made to the user: "I can …", "I'll …", "Want me to …?", "Would you like …?", "Let me …", or a request to them. */
-const OFFER_FORM = /\b(I can|I could|I'll|I will|I'd be happy|happy to|let me|want me to|shall I|should I|would you like|do you want|if you (tell|send|share|give|list)|tell me|send me|share|give me|list them)\b/i;
+const OFFER_FORM = /\b(I can|I could|I'll|I will|I'd be happy|happy to|let me|want me to|shall I|should I|would you like|do you want|could you|can you|please|if you (tell|send|share|give|list|paste)|tell me|send me|share|give me|list them|paste)\b/i;
 
 /** Some sentence matches `pattern`, is phrased as an offer or request to the user, and does not refuse or negate. */
 export function offersIn(text: string, pattern: RegExp): boolean {

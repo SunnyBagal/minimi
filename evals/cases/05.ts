@@ -19,7 +19,7 @@ export const evalCase: EvalCase = {
         /not saved|don't have|do not have|no shortlist|isn't saved|is not saved|no saved|nothing saved/i.test(answer) &&
           // Asks for the names (a question about which tools / their names) or offers to build a fresh shortlist.
           (/\b(which|what)\b[^.?!]*\b(tools?|names?|crms?)\b[^.?!]*\?/i.test(writerTextOf(run, events)) ||
-            offersIn(writerTextOf(run, events), /\b(tell|send|share|give|list)\b[^.?!]*\b(names?|tools?)\b/i) ||
+            offersIn(writerTextOf(run, events), /\b(tell|send|share|give|list|paste)\b[^.?!]*\b(names?|tools?)\b/i) ||
             offersIn(writerTextOf(run, events), /\b(fresh|new)\b[^.?!]*\bshortlist\b|\b(put together|build|draw up|make)\b[^.?!]*\bshortlist\b/i)),
         answer,
       ),

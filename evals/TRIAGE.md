@@ -159,3 +159,7 @@ Codex's r5 review (a Codex code review) supports reporting 19 of 19 on both read
 - A judge "yes" must quote most of one sentence of the answer, not a fragment.
 - Case 16 checks both the row binding and the fixture's own 19 USD/month on 10 Nov 2026. Case 12 binds each vendor's sentence to that vendor's own claim amount and a valid citation; an all-abstention reply is allowed.
 - Prose: the fresh writer says what the sources state rather than asserting the price right now; the re-check writer names each row for what it is (price, free tier), and does not describe the screen.
+
+### After the held-out follow-ups (19 Nov 2026)
+
+The 19 × 3 main run on `94f69ea` scored 18 of 19: case 5 run 2 asked "Could you paste the names or list them in your own words?", which the offer check did not recognise ("paste" was not a request verb, and "Could you …?" not a request form). The no-record prompt had just started suggesting "paste it or describe it" (held-out case 118). The check now accepts "paste" and polite request forms; a negated request still fails (`strength.test.ts`).

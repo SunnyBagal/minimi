@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { catTakesClick, inRect, type ClickFacts } from './catClick';
+import { catTakesClick, inRect, modeAfterClick, type ClickFacts } from './catClick';
+import { MODE_NAMES, type NekoMode } from './onekoCore';
 
 const blank: ClickFacts = {
   insideSprite: true,
@@ -28,6 +29,38 @@ describe('catTakesClick', () => {
     expect(catTakesClick({ ...blank, insideSprite: false })).toBe(false);
     expect(catTakesClick({ ...blank, spriteShown: false })).toBe(false);
     expect(catTakesClick({ ...blank, inConversation: false })).toBe(false);
+  });
+});
+
+describe('modeAfterClick: the order and one step per click', () => {
+  // A click straight on the sprite (it is not inside .thread, so only onSprite lets it through).
+  const onSprite = { ...blank, onSprite: true, inConversation: false };
+  // A click that reaches the sprite through blank answer space.
+  const throughAnswer = { ...blank, onSprite: false };
+
+  it('four clicks go follow → flee → wander → follow → flee', () => {
+    const seen: string[] = [MODE_NAMES[0]];
+    let mode: NekoMode = 0;
+    for (let click = 1; click <= 4; click += 1) {
+      mode = modeAfterClick(mode, click % 2 === 0 ? throughAnswer : onSprite);
+      seen.push(MODE_NAMES[mode]);
+    }
+    expect(seen).toEqual(['follow', 'flee', 'wander', 'follow', 'flee']);
+  });
+
+  it('one click advances exactly one mode, from every mode, on the sprite or through an answer', () => {
+    for (const from of [0, 1, 2] as const) {
+      for (const facts of [onSprite, throughAnswer]) {
+        expect(modeAfterClick(from, facts)).toBe((from + 1) % 3);
+      }
+    }
+  });
+
+  it('a click that does not reach the cat leaves the mode alone', () => {
+    expect(modeAfterClick(1, { ...throughAnswer, onGlyph: true })).toBe(1);
+    expect(modeAfterClick(1, { ...throughAnswer, onControl: true })).toBe(1);
+    expect(modeAfterClick(1, { ...throughAnswer, insideSprite: false })).toBe(1);
+    expect(modeAfterClick(2, { ...onSprite, spriteShown: false })).toBe(2);
   });
 });
 

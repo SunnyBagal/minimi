@@ -110,6 +110,28 @@ describe('recheck', () => {
     expect(r.llm.calls('judge')).toHaveLength(1);
   });
 
+  it('a stored copy (not live) says whether it still shows the value; the verdict stays source_unavailable', async () => {
+    for (const [text, still] of [
+      ['The Launch plan costs 19 USD per month.', true],
+      ['The Launch plan costs 24 USD per month.', false],
+    ] as const) {
+      const r = recheckRig({
+        llm: {
+          route: plan({ intent: 'recheck', refersToPrevious: true }),
+          // The rig's guard passes through; the real guard turns a not-live page into source_unavailable (guards.test.ts).
+          judge: { verdict: 'source_unavailable', newValue: null, quote: null, quoteUrl: null, scope: {}, reason: 'The page came from a cache, not a live fetch.' },
+          write: ['Summary.'],
+        },
+        search: { pages: { [NEON_PAGE]: { status: 'ok', live: false, text } }, results: {} },
+      });
+      storedAnswer(r, [{}]);
+      const row = verdicts(await r.run({ message: 'Is that still right?' }))[0];
+      expect(row?.check.verdict).toBe('source_unavailable');
+      expect(row?.check.reason).toContain('stored copy');
+      expect(row?.check.reason).toContain(still ? 'still shows this value' : 'no longer shows this value');
+    }
+  });
+
   it('a page with live: false never yields a fast-path unchanged', async () => {
     const r = recheckRig({
       search: { pages: { [NEON_PAGE]: { status: 'ok', live: false, text: 'costs 19 USD per month' } } },

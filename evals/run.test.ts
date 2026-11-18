@@ -267,9 +267,11 @@ describe('budget', () => {
       calls += 1;
       current = evalCase.id;
       try {
+        const step = plan(evalCase.id);
+        // The body is padded to the input size the fake API will report, so usage stays within the reservation.
         const response = await (options.fetch ?? fetch)('https://api.anthropic.com/v1/messages', {
           method: 'POST',
-          body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: plan(evalCase.id).maxTokens }),
+          body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: step.maxTokens, pad: 'x'.repeat(step.input) }),
         });
         await response.text();
       } catch {
@@ -291,8 +293,8 @@ describe('budget', () => {
     return JSON.parse(readFileSync(file ?? '', 'utf8')) as Written;
   }
 
-  // 100K input + 50K output tokens of Sonnet = $0.70 per case-run; max_tokens 1000 reserves well under that.
-  const even = () => ({ input: 100_000, output: 50_000, maxTokens: 1000 });
+  // 100K input + 50K output tokens of Sonnet = $0.70 per case-run; it reserves about $0.75.
+  const even = () => ({ input: 100_000, output: 50_000, maxTokens: 50_000 });
 
   it('stops between cases when the next run could pass the budget, and writes neither full.json nor latest.json', async () => {
     const dir = tempResults();
@@ -343,13 +345,33 @@ describe('budget', () => {
     expect(out.passAtAll).toEqual([]);
   });
 
+  it('a response that costs more than its reservation cuts the run and is never scored', async () => {
+    const dir = tempResults();
+    const stub = meteredHarness(() => ({ input: 100_000, output: 50_000, maxTokens: 50_000 }));
+    // Report more input than the padded body can hold: the meter must treat that as unknown spend.
+    const overrun = (async () =>
+      new Response(JSON.stringify({ model: 'claude-sonnet-5-5', usage: { input_tokens: 900_000, output_tokens: 50_000 } }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })) as typeof fetch;
+    const result = await execute(['--case', '1', '--budget-usd', '10'], {
+      resultsDir: dir,
+      runHarness: stub.runHarness,
+      baseFetch: overrun,
+    });
+    const out = written(result.resultsFile);
+    expect(out.cases[0]).toMatchObject({ id: 1, runs: 0, incomplete: true });
+    expect(out.cases[0]?.cutRun).toBeDefined();
+    expect(out.passAtAll).toEqual([]);
+  });
+
   it('a cheap case cannot license a dear one: the dear request is refused before it is sent', async () => {
     const dir = tempResults();
     const ids = allIds.slice(0, 2);
     const first = ids[0] ?? 1;
-    // First case: $0.10. Second case asks for 100_000 output tokens: a $1 reservation against $0.90 left.
+    // First case: $0.10 (it reserves about $0.13). Second asks for 100_000 output tokens: a $1 reservation against $0.90 left.
     const stub = meteredHarness((id) =>
-      id === first ? { input: 50_000, output: 0, maxTokens: 1000 } : { input: 10, output: 10, maxTokens: 100_000 },
+      id === first ? { input: 50_000, output: 0, maxTokens: 10 } : { input: 10, output: 10, maxTokens: 100_000 },
     );
     const result = await execute(['--cases', ids.join(','), '--budget-usd', '1'], {
       resultsDir: dir,

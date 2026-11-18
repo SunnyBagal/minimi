@@ -69,25 +69,85 @@ function clausesOf(sentence: string): string[] {
     .filter((clause) => clause !== '');
 }
 
-/** A clause that opens by referring back to the last-named subject. */
+/** A clause that opens by referring back to the current subject. */
 const BACK_REFERENCE = /^(?:it|its|it's|this|that|the price|the page|the plan|their|they)\b/i;
 
+type Subject = 'entity' | 'other';
+
+interface Mention {
+  subject: Subject;
+  start: number;
+  end: number;
+}
+
+function mentionsIn(clause: string, entity: RegExp, others: RegExp | undefined): Mention[] {
+  const found: Mention[] = [];
+  const scan = (pattern: RegExp, subject: Subject): void => {
+    const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    for (const match of clause.matchAll(global)) {
+      found.push({ subject, start: match.index, end: match.index + match[0].length });
+    }
+  };
+  scan(entity, 'entity');
+  if (others !== undefined) scan(others, 'other');
+  return found.sort((a, b) => a.start - b.start);
+}
+
 /**
- * True when some clause about the entity asserts that nothing changed for it.
- * A clause is about the entity when it names it, or when it opens with a back
- * reference ("Its price is unchanged") and the last-named subject was the
- * entity. Naming one of `others` makes that the subject instead. Uncertainty
- * ("can't say whether ... still holds") vetoes only its own clause, so doubt
- * about another product does not hide a no-change claim about this one.
+ * The subjects a phrase at `at` is about: the product named last before it,
+ * plus any named just before that and joined to it by "and", "&" or a comma
+ * ("Northwind PG and Basalt DB are unchanged"). Empty when nothing is named
+ * before the phrase.
+ */
+function subjectsBefore(clause: string, mentions: Mention[], at: number): Subject[] {
+  const before = mentions.filter((mention) => mention.end <= at);
+  const last = before.at(-1);
+  if (last === undefined) return [];
+  const subjects: Subject[] = [last.subject];
+  for (let index = before.length - 2; index >= 0; index -= 1) {
+    const current = before[index];
+    const next = before[index + 1];
+    if (current === undefined || next === undefined) break;
+    // Between two coordinated names: the rest of the first name (capitalised tails such as "PG"), then a joiner.
+    if (!/^(?:\s+[A-Z][\w.-]*)*\s*(?:,|and|&|, and)\s*(?:the\s+)?$/.test(clause.slice(current.end, next.start))) break;
+    subjects.push(current.subject);
+  }
+  return subjects;
+}
+
+/**
+ * True when some clause asserts that nothing changed for the entity. Within a
+ * clause the no-change phrase belongs to the product named closest before it
+ * (with any products coordinated to that one by "and"), else to the first one
+ * named after it ("no change for Northwind PG"); with none named, a clause
+ * that opens with a back reference ("Its price is unchanged")
+ * belongs to the current subject, which carries across clauses that name no
+ * product. Naming one of `others` makes that the subject. Uncertainty
+ * ("can't say whether ... still holds") vetoes only its own clause. Prose this
+ * does not resolve is left to the case's semantic judge (J2).
  */
 export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: RegExp): boolean {
-  let subject: 'entity' | 'other' | null = null;
+  let current: Subject | null = null;
   for (const sentence of sentencesOf(answer)) {
     for (const clause of clausesOf(sentence)) {
-      if (entity.test(clause)) subject = 'entity';
-      else if (others !== undefined && others.test(clause)) subject = 'other';
-      else if (!BACK_REFERENCE.test(clause)) subject = null;
-      if (subject === 'entity' && NO_CHANGE.test(clause) && !UNSURE.test(clause)) return true;
+      const mentions = mentionsIn(clause, entity, others);
+      const phrase = NO_CHANGE.exec(clause);
+      if (phrase !== null && !UNSURE.test(clause)) {
+        const named = subjectsBefore(clause, mentions, phrase.index);
+        // "There is no change for Northwind PG": nothing named before the phrase, so the first name after it.
+        const after = mentions.find((mention) => mention.start >= phrase.index + phrase[0].length);
+        const subjects =
+          named.length > 0
+            ? named
+            : after !== undefined
+              ? [after.subject]
+              : BACK_REFERENCE.test(clause) && current !== null
+                ? [current]
+                : [];
+        if (subjects.includes('entity')) return true;
+      }
+      const lastMention = mentions.at(-1);
+      if (lastMention !== undefined) current = lastMention.subject;
     }
   }
   return false;

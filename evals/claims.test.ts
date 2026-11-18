@@ -47,3 +47,19 @@ describe('claimsNoChangeAbout: subject and uncertainty scoped to the clause', ()
     expect(claimsNoChangeAbout('Northwind PG timed out. Everything else is unchanged.', /northwind/i, /basalt/i)).toBe(false);
   });
 });
+
+describe('claimsNoChangeAbout: the phrase belongs to the product named before it', () => {
+  it('does not give a no-change phrase about Basalt to Northwind named later in the clause', () => {
+    expect(claimsNoChangeAbout('Basalt DB is unchanged and Northwind PG timed out.', /northwind/i, /basalt/i)).toBe(false);
+  });
+
+  it('counts coordinated subjects: "Northwind PG and Basalt DB are unchanged"', () => {
+    expect(claimsNoChangeAbout('Northwind PG and Basalt DB are unchanged.', /northwind/i, /basalt/i)).toBe(true);
+  });
+
+  it('carries the subject across a sentence that names no product', () => {
+    expect(
+      claimsNoChangeAbout('Northwind PG timed out. The source was unavailable. Its price is unchanged.', /northwind/i, /basalt/i),
+    ).toBe(true);
+  });
+});

@@ -17,6 +17,14 @@ function sonnetBody(maxTokens: number): RequestInit {
   return { method: 'POST', body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: maxTokens }) };
 }
 
+function paddedSonnetBody(maxTokens: number, bytes: number): RequestInit {
+  return { method: 'POST', body: JSON.stringify({ model: 'claude-sonnet-5-5', max_tokens: maxTokens, pad: 'x'.repeat(bytes) }) };
+}
+
+function sseResponse(body: string): Response {
+  return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+}
+
 function jsonResponse(usage: object): Response {
   return new Response(JSON.stringify({ model: 'claude-sonnet-5-5', usage }), {
     status: 200,
@@ -38,8 +46,9 @@ describe('costUsd', () => {
     expect(() => costUsd('claude-unknown', { ...zero, input_tokens: 1 })).toThrow(UnpricedModelError);
   });
 
-  it('reserves a request at one token per 2 body characters plus its full max_tokens', () => {
-    expect(reserveUsd('claude-sonnet-5-5', 2_000_000, 100_000)).toBeCloseTo(2 + 1, 9);
+  it('reserves a request at one input token per body byte at the cache-write rate, plus its full max_tokens', () => {
+    // 1M bytes at $2.50 (Sonnet cache write) + 100K output at $10.
+    expect(reserveUsd('claude-sonnet-5-5', 1_000_000, 100_000)).toBeCloseTo(2.5 + 1, 9);
   });
 });
 
@@ -79,11 +88,13 @@ describe('SpendMeter', () => {
   it('records a streamed response and leaves the caller its full body', async () => {
     const sse =
       'data: {"type":"message_start","message":{"usage":{"input_tokens":1000000}}}\n\n' +
-      'data: {"type":"message_delta","usage":{"output_tokens":100000}}\n\n';
+      'data: {"type":"message_delta","usage":{"output_tokens":100000}}\n\n' +
+      'data: {"type":"message_stop"}\n\n';
     const meter = new SpendMeter(100);
     const fetched = meter.wrap((async () =>
       new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch);
-    const response = await fetched(URL_MESSAGES, sonnetBody(1000));
+    // A body of 1M bytes reserves enough input for the 1M tokens the response reports.
+    const response = await fetched(URL_MESSAGES, paddedSonnetBody(100_000, 1_000_000));
     expect(await response.text()).toBe(sse);
     await meter.settle();
     expect(meter.spentUsd()).toBeCloseTo(3, 9);
@@ -149,6 +160,62 @@ describe('SpendMeter', () => {
     release();
     await (await first).text();
     await meter.settle();
+  });
+
+  it('marks a stream that ends without message_stop, or with an error event, as incomplete, keeping its usage', async () => {
+    const start = 'data: {"type":"message_start","message":{"usage":{"input_tokens":50000}}}\n\n';
+    for (const body of [start, `${start}data: {"type":"error","error":{"type":"overloaded_error"}}\n\n`]) {
+      const meter = new SpendMeter(100);
+      const fetched = meter.wrap((async () => sseResponse(body)) as typeof fetch);
+      await (await fetched(URL_MESSAGES, paddedSonnetBody(100, 60_000))).text();
+      await meter.settle();
+      expect(meter.spentUsd()).toBeCloseTo(0.1, 9);
+      expect(meter.incomplete).not.toBeNull();
+      expect(meter.exhausted()).toBe(true);
+    }
+  });
+
+  it('marks a stream with message_stop but no final output total as incomplete', async () => {
+    const meter = new SpendMeter(100);
+    const body =
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}\n\n' + 'data: {"type":"message_stop"}\n\n';
+    const fetched = meter.wrap((async () => sseResponse(body)) as typeof fetch);
+    await (await fetched(URL_MESSAGES, sonnetBody(100))).text();
+    await meter.settle();
+    expect(meter.incomplete).toBe('a stream ended without final usage');
+  });
+
+  it('marks a successful response with no body, or JSON without both counts, as incomplete', async () => {
+    const empty = new SpendMeter(100);
+    await empty.wrap((async () => new Response(null, { status: 200 })) as typeof fetch)(URL_MESSAGES, sonnetBody(10));
+    expect(empty.incomplete).toBe('a successful response had no body');
+
+    const inputOnly = new SpendMeter(100);
+    const fetched = inputOnly.wrap((async () => jsonResponse({ input_tokens: 10 })) as typeof fetch);
+    await (await fetched(URL_MESSAGES, sonnetBody(10))).text();
+    await inputOnly.settle();
+    expect(inputOnly.incomplete).toBe('a response did not report both input and output tokens');
+  });
+
+  it('marks a response that cost more than its reservation as incomplete', async () => {
+    const meter = new SpendMeter(100);
+    // max_tokens 1 and a tiny body reserve far less than 1000 input + 1 output tokens.
+    const fetched = meter.wrap((async () => jsonResponse({ input_tokens: 1000, output_tokens: 1 })) as typeof fetch);
+    await (await fetched(URL_MESSAGES, sonnetBody(1))).text();
+    await meter.settle();
+    expect(meter.incomplete).toBe('a response cost more than its reservation');
+  });
+
+  it('after one refusal, sends nothing more, not even a smaller request', async () => {
+    let sent = 0;
+    const meter = new SpendMeter(0.0005);
+    const fetched = meter.wrap((async () => {
+      sent += 1;
+      return jsonResponse({ input_tokens: 1, output_tokens: 1 });
+    }) as typeof fetch);
+    await expect(fetched(URL_MESSAGES, sonnetBody(100))).rejects.toThrow(BudgetRefusedError);
+    await expect(fetched(URL_MESSAGES, sonnetBody(1))).rejects.toThrow(BudgetRefusedError);
+    expect(sent).toBe(0);
   });
 
   it('refuses a request for an unpriced model', async () => {

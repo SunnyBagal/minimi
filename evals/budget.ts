@@ -45,8 +45,6 @@ const HAIKU_LONG_PROMPT = 100_000;
 
 /** Output tokens to reserve when a request names no `max_tokens`. */
 const DEFAULT_MAX_TOKENS_RESERVE = 64_000;
-/** Prompt tokens are reserved at one per 2 body characters: a high estimate (text runs nearer 4). */
-const CHARS_PER_TOKEN_RESERVE = 2;
 
 export class UnpricedModelError extends Error {}
 export class BudgetRefusedError extends Error {}
@@ -73,15 +71,17 @@ export function costUsd(model: string, usage: Usage): number {
   );
 }
 
-/** The most a request can cost: its prompt estimated high, all of it uncached, plus its full `max_tokens`. */
-export function reserveUsd(model: string, bodyChars: number, maxTokens: number | null): number {
-  const promptTokens = Math.ceil(bodyChars / CHARS_PER_TOKEN_RESERVE);
-  return costUsd(model, {
-    input_tokens: promptTokens,
-    output_tokens: maxTokens ?? DEFAULT_MAX_TOKENS_RESERVE,
-    cache_creation_input_tokens: 0,
-    cache_read_input_tokens: 0,
-  });
+/**
+ * The most a request can cost. Prompt tokens are bounded by the request
+ * body's UTF-8 bytes (each token stands for at least one byte, and the body
+ * holds the whole prompt plus JSON syntax), priced at the dearest input rate
+ * (a cache write); output at its full `max_tokens`. A response that still
+ * costs more than this marks accounting incomplete.
+ */
+export function reserveUsd(model: string, bodyBytes: number, maxTokens: number | null): number {
+  const outputTokens = maxTokens ?? DEFAULT_MAX_TOKENS_RESERVE;
+  const rate = rateFor(model, bodyBytes);
+  return (bodyBytes * Math.max(rate.input, rate.cacheWrite) + outputTokens * rate.output) / 1_000_000;
 }
 
 function emptyUsage(): Usage {
@@ -119,6 +119,12 @@ function mergeUsage(into: Usage, raw: unknown): boolean {
 export class SseUsageReader {
   readonly usage: Usage = emptyUsage();
   sawUsage = false;
+  /** A message_delta reported the output total. */
+  sawFinalUsage = false;
+  /** The stream ended with message_stop. */
+  sawStop = false;
+  /** The stream carried an `error` event. */
+  sawError = false;
   private buffer = '';
 
   push(chunk: string): void {
@@ -145,6 +151,12 @@ export class SseUsageReader {
       if (mergeUsage(this.usage, event.message?.usage)) this.sawUsage = true;
     } else if (event.type === 'message_delta') {
       if (mergeUsage(this.usage, event.usage)) this.sawUsage = true;
+      const output = (event.usage as Record<string, unknown> | undefined)?.output_tokens;
+      if (typeof output === 'number') this.sawFinalUsage = true;
+    } else if (event.type === 'message_stop') {
+      this.sawStop = true;
+    } else if (event.type === 'error') {
+      this.sawError = true;
     }
   }
 }
@@ -165,21 +177,22 @@ export interface ModelSpend {
 
 interface RequestFacts {
   model: string;
-  bodyChars: number;
+  bodyBytes: number;
   maxTokens: number | null;
 }
 
 function requestFacts(init: RequestInit | undefined): RequestFacts {
-  if (typeof init?.body !== 'string') return { model: 'unknown', bodyChars: 0, maxTokens: null };
+  if (typeof init?.body !== 'string') return { model: 'unknown', bodyBytes: 0, maxTokens: null };
+  const bodyBytes = new TextEncoder().encode(init.body).length;
   try {
     const parsed = JSON.parse(init.body) as { model?: unknown; max_tokens?: unknown };
     return {
       model: typeof parsed.model === 'string' ? parsed.model : 'unknown',
-      bodyChars: init.body.length,
+      bodyBytes,
       maxTokens: typeof parsed.max_tokens === 'number' ? parsed.max_tokens : null,
     };
   } catch {
-    return { model: 'unknown', bodyChars: init.body.length, maxTokens: null };
+    return { model: 'unknown', bodyBytes, maxTokens: null };
   }
 }
 
@@ -199,12 +212,15 @@ export class SpendMeter {
 
   constructor(readonly budgetUsd: number) {}
 
-  record(model: string, usage: Usage): void {
+  /** Adds one response's usage and returns its cost. */
+  record(model: string, usage: Usage): number {
     const entry = this.byModel.get(model) ?? { calls: 0, usage: emptyUsage(), usd: 0 };
     entry.calls += 1;
     for (const key of USAGE_KEYS) entry.usage[key] += usage[key];
-    entry.usd += costUsd(model, usage);
+    const usd = costUsd(model, usage);
+    entry.usd += usd;
     this.byModel.set(model, entry);
+    return usd;
   }
 
   spentUsd(): number {
@@ -244,7 +260,12 @@ export class SpendMeter {
         this.refused += 1;
         throw new BudgetRefusedError(`evals: refused a request: spend accounting is incomplete (${this.incomplete})`);
       }
-      const reserve = reserveUsd(facts.model, facts.bodyChars, facts.maxTokens);
+      if (this.refused > 0) {
+        // The run that hit the cap is discarded; nothing after the first refusal is sent.
+        this.refused += 1;
+        throw new BudgetRefusedError('evals: refused a request: an earlier request was refused by the spend cap');
+      }
+      const reserve = reserveUsd(facts.model, facts.bodyBytes, facts.maxTokens);
       if (this.spentUsd() + this.reservedUsd + reserve > this.budgetUsd) {
         this.refused += 1;
         throw new BudgetRefusedError(
@@ -269,22 +290,32 @@ export class SpendMeter {
         this.markIncomplete('a request failed before a response arrived');
         throw error;
       }
-      if (!response.ok || response.body === null) {
+      if (!response.ok) {
         release();
+        return response;
+      }
+      if (response.body === null) {
+        release();
+        this.markIncomplete('a successful response had no body');
         return response;
       }
       const streaming = (response.headers.get('content-type') ?? '').includes('text/event-stream');
       const [forCaller, forMeter] = response.body.tee();
-      const reading = this.read(facts.model, streaming, forMeter).finally(() => {
-        release();
-        this.pending.delete(reading);
-      });
+      const reading = this.read(facts.model, streaming, forMeter)
+        .then((usd) => {
+          if (usd > reserve + 1e-12) this.markIncomplete('a response cost more than its reservation');
+        })
+        .finally(() => {
+          release();
+          this.pending.delete(reading);
+        });
       this.pending.add(reading);
       return new Response(forCaller, { status: response.status, statusText: response.statusText, headers: response.headers });
     }) as typeof fetch;
   }
 
-  private async read(model: string, streaming: boolean, body: ReadableStream<Uint8Array>): Promise<void> {
+  /** Reads a response body for its usage; returns the cost recorded for it. */
+  private async read(model: string, streaming: boolean, body: ReadableStream<Uint8Array>): Promise<number> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     const sse = new SseUsageReader();
@@ -299,18 +330,22 @@ export class SpendMeter {
       }
       if (streaming) {
         sse.end();
-        if (!sse.sawUsage) this.markIncomplete('a stream ended without usage');
-        this.record(model, sse.usage);
-        return;
+        if (sse.sawError) this.markIncomplete('a stream carried an error event');
+        else if (!sse.sawStop) this.markIncomplete('a stream ended without message_stop');
+        else if (!sse.sawFinalUsage) this.markIncomplete('a stream ended without final usage');
+        return this.record(model, sse.usage);
       }
-      const parsed = JSON.parse(text) as { usage?: unknown; model?: unknown };
+      const parsed = JSON.parse(text) as { usage?: Record<string, unknown>; model?: unknown };
       const usage = emptyUsage();
-      if (!mergeUsage(usage, parsed.usage)) this.markIncomplete('a response carried no usage');
-      this.record(model, usage);
+      mergeUsage(usage, parsed.usage);
+      if (typeof parsed.usage?.input_tokens !== 'number' || typeof parsed.usage?.output_tokens !== 'number') {
+        this.markIncomplete('a response did not report both input and output tokens');
+      }
+      return this.record(model, usage);
     } catch {
       // Keep what the stream already reported; the rest is unknown, so stop paid work.
-      if (streaming && sse.sawUsage) this.record(model, sse.usage);
       this.markIncomplete('a response body could not be read to the end');
+      return streaming && sse.sawUsage ? this.record(model, sse.usage) : 0;
     }
   }
 }

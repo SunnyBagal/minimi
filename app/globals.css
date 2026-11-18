@@ -229,19 +229,38 @@ button {
   }
 }
 
-/* oneko (Oneko.tsx): above the cat field and the thread, below the header and composer. */
+/*
+ * Layers inside .app (its own stacking context, above the cat field):
+ *   card and bubble backgrounds (in flow, no stacking context of their own)
+ *   < oneko (z-index 1)
+ *   < the text in cards and bubbles, the timing chips, the empty-state hero (z-index 2)
+ *   < header and composer (z-index 20).
+ * So the cat walks over a card's background and under its text. For this to hold,
+ * .thread, .turns, .turn, .user-row, .answer and .bubble must not create a stacking
+ * context (no z-index, transform, filter, backdrop-filter, opacity < 1, isolation).
+ */
 .oneko {
   position: fixed;
-  z-index: 10;
+  z-index: 1;
   width: 32px;
   height: 32px;
-  pointer-events: none;
+  /* Only the sprite takes clicks (they cycle its mode, as on the portfolio). */
+  pointer-events: auto;
+  cursor: pointer;
   image-rendering: pixelated;
   background-image: url('/oneko/oneko.gif');
 }
 
 .oneko[hidden] {
   display: none;
+}
+
+.answer > *,
+.bubble-text,
+.bubble-actions,
+.timings {
+  position: relative;
+  z-index: 2;
 }
 
 /* ------------------------------------------------------------------ app */
@@ -1100,8 +1119,10 @@ mark.uncited small {
   padding-top: clamp(24px, 10vh, 96px);
 }
 
+/* z-index 2: the hero's text, like card text, stays above the oneko cat. */
 .empty-hero {
   position: relative;
+  z-index: 2;
   isolation: isolate;
   display: flex;
   flex-direction: column;
@@ -1123,6 +1144,7 @@ mark.uncited small {
 
 .examples {
   position: relative;
+  z-index: 2;
   isolation: isolate;
 }
 

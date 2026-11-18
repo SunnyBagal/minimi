@@ -1,27 +1,36 @@
 'use client';
 
 /**
- * The oneko cat: the `useNeko` hook from the site owner's portfolio (follow mode),
- * ported to React and TypeScript. The logic is onekoCore.ts and nekoColumn.ts; this
- * draws it on one fixed 32 px element with the oneko.gif sprite sheet served from
- * public/oneko/, one tick per 100 ms. Credits are in CREDITS.md.
+ * The oneko cat: the `useNeko` hook from the site owner's portfolio, ported to React and
+ * TypeScript. The logic is onekoCore.ts; this draws it on one fixed 32 px element with
+ * the oneko.gif sprite sheet served from public/oneko/, one tick per 100 ms, and owns
+ * the pointer listener, the click that cycles the mode, and the wander sit timer.
+ * Credits are in CREDITS.md.
  *
  * Fitted to this page:
- * - The cat stays off the conversation column (the thread and the composer). When the
- *   pointer is over the column it runs to the nearest point on the column's edge and
- *   waits there; it never crosses the column. The column is measured again on resize,
- *   scroll and when the thread or composer changes size.
- * - Where neither side of the column has room for the cat (a phone), there is no cat.
+ * - Always on (the portfolio summons it with a button); rendered once in the page, so
+ *   New chat and the theme toggle do not remount it. Unmounting stops every timer and
+ *   listener.
+ * - Layering (globals.css): z-index 1 inside the app, so it walks over the card and
+ *   bubble backgrounds but under their text, and under the header and composer.
+ * - Only the 32 px sprite takes pointer events (for the click); nothing else changes.
  * - prefers-reduced-motion: reduce shows no cat; turning it on later hides it too.
- * - pointer-events: none (globals.css), so it never takes a click. Rendered once in
- *   the page, so New chat and the theme toggle do not remount it.
  */
 import { useEffect, useRef } from 'react';
-import { columnBand, insideRect, keepOut, nekoTarget, placeOutside, type Point, type Rect } from './nekoColumn';
-import { initialNeko, NEKO_EDGE_ARRIVE_PX, NEKO_FRAME_MS, NEKO_SIZE, nekoFrame, type NekoState } from './onekoCore';
-
-/** The elements that make up the conversation column. */
-const COLUMN_SELECTORS = ['.thread', '.composer-form'];
+import {
+  changeMode,
+  endSit,
+  initialNeko,
+  NEKO_FRAME_MS,
+  NEKO_SIZE,
+  NEKO_WANDER_SELECTORS,
+  nekoFrame,
+  nextMode,
+  pickWanderTarget,
+  sitMs,
+  type NekoMode,
+  type NekoState,
+} from './onekoCore';
 
 export function Oneko() {
   const ref = useRef<HTMLDivElement>(null);
@@ -31,18 +40,20 @@ export function Oneko() {
     if (el === null) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-    let state: NekoState = initialNeko(window.innerWidth, window.innerHeight);
-    let pointer: Point = { x: state.x, y: state.y };
-    let column: Rect | null = null;
+    const randTarget = () =>
+      pickWanderTarget(
+        Array.from(document.querySelectorAll(NEKO_WANDER_SELECTORS), (node) => node.getBoundingClientRect()),
+        window.innerWidth,
+        window.innerHeight,
+        Math.random,
+      );
 
-    const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
-    const measure = () => {
-      const rects = COLUMN_SELECTORS.flatMap((selector) => {
-        const node = document.querySelector(selector);
-        return node === null ? [] : [node.getBoundingClientRect()];
-      });
-      column = columnBand(rects, viewport());
-    };
+    let mode: NekoMode = 0;
+    let state: NekoState = initialNeko(window.innerWidth, window.innerHeight, randTarget());
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
+    let interval = 0;
+    let sitTimer = 0;
 
     const draw = () => {
       el.style.left = `${state.x - NEKO_SIZE / 2}px`;
@@ -50,69 +61,52 @@ export function Oneko() {
       el.style.backgroundPosition = state.bgPos;
     };
 
-    /** One tick. Returns false when there is no room for the cat beside the column. */
-    const tick = (): boolean => {
-      const view = viewport();
-      let target: Point | null = pointer;
-      if (column !== null) {
-        const cat = { x: state.x, y: state.y };
-        if (insideRect(cat, keepOut(column, NEKO_SIZE))) {
-          const outside = placeOutside(cat, NEKO_SIZE, column, view);
-          if (outside === null) return false;
-          state = { ...state, x: outside.x, y: outside.y };
-        }
-        target = nekoTarget(pointer, { x: state.x, y: state.y }, NEKO_SIZE, column, view);
-        if (target === null) return false;
+    const tick = () => {
+      const wasSitting = state.sitting;
+      state = nekoFrame(state, { mode, mouseX, mouseY, innerWidth: window.innerWidth, innerHeight: window.innerHeight });
+      draw();
+      if (!wasSitting && state.sitting) {
+        sitTimer = window.setTimeout(() => {
+          state = endSit(state, randTarget());
+        }, sitMs(Math.random));
       }
-      const atEdge = target.x !== pointer.x || target.y !== pointer.y;
-      state = nekoFrame(state, {
-        targetX: target.x,
-        targetY: target.y,
-        innerWidth: view.width,
-        innerHeight: view.height,
-        arriveWithin: atEdge ? NEKO_EDGE_ARRIVE_PX : undefined,
-      });
-      return true;
     };
 
-    let interval = 0;
-    const step = () => {
-      const room = tick();
-      el.hidden = !room;
-      if (room) draw();
-    };
     const start = () => {
       window.clearInterval(interval);
+      window.clearTimeout(sitTimer);
       interval = 0;
       if (reduced.matches) {
         el.hidden = true;
         return;
       }
-      measure();
-      step();
-      interval = window.setInterval(step, NEKO_FRAME_MS);
+      // A sit whose timer was cleared above would never end; stand the cat up.
+      if (state.sitting) state = endSit(state, randTarget());
+      el.hidden = false;
+      draw();
+      interval = window.setInterval(tick, NEKO_FRAME_MS);
     };
 
     const onMouse = (event: MouseEvent) => {
-      pointer = { x: event.clientX, y: event.clientY };
+      mouseX = event.clientX;
+      mouseY = event.clientY;
     };
-    const observer = new ResizeObserver(measure);
-    for (const selector of COLUMN_SELECTORS) {
-      const node = document.querySelector(selector);
-      if (node !== null) observer.observe(node);
-    }
+    const onClick = (event: MouseEvent) => {
+      event.stopPropagation();
+      mode = nextMode(mode);
+      window.clearTimeout(sitTimer);
+      state = changeMode(state, mode, randTarget());
+    };
 
     start();
-    document.addEventListener('mousemove', onMouse);
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, { capture: true, passive: true });
+    window.addEventListener('mousemove', onMouse);
+    el.addEventListener('click', onClick);
     reduced.addEventListener('change', start);
     return () => {
       window.clearInterval(interval);
-      observer.disconnect();
-      document.removeEventListener('mousemove', onMouse);
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, { capture: true });
+      window.clearTimeout(sitTimer);
+      window.removeEventListener('mousemove', onMouse);
+      el.removeEventListener('click', onClick);
       reduced.removeEventListener('change', start);
     };
   }, []);

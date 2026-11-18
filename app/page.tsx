@@ -390,7 +390,9 @@ export default function Page() {
                             {copiedId === turn.user.id ? <span className="copied">Copied</span> : null}
                           </button>
                         </div>
-                        <div className="bubble">{userText}</div>
+                        <div className="bubble">
+                          <span className="bubble-text">{userText}</span>
+                        </div>
                       </div>
                     ) : null}
 

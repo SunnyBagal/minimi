@@ -46,3 +46,4 @@ Runs after these changes are written to `evals/results/heldout.json` and are rep
 ### Third run after fixes
 
 `6cdd446`: 18 of 19 at 3 of 3; 115 flaky. Its run 2 said "I can't say whether it still holds", which the "does not say the price still holds" check read as a claim that it holds (no negation rule in its second branch). The check now applies the same uncertainty rule as `claimsNoChangeAbout`, and still catches "still costs 44 USD" (tested).
+Codex then found both check fixes too loose (`docs` review, not published): the 117 helper attached a marker even after a line break, and the 115 helper let a hedge anywhere in a sentence excuse a claim elsewhere in it. Both now follow the validator's and `claimsNoChangeAbout`'s rules exactly (marker on the same line after the full stop; hedge in the same clause), with Codex's counterexamples as tests. The re-check prompt's example no longer uses held-out figures.

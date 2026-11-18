@@ -233,12 +233,9 @@ function renewsDateQuestion(text: string): boolean {
  * Added after the second held-out run (case 117), per its review.
  */
 export function citedSentencesOf(text: string): string[] {
-  const out: string[] = [];
-  for (const sentence of sentencesOf(text)) {
-    if (/^(?:\[\d+\]\s*)+$/.test(sentence) && out.length > 0) out[out.length - 1] = `${out[out.length - 1]} ${sentence}`;
-    else out.push(sentence);
-  }
-  return out;
+  // Move a citation run that directly follows a terminator on the same line (horizontal space only)
+  // inside the sentence it closes; a marker after a line break stays detached, as in the validator.
+  return sentencesOf(text.replace(/([.!?])((?:[ \t]*\[\d+\])+)/g, '$2$1'));
 }
 
 function claimOn(run: CaseRun, entity: string, value: string, localDate: string): Claim | undefined {
@@ -267,14 +264,18 @@ function attributesHistoricalPrice(text: string): boolean {
 
 // After the third held-out run: a hedged sentence ("I can't say whether it still holds") is not a claim
 // that it holds, the same uncertainty rule claimsNoChangeAbout uses.
+const HOLDS = /\b(?:still costs|still priced|price still|still holds|continues to cost|remains \d)\b/i;
+const HEDGE = /\b(?:can't|cannot|can not|couldn't|could not|unable|not sure|don't know|do not know|whether|unclear|unconfirmed)\b/i;
+
 export function stillHolds(answer: string): boolean {
   if (claimsNoChangeAbout(answer, /Cinderwell/)) return true;
-  return sentencesOf(answer).some(
-    (sentence) =>
-      /\b(?:still costs|still priced|price still|still holds|continues to cost|remains \d)\b/i.test(sentence) &&
-      /(?:Cinderwell|Foundry|\b44\b)/.test(sentence) &&
-      !/\b(?:can't|cannot|can not|couldn't|could not|unable|not sure|don't know|do not know|whether|unclear|unconfirmed)\b/i.test(sentence),
-  );
+  return sentencesOf(answer).some((sentence) => {
+    if (!/(?:Cinderwell|Foundry|\b44\b)/.test(sentence)) return false;
+    // The hedge must sit in the clause that makes the claim, as in claimsNoChangeAbout.
+    return sentence
+      .split(/[,;:]|\s(?:but|and|while|whereas|although)\s/i)
+      .some((clause) => HOLDS.test(clause) && !HEDGE.test(clause));
+  });
 }
 
 function saysItCannotIdentify(text: string): boolean {

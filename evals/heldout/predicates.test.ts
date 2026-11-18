@@ -28,10 +28,18 @@ describe('held-out case 111: offersRelayLookup', () => {
 describe('held-out case 117: citedSentencesOf', () => {
   it('attaches a marker that follows the full stop to its sentence, as the validator does', () => {
     expect(citedSentencesOf('Loomery shipped shared drafts on 12 Nov 2026, news since your question. [3]\n\nNothing else.')).toEqual([
-      'Loomery shipped shared drafts on 12 Nov 2026, news since your question. [3]',
+      'Loomery shipped shared drafts on 12 Nov 2026, news since your question [3].',
       'Nothing else.',
     ]);
   });
+  it('leaves a marker after a line break detached, and attaches one followed by more text (Codex counterexamples)', () => {
+    expect(citedSentencesOf('Loomery shipped shared drafts on 12 Nov 2026.\n\n[3]')).toEqual(['Loomery shipped shared drafts on 12 Nov 2026.', '[3]']);
+    expect(citedSentencesOf('Loomery shipped shared drafts on 12 Nov 2026. [3] Prices are unchanged.')).toEqual([
+      'Loomery shipped shared drafts on 12 Nov 2026 [3].',
+      'Prices are unchanged.',
+    ]);
+  });
+
   it('does not attach a marker to a sentence it does not follow', () => {
     expect(citedSentencesOf('Shared drafts shipped. Prices are unchanged [3].')).toEqual(['Shared drafts shipped.', 'Prices are unchanged [3].']);
   });
@@ -44,5 +52,8 @@ describe('held-out case 115: stillHolds', () => {
   it('still catches a plain claim that it holds', () => {
     expect(stillHolds('Cinderwell Foundry still costs 44 USD per month.')).toBe(true);
     expect(stillHolds('The Foundry price still holds at 44 USD.')).toBe(true);
+  });
+  it('a hedge in another clause does not excuse a claim that it holds (Codex counterexample)', () => {
+    expect(stillHolds("I couldn't fetch the page, but Cinderwell Foundry still costs 44 USD per month.")).toBe(true);
   });
 });

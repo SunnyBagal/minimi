@@ -4,6 +4,7 @@ import {
   changeMode,
   endSit,
   initialNeko,
+  MODE_NAMES,
   nekoFrame,
   nextMode,
   pickWanderTarget,
@@ -23,7 +24,10 @@ const FLEE_RADIUS = 220;
 const FLEE_STEP = 14;
 const VIEW = { innerWidth: 1280, innerHeight: 800 };
 
-const start = (over: Partial<NekoState> = {}): NekoState => ({ ...initialNeko(1280, 800, { x: 900, y: 200 }), ...over });
+const start = (over: Partial<NekoState> = {}): NekoState => ({
+  ...initialNeko(1280, 800, { x: 900, y: 200 }),
+  ...over,
+});
 const input = (mode: NekoMode, mouseX: number, mouseY: number): NekoInput => ({ mode, mouseX, mouseY, ...VIEW });
 const run = (state: NekoState, ticks: number, at: NekoInput): NekoState => {
   let current = state;
@@ -42,7 +46,20 @@ const box = (left: number, top: number, width: number, height: number): Box => (
 
 describe('oneko sprites and directions (portfolio useNeko)', () => {
   it('keeps the portfolio sprite map and its sheet offsets (32 px cells)', () => {
-    expect(Object.keys(SPRITE_SETS)).toEqual(['idle', 'alert', 'tired', 'sleeping', 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
+    expect(Object.keys(SPRITE_SETS)).toEqual([
+      'idle',
+      'alert',
+      'tired',
+      'sleeping',
+      'N',
+      'NE',
+      'E',
+      'SE',
+      'S',
+      'SW',
+      'W',
+      'NW',
+    ]);
     expect(spritePosition('idle', 0)).toBe('-96px -96px');
     expect(spritePosition('alert', 0)).toBe('-224px -96px');
     expect(spritePosition('E', 0)).toBe('-96px 0px');
@@ -92,7 +109,8 @@ describe('follow mode', () => {
 
   it('arrives and idles between 38 and 48 px from the pointer', () => {
     let state = start({ x: 100, y: 100 });
-    for (let tick = 0; tick < 80 && (tick === 0 || state.phase === 'running'); tick += 1) state = nekoFrame(state, input(0, 600, 300));
+    for (let tick = 0; tick < 80 && (tick === 0 || state.phase === 'running'); tick += 1)
+      state = nekoFrame(state, input(0, 600, 300));
     const distance = Math.hypot(state.x - 600, state.y - 300);
     expect(distance).toBeLessThan(NEAR);
     expect(distance).toBeGreaterThanOrEqual(NEAR - SPEED);
@@ -162,6 +180,80 @@ describe('flee mode', () => {
     expect(cornered.x).toBe(1280 - 24);
     expect(cornered.y).toBe(800 - 24);
   });
+
+  it('safe from the pointer, it sleeps like follow: idle, tired after 10 ticks, sleeping after 15', () => {
+    const far = input(1, 100, 100); // more than 220 px from (600, 300)
+    let state = nekoFrame(start({ x: 600, y: 300, phase: 'running' }), far);
+    expect(state.phase).toBe('idle');
+    expect(state.bgPos).toBe(spritePosition('idle', 0));
+    state = run(state, 10, far);
+    expect(state.phase).toBe('idle');
+    state = nekoFrame(state, far);
+    expect(state.phase).toBe('tired');
+    state = nekoFrame(state, far);
+    expect(state.bgPos).toBe(spritePosition('tired', 0));
+    state = run(state, 14, far);
+    expect(state.phase).toBe('tired');
+    state = nekoFrame(state, far);
+    expect(state.phase).toBe('sleeping');
+    state = nekoFrame(state, far);
+    expect(sprites('sleeping')).toContain(state.bgPos);
+    expect(state.x).toBe(600);
+  });
+
+  it('runs to a safe distance and then falls asleep there, with the pointer still', () => {
+    const still = input(1, 500, 300);
+    let state = start({ x: 600, y: 300 });
+    let ticks = 0;
+    while (state.phase !== 'sleeping' && ticks < 60) {
+      state = nekoFrame(state, still);
+      ticks += 1;
+    }
+    expect(state.phase).toBe('sleeping');
+    expect(state.x - 500).toBeGreaterThan(FLEE_RADIUS);
+  });
+
+  it('cornered at the edge with the pointer still, it falls asleep too', () => {
+    const still = input(1, 1200, 700);
+    let state = start({ x: 1256, y: 776 }); // already in the corner, pointer within 220 px
+    let ticks = 0;
+    while (state.phase !== 'sleeping' && ticks < 60) {
+      state = nekoFrame(state, still);
+      ticks += 1;
+    }
+    expect(state.phase).toBe('sleeping');
+    expect([state.x, state.y]).toEqual([1256, 776]);
+  });
+
+  it('cornered with the pointer moving near it, it stays awake', () => {
+    let state = start({ x: 1256, y: 776 });
+    for (let i = 0; i < 60; i += 1) state = nekoFrame(state, input(1, 1200 + (i % 2), 700));
+    expect(state.phase).toBe('idle');
+  });
+
+  it('asleep, it wakes when the pointer moves within 220 px: alert for a tick, then runs away', () => {
+    const asleep = start({ x: 600, y: 300, phase: 'sleeping', pointer: { x: 100, y: 100 } });
+    const alerted = nekoFrame(asleep, input(1, 500, 300));
+    expect(alerted.phase).toBe('alert');
+    expect(alerted.bgPos).toBe(spritePosition('alert', 0));
+    expect(alerted.x).toBe(600);
+    const running = nekoFrame(alerted, input(1, 500, 300));
+    expect(running.phase).toBe('running');
+    expect(running.x).toBeCloseTo(600 + FLEE_STEP);
+  });
+
+  it('asleep, it stays asleep while the pointer moves about more than 220 px away', () => {
+    let state = start({ x: 600, y: 300, phase: 'sleeping', pointer: { x: 100, y: 100 } });
+    for (let i = 0; i < 20; i += 1) state = nekoFrame(state, input(1, 100 + i * 5, 100));
+    expect(state.phase).toBe('sleeping');
+  });
+
+  it('with the pointer exactly on it, runs toward the side with more room instead of running in place', () => {
+    const left = nekoFrame(start({ x: 300, y: 300 }), input(1, 300, 300));
+    expect(left.x).toBeCloseTo(300 + FLEE_STEP);
+    const right = nekoFrame(start({ x: 1000, y: 300 }), input(1, 1000, 300));
+    expect(right.x).toBeCloseTo(1000 - FLEE_STEP);
+  });
 });
 
 describe('wander mode', () => {
@@ -199,7 +291,13 @@ describe('wander mode', () => {
   });
 
   it('picks the centre of a random fully visible element', () => {
-    const boxes = [box(10, 10, 100, 20), box(-5, 50, 100, 20), box(200, 790, 50, 20), box(300, 300, 0, 10), box(500, 400, 60, 40)];
+    const boxes = [
+      box(10, 10, 100, 20),
+      box(-5, 50, 100, 20),
+      box(200, 790, 50, 20),
+      box(300, 300, 0, 10),
+      box(500, 400, 60, 40),
+    ];
     expect(pickWanderTarget(boxes, 1280, 800, () => 0)).toEqual({ x: 60, y: 20 });
     expect(pickWanderTarget(boxes, 1280, 800, () => 0.99)).toEqual({ x: 530, y: 420 });
   });
@@ -213,6 +311,7 @@ describe('wander mode', () => {
 describe('mode changes (clicking the cat)', () => {
   it('cycles follow → flee → wander → follow', () => {
     expect([nextMode(0), nextMode(1), nextMode(2)]).toEqual([1, 2, 0]);
+    expect(MODE_NAMES).toEqual(['follow', 'flee', 'wander']);
   });
 
   it('to wander: drops a sit and takes a new target', () => {

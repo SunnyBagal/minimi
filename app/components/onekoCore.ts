@@ -13,13 +13,22 @@
  *   sleeping it is alerted for a tick, then runs. Alerted but already near, it waits
  *   3 ticks and idles.
  * - Flee: within 220 px of the pointer, run away at 1.4 × speed, kept 24 px inside
- *   the window, facing away; further off, idle.
+ *   the window, facing away.
  * - Wander: run to a random visible heading, paragraph, link, button, list item or
  *   icon (or a random point when there is none); within 48 px sit asleep for 2–3 s,
  *   then pick the next target.
  * - One tick per 100 ms; the cat starts in the middle of the window.
- * The only changes are the shape: state is a value passed in and returned, and the
- * random source, window size and target rectangles are parameters, so it can be tested.
+ * Changed from the portfolio:
+ * - The shape: state is a value passed in and returned, and the random source, window
+ *   size and target rectangles are parameters, so it can be tested.
+ * - Flee rests like follow (ui-r4): with nowhere to run (more than 220 px from the
+ *   pointer, or cornered at the edge with the pointer still) it goes idle, then tired
+ *   after 10 ticks, then sleeping after 15, as in follow. It wakes (alert for a tick,
+ *   then runs) when the pointer moves within 220 px. The portfolio's flee only showed
+ *   the idle sprite, awake for ever.
+ * - Flee with the pointer exactly on the cat runs toward the side with more room; the
+ *   portfolio's divided by a zero distance and ran in place.
+ * - Wander visits only elements the cat stays visible and clickable at (Oneko.tsx).
  */
 
 export const NEKO_SPEED = 10;
@@ -48,6 +57,15 @@ export const NEKO_SIT_JITTER_MS = 1000;
 export const NEKO_WANDER_INSET = 80;
 /** Wander: the elements the cat visits, as in the portfolio. */
 export const NEKO_WANDER_SELECTORS = 'h1, h2, h3, p, a, button, li, [class*="icon"]';
+/**
+ * Wander: candidates inside these are skipped. They are drawn above the cat (the header,
+ * the composer, the popovers, the empty-state hero and its example buttons), so a cat
+ * sitting there is hidden and a click meant for it lands on them instead.
+ */
+export const NEKO_WANDER_EXCLUDE = '.topbar, .composer, .mb-popover, .empty-hero, .examples';
+
+/** The modes in click order, as the portfolio numbers them. */
+export const MODE_NAMES = ['follow', 'flee', 'wander'] as const;
 
 export const SPRITE_SETS = {
   idle: [[-3, -3]],
@@ -121,6 +139,8 @@ export interface NekoState {
   wanderTarget: Point;
   /** Wander: sitting at a target until Oneko.tsx's timer ends the sit. */
   sitting: boolean;
+  /** Flee: the pointer position seen last tick, to tell whether it has moved; null before the first. */
+  pointer: Point | null;
   /** The background-position of the sprite sheet, e.g. "-96px -96px". */
   bgPos: string;
 }
@@ -156,7 +176,12 @@ export function angleToDir(angle: number): Direction {
  * randTarget: the centre of a random fully visible candidate, or a random point inside
  * the window when none is visible. `boxes` are the candidates' bounding rectangles.
  */
-export function pickWanderTarget(boxes: readonly Box[], innerWidth: number, innerHeight: number, random: () => number): Point {
+export function pickWanderTarget(
+  boxes: readonly Box[],
+  innerWidth: number,
+  innerHeight: number,
+  random: () => number,
+): Point {
   const visible = boxes.filter(
     (r) => r.width > 0 && r.height > 0 && r.top > 0 && r.bottom < innerHeight && r.left > 0 && r.right < innerWidth,
   );
@@ -180,6 +205,7 @@ export function initialNeko(innerWidth: number, innerHeight: number, wanderTarge
     phase: 'idle',
     wanderTarget,
     sitting: false,
+    pointer: null,
     bgPos: spritePosition('idle', 0),
   };
 }
@@ -218,6 +244,40 @@ function runToward(s: NekoState, tx: number, ty: number, dist: number, input: Ne
   s.bgPos = spritePosition(angleToDir(Math.atan2(dy, dx) * (180 / Math.PI)), s.frame);
 }
 
+/**
+ * One resting tick: follow's "near the pointer" branch, also used by flee when it has
+ * nowhere to run. running → idle; after NEKO_IDLE_TICKS tired; after NEKO_TIRED_TICKS
+ * sleeping; an alerted cat that stays at rest idles after NEKO_ALERT_TICKS.
+ */
+function rest(s: NekoState): void {
+  if (s.phase === 'running') {
+    s.phase = 'idle';
+    s.tickCount = 0;
+  }
+  if (s.phase === 'idle') {
+    if (s.tickCount > NEKO_IDLE_TICKS) {
+      s.phase = 'tired';
+      s.tickCount = 0;
+    } else {
+      s.bgPos = spritePosition('idle', 0);
+    }
+  } else if (s.phase === 'tired') {
+    s.bgPos = spritePosition('tired', 0);
+    if (s.tickCount > NEKO_TIRED_TICKS) {
+      s.phase = 'sleeping';
+      s.tickCount = 0;
+    }
+  } else if (s.phase === 'sleeping') {
+    s.bgPos = spritePosition('sleeping', s.frame);
+  } else if (s.phase === 'alert') {
+    s.bgPos = spritePosition('alert', 0);
+    if (s.tickCount > NEKO_ALERT_TICKS) {
+      s.phase = 'idle';
+      s.tickCount = 0;
+    }
+  }
+}
+
 /** One 100 ms tick of the portfolio's tick(). */
 export function nekoFrame(state: NekoState, input: NekoInput): NekoState {
   const s: NekoState = { ...state, frame: state.frame + 1, tickCount: state.tickCount + 1 };
@@ -227,32 +287,7 @@ export function nekoFrame(state: NekoState, input: NekoInput): NekoState {
     const dy = input.mouseY - s.y;
     const dist = Math.hypot(dx, dy);
     if (dist < NEKO_NEAR_PX) {
-      if (s.phase === 'running') {
-        s.phase = 'idle';
-        s.tickCount = 0;
-      }
-      if (s.phase === 'idle') {
-        if (s.tickCount > NEKO_IDLE_TICKS) {
-          s.phase = 'tired';
-          s.tickCount = 0;
-        } else {
-          s.bgPos = spritePosition('idle', 0);
-        }
-      } else if (s.phase === 'tired') {
-        s.bgPos = spritePosition('tired', 0);
-        if (s.tickCount > NEKO_TIRED_TICKS) {
-          s.phase = 'sleeping';
-          s.tickCount = 0;
-        }
-      } else if (s.phase === 'sleeping') {
-        s.bgPos = spritePosition('sleeping', s.frame);
-      } else if (s.phase === 'alert') {
-        s.bgPos = spritePosition('alert', 0);
-        if (s.tickCount > NEKO_ALERT_TICKS) {
-          s.phase = 'idle';
-          s.tickCount = 0;
-        }
-      }
+      rest(s);
       return s;
     }
     if (s.phase === 'sleeping' || s.phase === 'tired') {
@@ -266,18 +301,50 @@ export function nekoFrame(state: NekoState, input: NekoInput): NekoState {
   }
 
   if (input.mode === 1) {
-    const dx = s.x - input.mouseX; // away from the pointer
-    const dy = s.y - input.mouseY;
-    const dist = Math.hypot(dx, dy);
+    const moved = s.pointer === null || s.pointer.x !== input.mouseX || s.pointer.y !== input.mouseY;
+    s.pointer = { x: input.mouseX, y: input.mouseY };
+    let dx = s.x - input.mouseX; // away from the pointer
+    let dy = s.y - input.mouseY;
+    let dist = Math.hypot(dx, dy);
+    if (dist === 0) {
+      // Pointer exactly on the cat: no "away", so run toward the side with more room.
+      dx = s.x < input.innerWidth / 2 ? 1 : -1;
+      dy = 0;
+      dist = 1;
+    }
+    // Safe: nowhere it needs to run. Rest as follow does (idle → tired → sleeping).
     if (dist > NEKO_FLEE_RADIUS) {
-      s.bgPos = spritePosition('idle', s.frame);
+      rest(s);
+      return s;
+    }
+    // The pointer is close. A tired or sleeping cat wakes only if the pointer moved.
+    if (s.phase === 'sleeping' || s.phase === 'tired') {
+      if (!moved) {
+        rest(s);
+        return s;
+      }
+      s.phase = 'alert';
+      s.tickCount = 0;
+      s.bgPos = spritePosition('alert', 0);
       return s;
     }
     const step = NEKO_SPEED * NEKO_FLEE_FACTOR;
-    const nx = s.x + (dx / (dist || 1)) * step;
-    const ny = s.y + (dy / (dist || 1)) * step;
-    s.x = Math.min(Math.max(nx, NEKO_FLEE_MARGIN), input.innerWidth - NEKO_FLEE_MARGIN);
-    s.y = Math.min(Math.max(ny, NEKO_FLEE_MARGIN), input.innerHeight - NEKO_FLEE_MARGIN);
+    const nx = Math.min(Math.max(s.x + (dx / dist) * step, NEKO_FLEE_MARGIN), input.innerWidth - NEKO_FLEE_MARGIN);
+    const ny = Math.min(Math.max(s.y + (dy / dist) * step, NEKO_FLEE_MARGIN), input.innerHeight - NEKO_FLEE_MARGIN);
+    if (nx === s.x && ny === s.y) {
+      // Cornered at the edge: nowhere to run. Rest while the pointer is still; stay awake while it moves.
+      if (moved) {
+        s.phase = 'idle';
+        s.tickCount = 0;
+        s.bgPos = spritePosition('idle', 0);
+      } else {
+        rest(s);
+      }
+      return s;
+    }
+    s.phase = 'running';
+    s.x = nx;
+    s.y = ny;
     s.bgPos = spritePosition(angleToDir(Math.atan2(dy, dx) * (180 / Math.PI)), s.frame);
     return s;
   }

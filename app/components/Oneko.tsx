@@ -16,19 +16,23 @@
  * - Only the 32 px sprite takes pointer events (for the click); nothing else changes.
  *   Where it walks under an answer's text layer, a click on its visible pixels in blank
  *   space still reaches it; text, links and controls keep their clicks (catClick.ts).
+ *   One capture-phase click listener decides both cases through modeAfterClick, so one
+ *   click advances the mode exactly one step: follow → flee → wander → follow. The
+ *   current mode's name is on the element as data-mode (follow, flee, wander).
  * - prefers-reduced-motion: reduce shows no cat; turning it on later hides it too.
  */
 import { useEffect, useRef } from 'react';
-import { catTakesClick, CLICKABLE, inRect, onGlyph } from './catClick';
+import { catTakesClick, CLICKABLE, inRect, modeAfterClick, onGlyph } from './catClick';
 import {
   changeMode,
   endSit,
   initialNeko,
   NEKO_FRAME_MS,
   NEKO_SIZE,
+  NEKO_WANDER_EXCLUDE,
   NEKO_WANDER_SELECTORS,
   nekoFrame,
-  nextMode,
+  MODE_NAMES,
   pickWanderTarget,
   sitMs,
   type NekoMode,
@@ -43,9 +47,13 @@ export function Oneko() {
     if (el === null) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
+    // Wander targets: the portfolio's elements, minus those drawn above the cat (NEKO_WANDER_EXCLUDE),
+    // where it would be hidden and a click meant for it would land on them.
     const randTarget = () =>
       pickWanderTarget(
-        Array.from(document.querySelectorAll(NEKO_WANDER_SELECTORS), (node) => node.getBoundingClientRect()),
+        Array.from(document.querySelectorAll(NEKO_WANDER_SELECTORS))
+          .filter((node) => node.closest(NEKO_WANDER_EXCLUDE) === null)
+          .map((node) => node.getBoundingClientRect()),
         window.innerWidth,
         window.innerHeight,
         Math.random,
@@ -66,7 +74,13 @@ export function Oneko() {
 
     const tick = () => {
       const wasSitting = state.sitting;
-      state = nekoFrame(state, { mode, mouseX, mouseY, innerWidth: window.innerWidth, innerHeight: window.innerHeight });
+      state = nekoFrame(state, {
+        mode,
+        mouseX,
+        mouseY,
+        innerWidth: window.innerWidth,
+        innerHeight: window.innerHeight,
+      });
       draw();
       if (!wasSitting && state.sitting) {
         sitTimer = window.setTimeout(() => {
@@ -94,21 +108,23 @@ export function Oneko() {
       mouseX = event.clientX;
       mouseY = event.clientY;
     };
-    const cycleMode = () => {
-      mode = nextMode(mode);
+    const setMode = (next: NekoMode) => {
+      if (next === mode) return;
+      mode = next;
+      el.dataset.mode = MODE_NAMES[mode];
       window.clearTimeout(sitTimer);
       state = changeMode(state, mode, randTarget());
     };
-    const onClick = (event: MouseEvent) => {
-      event.stopPropagation();
-      cycleMode();
-    };
-    // A click on the visible sprite where it walks under an answer's blank space (catClick.ts).
+    // One listener for every click, so one click can change the mode at most once: on the
+    // sprite itself, or through blank answer space where the sprite is under the text layer
+    // (catClick.ts). Capture phase, so nothing below can stop it from seeing the click.
     const onPageClick = (event: MouseEvent) => {
-      if (event.button !== 0 || event.defaultPrevented || event.target === el) return;
+      if (event.button !== 0 || event.defaultPrevented) return;
       const target = event.target instanceof Element ? event.target : null;
+      const onSprite = event.target === el;
       const selection = window.getSelection();
       const facts = {
+        onSprite,
         spriteShown: !el.hidden,
         insideSprite: inRect(event.clientX, event.clientY, el.getBoundingClientRect()),
         inConversation: target?.closest('.thread') != null,
@@ -116,22 +132,21 @@ export function Oneko() {
         selecting: selection !== null && !selection.isCollapsed,
         onGlyph: false,
       };
-      if (!catTakesClick(facts)) return;
-      if (onGlyph(document, event.clientX, event.clientY)) return;
-      cycleMode();
+      // The glyph check reads layout, so only when everything else says yes.
+      if (!onSprite && catTakesClick(facts)) facts.onGlyph = onGlyph(document, event.clientX, event.clientY);
+      setMode(modeAfterClick(mode, facts));
     };
 
     start();
     window.addEventListener('mousemove', onMouse);
-    el.addEventListener('click', onClick);
-    document.addEventListener('click', onPageClick);
+    el.dataset.mode = MODE_NAMES[mode];
+    document.addEventListener('click', onPageClick, true);
     reduced.addEventListener('change', start);
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(sitTimer);
       window.removeEventListener('mousemove', onMouse);
-      el.removeEventListener('click', onClick);
-      document.removeEventListener('click', onPageClick);
+      document.removeEventListener('click', onPageClick, true);
       reduced.removeEventListener('change', start);
     };
   }, []);

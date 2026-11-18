@@ -8,6 +8,8 @@
  * conversation (the header, composer and popovers sit above the cat and keep their clicks).
  */
 
+import { nextMode, type NekoMode } from './onekoCore';
+
 /** Elements that keep their own clicks even over the cat. */
 export const CLICKABLE =
   'a, button, summary, input, textarea, select, label, [role="button"], [contenteditable], [tabindex]';
@@ -65,4 +67,15 @@ export function onGlyph(doc: Document, x: number, y: number): boolean {
     }
   }
   return false;
+}
+
+/**
+ * The mode after one click, the only place a click changes the mode (ui-r4). Oneko.tsx
+ * has a single click listener that calls this once per click, so a click on the sprite
+ * itself and a click that reaches it through blank answer space each advance exactly one
+ * step: follow → flee → wander → follow.
+ */
+export function modeAfterClick(mode: NekoMode, facts: ClickFacts & { onSprite: boolean }): NekoMode {
+  const takes = facts.onSprite ? facts.spriteShown : catTakesClick(facts);
+  return takes ? nextMode(mode) : mode;
 }

@@ -3,9 +3,9 @@
 import type { SourceRef } from '../../src/core/contracts';
 import type { ReactNode } from 'react';
 
-type Citation = Omit<SourceRef, 'text'>;
+export type Citation = Omit<SourceRef, 'text'>;
 
-function checkedLabel(ref: Citation): string {
+export function checkedLabel(ref: Citation): string {
   const when = new Intl.DateTimeFormat(undefined, {
     hour: '2-digit',
     minute: '2-digit',
@@ -21,7 +21,8 @@ function checkedLabel(ref: Citation): string {
 const SENTENCE_END = /[.!?](?=\s|$)|\n/;
 const TRAILING_CITATIONS = /^(?:[ \t]*\[\d+\])+/;
 
-interface Piece {
+/** A span of the raw answer text: a linked citation (with `ref`) or an uncited number mark. */
+export interface Piece {
   start: number;
   end: number;
   ref?: Citation;
@@ -38,8 +39,9 @@ function sentenceEnd(text: string, from: number): number {
  * The linked citations, plus each occurrence of a flagged number that no
  * citation in its sentence covers, in text order. A number the flags list
  * can also appear elsewhere with a citation; that occurrence is not marked.
+ * Offsets are into the raw text, so the markdown renderer can carry them.
  */
-function piecesOf(text: string, byN: Map<number, Citation>, uncited: string[]): Piece[] {
+export function piecesOf(text: string, byN: Map<number, Citation>, uncited: string[]): Piece[] {
   const links: Piece[] = [];
   for (const match of text.matchAll(/\[(\d+)\]/g)) {
     const ref = byN.get(Number(match[1]));
@@ -58,6 +60,26 @@ function piecesOf(text: string, byN: Map<number, Citation>, uncited: string[]): 
     marks.push({ start, end });
   }
   return [...links, ...marks].sort((a, b) => a.start - b.start);
+}
+
+/** An inline [n] citation, as a small chip linking to the source. */
+export function CitationLink({ citation }: { citation: Citation }) {
+  return (
+    <a className="cite" href={citation.url} title={checkedLabel(citation)} target="_blank" rel="noopener noreferrer">
+      [{citation.n}]
+      <sup className="cite-state"> {citation.live ? 'live' : 'cached'}</sup>
+    </a>
+  );
+}
+
+/** A number the answer states without a citation that covers it. */
+export function UncitedMark({ children }: { children: ReactNode }) {
+  return (
+    <mark className="uncited" title="not verified">
+      {children}
+      <small> (not verified)</small>
+    </mark>
+  );
 }
 
 /**
@@ -80,24 +102,14 @@ export function CitedText({
     if (piece.start > at) parts.push(text.slice(at, piece.start));
     const key = piece.start;
     if (piece.ref !== undefined) {
-      parts.push(
-        <a key={key} href={piece.ref.url} title={checkedLabel(piece.ref)} style={{ margin: '0 1px' }}>
-          [{piece.ref.n}]
-          <sup style={{ color: '#777', fontSize: 10 }}> {piece.ref.live ? 'live' : 'cached'}</sup>
-        </a>,
-      );
+      parts.push(<CitationLink key={key} citation={piece.ref} />);
     } else {
-      parts.push(
-        <mark key={key} title="not verified">
-          {text.slice(piece.start, piece.end)}
-          <small> (not verified)</small>
-        </mark>,
-      );
+      parts.push(<UncitedMark key={key}>{text.slice(piece.start, piece.end)}</UncitedMark>);
     }
     at = piece.end;
   }
   if (at < text.length) parts.push(text.slice(at));
-  return <span style={{ whiteSpace: 'pre-wrap' }}>{parts}</span>;
+  return <span className="prewrap">{parts}</span>;
 }
 
 function escapeRegExp(text: string): string {

@@ -1,0 +1,1206 @@
+{
+  "mode": "live",
+  "sha": "7d33b5a5c82a931f3c78f32b1f49075f466a21e7",
+  "runs": 3,
+  "spend": {
+    "budgetUsd": 4.5,
+    "spentUsd": 0.0317777,
+    "byModel": {
+      "claude-haiku-5-5": {
+        "calls": 14,
+        "usage": {
+          "input_tokens": 63232,
+          "output_tokens": 1565,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0
+        },
+        "usd": 0.007105699999999999
+      },
+      "claude-sonnet-5-5": {
+        "calls": 11,
+        "usage": {
+          "input_tokens": 6091,
+          "output_tokens": 1249,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0
+        },
+        "usd": 0.024672
+      }
+    },
+    "refusedRequests": 0,
+    "incompleteAccounting": "a request failed before a response arrived",
+    "stoppedBefore": {
+      "id": 17,
+      "run": 3,
+      "reason": "a request failed before a response arrived"
+    },
+    "priceSource": "claude-api skill, Current Models table, cached 2026-11-03"
+  },
+  "cases": [
+    {
+      "id": 10,
+      "runs": 3,
+      "requestedRuns": 3,
+      "passedRuns": 3,
+      "results": [
+        {
+          "run": 1,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "done.intent is recheck",
+              "pass": true,
+              "observed": "recheck"
+            },
+            {
+              "name": "found without a date lookup",
+              "pass": true,
+              "observed": "the previous answer in this session"
+            },
+            {
+              "name": "one verdict",
+              "pass": true,
+              "observed": 1
+            },
+            {
+              "name": "Basalt DB price is unchanged",
+              "pass": true,
+              "observed": "unchanged"
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
+              "pass": false,
+              "observed": [
+                "13",
+                "2026"
+              ]
+            }
+          ],
+          "judge": null,
+          "trace": {
+            "parts": [
+              {
+                "tz": "Asia/Kolkata",
+                "turns": [
+                  {
+                    "message": "What does Basalt DB's Pro plan cost?",
+                    "answerText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "modelText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "events": [
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "a5e9a1f5-224d-4377-8365-7f9e18e0a7d6",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "Basalt DB pricing",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": false,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "eb24dda2-21ff-4de9-bb89-bf928f7c1d78",
+                        "intent": "fresh"
+                      }
+                    ]
+                  },
+                  {
+                    "message": "Is that still right?",
+                    "answerText": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"What does Basalt DB's Pro plan cost?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, it still holds. The Basalt DB price of 25 USD per month is unchanged as of your question on Fri 13 Nov 2026. The quote still appears on the live first-party page, so no correction is needed.",
+                    "modelText": "Yes, it still holds. The Basalt DB price of 25 USD per month is unchanged as of your question on Fri 13 Nov 2026. The quote still appears on the live first-party page, so no correction is needed.",
+                    "events": [
+                      {
+                        "type": "recall",
+                        "candidates": {
+                          "dates": [
+                            "2026-11-13"
+                          ],
+                          "range": null,
+                          "ambiguous": false,
+                          "rule": "the previous answer in this session"
+                        },
+                        "hits": [
+                          {
+                            "userTurn": {
+                              "id": "68eea6e9-50db-4f2c-83ee-c342b15e3871",
+                              "sessionId": "case-10-part-0",
+                              "role": "user",
+                              "content": "What does Basalt DB's Pro plan cost?",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "skipped",
+                              "intent": null,
+                              "targetTurnIds": []
+                            },
+                            "assistantTurn": {
+                              "id": "eb24dda2-21ff-4de9-bb89-bf928f7c1d78",
+                              "sessionId": "case-10-part-0",
+                              "role": "assistant",
+                              "content": "Basalt DB Pro costs 25 USD per month [1].",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "done",
+                              "intent": "fresh",
+                              "targetTurnIds": []
+                            },
+                            "matched": "date",
+                            "score": 0
+                          }
+                        ],
+                        "chosen": "2026-11-13",
+                        "asked": {
+                          "turnId": "68eea6e9-50db-4f2c-83ee-c342b15e3871",
+                          "question": "What does Basalt DB's Pro plan cost?",
+                          "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                          "tz": "Asia/Kolkata",
+                          "origin": "live"
+                        }
+                      },
+                      {
+                        "type": "verdict",
+                        "row": {
+                          "claim": {
+                            "id": "701ac031-e675-4f9b-92b6-7e42ac29eb1e",
+                            "turnId": "eb24dda2-21ff-4de9-bb89-bf928f7c1d78",
+                            "entity": "Basalt DB",
+                            "attribute": "price",
+                            "value": "25 USD per month",
+                            "scope": {
+                              "plan": "Pro",
+                              "period": "month",
+                              "currency": "USD"
+                            },
+                            "sourceId": "a5e9a1f5-224d-4377-8365-7f9e18e0a7d6",
+                            "quote": "Basalt DB Pro is 25 USD per month.",
+                            "asOfUtc": "2026-11-13T13:00:00.000Z",
+                            "volatility": "high",
+                            "lastVerifiedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "supersedesId": null
+                          },
+                          "check": {
+                            "id": "1774e704-7b78-4b5b-87fb-7e5fef4ac887",
+                            "claimId": "701ac031-e675-4f9b-92b6-7e42ac29eb1e",
+                            "checkedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "verdict": "unchanged",
+                            "newValue": null,
+                            "newSourceId": "988e6eda-4d24-431b-9fa2-0dfe80938d40",
+                            "newQuote": "Basalt DB Pro is 25 USD per month.",
+                            "reason": "The quote is still on the live first-party page.",
+                            "decidedBy": "fast_path"
+                          },
+                          "provenance": "verified_now",
+                          "nowSource": {
+                            "n": 1,
+                            "sourceId": "988e6eda-4d24-431b-9fa2-0dfe80938d40",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true,
+                            "text": "# Invented prices. Not a real vendor.\nBasalt DB Pro is 25 USD per month.\nBasalt DB free tier includes 1 project.\n"
+                          }
+                        }
+                      },
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "988e6eda-4d24-431b-9fa2-0dfe80938d40",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "a15e1def-9b41-46a8-8231-2d22a9d9dc63",
+                        "intent": "recheck"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "claims": [
+              {
+                "id": "701ac031-e675-4f9b-92b6-7e42ac29eb1e",
+                "turnId": "eb24dda2-21ff-4de9-bb89-bf928f7c1d78",
+                "entity": "Basalt DB",
+                "attribute": "price",
+                "value": "25 USD per month",
+                "quote": "Basalt DB Pro is 25 USD per month.",
+                "supersedesId": null
+              }
+            ]
+          },
+          "spendUsd": 0.0053365
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "done.intent is recheck",
+              "pass": true,
+              "observed": "recheck"
+            },
+            {
+              "name": "found without a date lookup",
+              "pass": true,
+              "observed": "the previous answer in this session"
+            },
+            {
+              "name": "one verdict",
+              "pass": true,
+              "observed": 1
+            },
+            {
+              "name": "Basalt DB price is unchanged",
+              "pass": true,
+              "observed": "unchanged"
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
+              "pass": false,
+              "observed": [
+                "13",
+                "2026"
+              ]
+            }
+          ],
+          "judge": null,
+          "trace": {
+            "parts": [
+              {
+                "tz": "Asia/Kolkata",
+                "turns": [
+                  {
+                    "message": "What does Basalt DB's Pro plan cost?",
+                    "answerText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "modelText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "events": [
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "d9e3fd24-d7fb-41ce-be7b-80818a1bfb94",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "Basalt DB pricing",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": false,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "0204c533-ef3c-41a5-ad54-1c3f59d40b46",
+                        "intent": "fresh"
+                      }
+                    ]
+                  },
+                  {
+                    "message": "Is that still right?",
+                    "answerText": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"What does Basalt DB's Pro plan cost?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, it's still right. The Basalt DB price of 25 USD per month is unchanged, and the quote is still on the live first-party page as of your question on Fri 13 Nov 2026.",
+                    "modelText": "Yes, it's still right. The Basalt DB price of 25 USD per month is unchanged, and the quote is still on the live first-party page as of your question on Fri 13 Nov 2026.",
+                    "events": [
+                      {
+                        "type": "recall",
+                        "candidates": {
+                          "dates": [
+                            "2026-11-13"
+                          ],
+                          "range": null,
+                          "ambiguous": false,
+                          "rule": "the previous answer in this session"
+                        },
+                        "hits": [
+                          {
+                            "userTurn": {
+                              "id": "521b1442-ce60-4ad6-ba36-6b2ac0d01aa2",
+                              "sessionId": "case-10-part-0",
+                              "role": "user",
+                              "content": "What does Basalt DB's Pro plan cost?",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "skipped",
+                              "intent": null,
+                              "targetTurnIds": []
+                            },
+                            "assistantTurn": {
+                              "id": "0204c533-ef3c-41a5-ad54-1c3f59d40b46",
+                              "sessionId": "case-10-part-0",
+                              "role": "assistant",
+                              "content": "Basalt DB Pro costs 25 USD per month [1].",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "done",
+                              "intent": "fresh",
+                              "targetTurnIds": []
+                            },
+                            "matched": "date",
+                            "score": 0
+                          }
+                        ],
+                        "chosen": "2026-11-13",
+                        "asked": {
+                          "turnId": "521b1442-ce60-4ad6-ba36-6b2ac0d01aa2",
+                          "question": "What does Basalt DB's Pro plan cost?",
+                          "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                          "tz": "Asia/Kolkata",
+                          "origin": "live"
+                        }
+                      },
+                      {
+                        "type": "verdict",
+                        "row": {
+                          "claim": {
+                            "id": "7c3da87f-0ae5-417c-91ea-73cff428b33b",
+                            "turnId": "0204c533-ef3c-41a5-ad54-1c3f59d40b46",
+                            "entity": "Basalt DB",
+                            "attribute": "price",
+                            "value": "25 USD per month",
+                            "scope": {
+                              "plan": "Pro",
+                              "period": "month",
+                              "currency": "USD"
+                            },
+                            "sourceId": "d9e3fd24-d7fb-41ce-be7b-80818a1bfb94",
+                            "quote": "Basalt DB Pro is 25 USD per month.",
+                            "asOfUtc": "2026-11-13T13:00:00.000Z",
+                            "volatility": "high",
+                            "lastVerifiedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "supersedesId": null
+                          },
+                          "check": {
+                            "id": "55ccb8f5-5571-4cb7-882d-d670da9e7e23",
+                            "claimId": "7c3da87f-0ae5-417c-91ea-73cff428b33b",
+                            "checkedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "verdict": "unchanged",
+                            "newValue": null,
+                            "newSourceId": "96ed4626-3271-417b-8522-2b7761518477",
+                            "newQuote": "Basalt DB Pro is 25 USD per month.",
+                            "reason": "The quote is still on the live first-party page.",
+                            "decidedBy": "fast_path"
+                          },
+                          "provenance": "verified_now",
+                          "nowSource": {
+                            "n": 1,
+                            "sourceId": "96ed4626-3271-417b-8522-2b7761518477",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true,
+                            "text": "# Invented prices. Not a real vendor.\nBasalt DB Pro is 25 USD per month.\nBasalt DB free tier includes 1 project.\n"
+                          }
+                        }
+                      },
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "96ed4626-3271-417b-8522-2b7761518477",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "1fd91220-c877-444c-be5c-2189644a9374",
+                        "intent": "recheck"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "claims": [
+              {
+                "id": "7c3da87f-0ae5-417c-91ea-73cff428b33b",
+                "turnId": "0204c533-ef3c-41a5-ad54-1c3f59d40b46",
+                "entity": "Basalt DB",
+                "attribute": "price",
+                "value": "25 USD per month",
+                "quote": "Basalt DB Pro is 25 USD per month.",
+                "supersedesId": null
+              }
+            ]
+          },
+          "spendUsd": 0.005137999999999999
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "done.intent is recheck",
+              "pass": true,
+              "observed": "recheck"
+            },
+            {
+              "name": "found without a date lookup",
+              "pass": true,
+              "observed": "the previous answer in this session"
+            },
+            {
+              "name": "one verdict",
+              "pass": true,
+              "observed": 1
+            },
+            {
+              "name": "Basalt DB price is unchanged",
+              "pass": true,
+              "observed": "unchanged"
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message",
+              "pass": false,
+              "observed": [
+                "13",
+                "2026"
+              ]
+            }
+          ],
+          "judge": null,
+          "trace": {
+            "parts": [
+              {
+                "tz": "Asia/Kolkata",
+                "turns": [
+                  {
+                    "message": "What does Basalt DB's Pro plan cost?",
+                    "answerText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "modelText": "Basalt DB Pro costs 25 USD per month [1].",
+                    "events": [
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "0407d05a-d196-452e-8d2c-761f3beb45f8",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "Basalt DB pricing",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": false,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "a4602990-779c-48d0-a51a-37b362ce1e7b",
+                        "intent": "fresh"
+                      }
+                    ]
+                  },
+                  {
+                    "message": "Is that still right?",
+                    "answerText": "On Fri 13 Nov 2026, 18:30 GMT+5:30 you asked: \"What does Basalt DB's Pro plan cost?\".\nChecked Fri 13 Nov 2026, 18:30 GMT+5:30.\nYes, it still holds. The Basalt DB price of 25 USD per month is unchanged, and the quote still appears on the live first-party page as of your question on Fri 13 Nov 2026.",
+                    "modelText": "Yes, it still holds. The Basalt DB price of 25 USD per month is unchanged, and the quote still appears on the live first-party page as of your question on Fri 13 Nov 2026.",
+                    "events": [
+                      {
+                        "type": "recall",
+                        "candidates": {
+                          "dates": [
+                            "2026-11-13"
+                          ],
+                          "range": null,
+                          "ambiguous": false,
+                          "rule": "the previous answer in this session"
+                        },
+                        "hits": [
+                          {
+                            "userTurn": {
+                              "id": "79f27bf4-4891-4593-8c81-4786c6b242c2",
+                              "sessionId": "case-10-part-0",
+                              "role": "user",
+                              "content": "What does Basalt DB's Pro plan cost?",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "skipped",
+                              "intent": null,
+                              "targetTurnIds": []
+                            },
+                            "assistantTurn": {
+                              "id": "a4602990-779c-48d0-a51a-37b362ce1e7b",
+                              "sessionId": "case-10-part-0",
+                              "role": "assistant",
+                              "content": "Basalt DB Pro costs 25 USD per month [1].",
+                              "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                              "tz": "Asia/Kolkata",
+                              "localDate": "2026-11-13",
+                              "origin": "live",
+                              "topic": "Basalt DB Pro plan price",
+                              "entities": [
+                                "Basalt DB",
+                                "Basalt DB Pro"
+                              ],
+                              "summary": null,
+                              "extraction": "done",
+                              "intent": "fresh",
+                              "targetTurnIds": []
+                            },
+                            "matched": "date",
+                            "score": 0
+                          }
+                        ],
+                        "chosen": "2026-11-13",
+                        "asked": {
+                          "turnId": "79f27bf4-4891-4593-8c81-4786c6b242c2",
+                          "question": "What does Basalt DB's Pro plan cost?",
+                          "createdAtUtc": "2026-11-13T13:00:00.000Z",
+                          "tz": "Asia/Kolkata",
+                          "origin": "live"
+                        }
+                      },
+                      {
+                        "type": "verdict",
+                        "row": {
+                          "claim": {
+                            "id": "5293e52e-c26d-4caa-bf21-d01a143fda8c",
+                            "turnId": "a4602990-779c-48d0-a51a-37b362ce1e7b",
+                            "entity": "Basalt DB",
+                            "attribute": "price",
+                            "value": "25 USD per month",
+                            "scope": {
+                              "plan": "Pro",
+                              "period": "month",
+                              "currency": "USD"
+                            },
+                            "sourceId": "0407d05a-d196-452e-8d2c-761f3beb45f8",
+                            "quote": "Basalt DB Pro is 25 USD per month.",
+                            "asOfUtc": "2026-11-13T13:00:00.000Z",
+                            "volatility": "high",
+                            "lastVerifiedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "supersedesId": null
+                          },
+                          "check": {
+                            "id": "423f704d-599b-411a-84f9-5f4130fe394b",
+                            "claimId": "5293e52e-c26d-4caa-bf21-d01a143fda8c",
+                            "checkedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "verdict": "unchanged",
+                            "newValue": null,
+                            "newSourceId": "b63db561-62a3-4071-b072-10847a601561",
+                            "newQuote": "Basalt DB Pro is 25 USD per month.",
+                            "reason": "The quote is still on the live first-party page.",
+                            "decidedBy": "fast_path"
+                          },
+                          "provenance": "verified_now",
+                          "nowSource": {
+                            "n": 1,
+                            "sourceId": "b63db561-62a3-4071-b072-10847a601561",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true,
+                            "text": "# Invented prices. Not a real vendor.\nBasalt DB Pro is 25 USD per month.\nBasalt DB free tier includes 1 project.\n"
+                          }
+                        }
+                      },
+                      {
+                        "type": "citations",
+                        "items": [
+                          {
+                            "n": 1,
+                            "sourceId": "b63db561-62a3-4071-b072-10847a601561",
+                            "url": "https://basaltdb.test/pricing",
+                            "title": "basaltdb.test",
+                            "fetchedAtUtc": "2026-11-13T13:00:00.000Z",
+                            "live": true,
+                            "firstParty": true
+                          }
+                        ]
+                      },
+                      {
+                        "type": "flags",
+                        "strippedCitations": [],
+                        "uncitedNumbers": []
+                      },
+                      {
+                        "type": "done",
+                        "turnId": "cad477b4-537f-4d40-a419-f84c464934de",
+                        "intent": "recheck"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "claims": [
+              {
+                "id": "5293e52e-c26d-4caa-bf21-d01a143fda8c",
+                "turnId": "a4602990-779c-48d0-a51a-37b362ce1e7b",
+                "entity": "Basalt DB",
+                "attribute": "price",
+                "value": "25 USD per month",
+                "quote": "Basalt DB Pro is 25 USD per month.",
+                "supersedesId": null
+              }
+            ]
+          },
+          "spendUsd": 0.005148
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "runs": 2,
+      "requestedRuns": 3,
+      "passedRuns": 2,
+      "results": [
+        {
+          "run": 1,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "provider log is empty",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "shorter has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter does not mention a stored claim",
+              "pass": true,
+              "observed": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\""
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "mutex done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "mutex has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex does not mention a stored claim",
+              "pass": true,
+              "observed": "A mutex is a lock that guards a shared resource so only one thread can use it at a time. A semaphore is a counter that controls how many threads can access a resource at once.\n\n**Mutex**\n- Has an owner: the thread that locks it must be the one to unlock it.\n- Used for mutual exclusion around a critical section.\n- Its state is simply locked or free.\n\n**Semaphore**\n- Has no owner: any thread can signal it, not just the one that waited on it.\n- Holds a count, so it can allow several threads in at once, such as a pool of connections.\n- Also used for signaling between threads, such as a producer telling a consumer that data is ready.\n\nA semaphore that allows only a single holder behaves much like a mutex, but it lacks ownership, so it doesn't give the same safety guarantees."
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (mutex)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+              "pass": true,
+              "observed": []
+            }
+          ],
+          "judge": null,
+          "trace": {
+            "parts": [
+              {
+                "tz": "Asia/Kolkata",
+                "turns": [
+                  {
+                    "message": "Make this shorter: 'We are reaching out to inform you that the meeting has been moved.'",
+                    "answerText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\"",
+                    "modelText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\"",
+                    "events": [
+                      {
+                        "type": "done",
+                        "turnId": "ae165520-1e03-495c-ba6f-f03353bada02",
+                        "intent": "chat"
+                      }
+                    ]
+                  },
+                  {
+                    "message": "What's the difference between a mutex and a semaphore?",
+                    "answerText": "A mutex is a lock that guards a shared resource so only one thread can use it at a time. A semaphore is a counter that controls how many threads can access a resource at once.\n\n**Mutex**\n- Has an owner: the thread that locks it must be the one to unlock it.\n- Used for mutual exclusion around a critical section.\n- Its state is simply locked or free.\n\n**Semaphore**\n- Has no owner: any thread can signal it, not just the one that waited on it.\n- Holds a count, so it can allow several threads in at once, such as a pool of connections.\n- Also used for signaling between threads, such as a producer telling a consumer that data is ready.\n\nA semaphore that allows only a single holder behaves much like a mutex, but it lacks ownership, so it doesn't give the same safety guarantees.",
+                    "modelText": "A mutex is a lock that guards a shared resource so only one thread can use it at a time. A semaphore is a counter that controls how many threads can access a resource at once.\n\n**Mutex**\n- Has an owner: the thread that locks it must be the one to unlock it.\n- Used for mutual exclusion around a critical section.\n- Its state is simply locked or free.\n\n**Semaphore**\n- Has no owner: any thread can signal it, not just the one that waited on it.\n- Holds a count, so it can allow several threads in at once, such as a pool of connections.\n- Also used for signaling between threads, such as a producer telling a consumer that data is ready.\n\nA semaphore that allows only a single holder behaves much like a mutex, but it lacks ownership, so it doesn't give the same safety guarantees.",
+                    "events": [
+                      {
+                        "type": "done",
+                        "turnId": "fbcc75f6-5b8e-4d8f-8a1e-071631807f82",
+                        "intent": "chat"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "claims": [
+              {
+                "id": "e0a581bf-7bfe-45ae-8659-e46d62f2ef93",
+                "turnId": "521bcaf8-277f-49b9-9b84-3c729f7f9ced",
+                "entity": "Northwind PG",
+                "attribute": "price",
+                "value": "19 USD/month",
+                "quote": "Northwind PG Starter is 19 USD per month.",
+                "supersedesId": null
+              },
+              {
+                "id": "4609d7ba-feed-41ad-bb0e-45d5980e4fd4",
+                "turnId": "521bcaf8-277f-49b9-9b84-3c729f7f9ced",
+                "entity": "Basalt DB",
+                "attribute": "price",
+                "value": "25 USD/month",
+                "quote": "Basalt DB Pro is 25 USD per month.",
+                "supersedesId": null
+              },
+              {
+                "id": "e7897654-61a2-45ad-8bf6-e758fed6272f",
+                "turnId": "521bcaf8-277f-49b9-9b84-3c729f7f9ced",
+                "entity": "Basalt DB",
+                "attribute": "free tier",
+                "value": "1 project",
+                "quote": "Basalt DB free tier includes 1 project.",
+                "supersedesId": null
+              }
+            ]
+          },
+          "spendUsd": 0.007032399999999999
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "provider log is empty",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "shorter has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter does not mention a stored claim",
+              "pass": true,
+              "observed": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\""
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "mutex done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "mutex has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex does not mention a stored claim",
+              "pass": true,
+              "observed": "**Mutex:** A lock for mutual exclusion. It is either locked or free, and only the thread that locked it should unlock it. It protects a shared resource so that only a single thread uses it at a time.\n\n**Semaphore:** A counter that controls access by a limited number of threads. Threads wait when the count runs out and proceed when it's available again. Any thread can signal it, not just the one that waited on it. It's used to limit access to a pool of resources or to signal between threads.\n\n**Rule of thumb:** Use a mutex to guard a critical section. Use a semaphore to coordinate or limit how many threads can proceed, or to signal events."
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (mutex)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+              "pass": true,
+              "observed": []
+            }
+          ],
+          "judge": null,
+          "trace": {
+            "parts": [
+              {
+                "tz": "Asia/Kolkata",
+                "turns": [
+                  {
+                    "message": "Make this shorter: 'We are reaching out to inform you that the meeting has been moved.'",
+                    "answerText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\"",
+                    "modelText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Just letting you know the meeting has been moved.\"",
+                    "events": [
+                      {
+                        "type": "done",
+                        "turnId": "7da279c6-41ae-47a8-914f-ed416999b514",
+                        "intent": "chat"
+                      }
+                    ]
+                  },
+                  {
+                    "message": "What's the difference between a mutex and a semaphore?",
+                    "answerText": "**Mutex:** A lock for mutual exclusion. It is either locked or free, and only the thread that locked it should unlock it. It protects a shared resource so that only a single thread uses it at a time.\n\n**Semaphore:** A counter that controls access by a limited number of threads. Threads wait when the count runs out and proceed when it's available again. Any thread can signal it, not just the one that waited on it. It's used to limit access to a pool of resources or to signal between threads.\n\n**Rule of thumb:** Use a mutex to guard a critical section. Use a semaphore to coordinate or limit how many threads can proceed, or to signal events.",
+                    "modelText": "**Mutex:** A lock for mutual exclusion. It is either locked or free, and only the thread that locked it should unlock it. It protects a shared resource so that only a single thread uses it at a time.\n\n**Semaphore:** A counter that controls access by a limited number of threads. Threads wait when the count runs out and proceed when it's available again. Any thread can signal it, not just the one that waited on it. It's used to limit access to a pool of resources or to signal between threads.\n\n**Rule of thumb:** Use a mutex to guard a critical section. Use a semaphore to coordinate or limit how many threads can proceed, or to signal events.",
+                    "events": [
+                      {
+                        "type": "done",
+                        "turnId": "13b84ac8-2ffa-47f8-875b-ac0ce25a3d3d",
+                        "intent": "chat"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "claims": [
+              {
+                "id": "25d8cb76-4bf1-43b6-bd4d-d3ede86a3598",
+                "turnId": "9e3138b9-0c0d-441d-a0ea-54924ce58238",
+                "entity": "Northwind PG",
+                "attribute": "price",
+                "value": "19 USD/month",
+                "quote": "Northwind PG Starter is 19 USD per month.",
+                "supersedesId": null
+              },
+              {
+                "id": "c4d4eac2-6059-4c77-b8a5-9b9b830180f0",
+                "turnId": "9e3138b9-0c0d-441d-a0ea-54924ce58238",
+                "entity": "Basalt DB",
+                "attribute": "price",
+                "value": "25 USD/month",
+                "quote": "Basalt DB Pro is 25 USD per month.",
+                "supersedesId": null
+              },
+              {
+                "id": "76768e8a-756d-47c5-af71-8ec5bd864545",
+                "turnId": "9e3138b9-0c0d-441d-a0ea-54924ce58238",
+                "entity": "Basalt DB",
+                "attribute": "free tier",
+                "value": "1 project",
+                "quote": "Basalt DB free tier includes 1 project.",
+                "supersedesId": null
+              }
+            ]
+          },
+          "spendUsd": 0.0074824
+        }
+      ],
+      "incomplete": true,
+      "cutRun": {
+        "run": 3,
+        "passed": true,
+        "assertions": [
+          {
+            "name": "provider log is empty",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "shorter done.intent is chat",
+            "pass": true,
+            "observed": "chat"
+          },
+          {
+            "name": "shorter has no recall event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "shorter has no verdict event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "shorter has no citations event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "shorter does not mention a stored claim",
+            "pass": true,
+            "observed": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Heads up: the meeting has been moved.\""
+          },
+          {
+            "name": "numbers are in the message, claims, rows or evidence (shorter)",
+            "pass": true,
+            "observed": []
+          },
+          {
+            "name": "mutex done.intent is chat",
+            "pass": true,
+            "observed": "chat"
+          },
+          {
+            "name": "mutex has no recall event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "mutex has no verdict event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "mutex has no citations event",
+            "pass": true,
+            "observed": 0
+          },
+          {
+            "name": "mutex does not mention a stored claim",
+            "pass": true,
+            "observed": ""
+          },
+          {
+            "name": "numbers are in the message, claims, rows or evidence (mutex)",
+            "pass": true,
+            "observed": []
+          },
+          {
+            "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+            "pass": true,
+            "observed": []
+          },
+          {
+            "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+            "pass": true,
+            "observed": []
+          }
+        ],
+        "judge": null,
+        "trace": {
+          "parts": [
+            {
+              "tz": "Asia/Kolkata",
+              "turns": [
+                {
+                  "message": "Make this shorter: 'We are reaching out to inform you that the meeting has been moved.'",
+                  "answerText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Heads up: the meeting has been moved.\"",
+                  "modelText": "\"The meeting has been moved.\"\n\nOr, if you want a bit more warmth: \"Heads up: the meeting has been moved.\"",
+                  "events": [
+                    {
+                      "type": "done",
+                      "turnId": "14ce0517-3b86-42aa-a018-29d2f74327dd",
+                      "intent": "chat"
+                    }
+                  ]
+                },
+                {
+                  "message": "What's the difference between a mutex and a semaphore?",
+                  "answerText": "",
+                  "modelText": "",
+                  "events": [
+                    {
+                      "type": "error",
+                      "stage": "route",
+                      "message": "TimeoutError: The operation was aborted due to timeout"
+                    },
+                    {
+                      "type": "done",
+                      "turnId": "0e70a994-3ce2-4532-87c6-1067407e4b78",
+                      "intent": "chat"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "claims": [
+            {
+              "id": "7d31a426-8dd2-4a35-ab0b-36293e45e8ed",
+              "turnId": "77b214c1-f25a-4f8f-9cae-52b16925a96b",
+              "entity": "Northwind PG",
+              "attribute": "price",
+              "value": "19 USD/month",
+              "quote": "Northwind PG Starter is 19 USD per month.",
+              "supersedesId": null
+            },
+            {
+              "id": "3e7da4c7-05d4-48c5-9313-a0558dfd80f7",
+              "turnId": "77b214c1-f25a-4f8f-9cae-52b16925a96b",
+              "entity": "Basalt DB",
+              "attribute": "price",
+              "value": "25 USD/month",
+              "quote": "Basalt DB Pro is 25 USD per month.",
+              "supersedesId": null
+            },
+            {
+              "id": "a225f5d7-4e46-44a6-ad03-519ed8476327",
+              "turnId": "77b214c1-f25a-4f8f-9cae-52b16925a96b",
+              "entity": "Basalt DB",
+              "attribute": "free tier",
+              "value": "1 project",
+              "quote": "Basalt DB free tier includes 1 project.",
+              "supersedesId": null
+            }
+          ]
+        },
+        "spendUsd": 0.0016404000000000002
+      }
+    }
+  ],
+  "incomplete": [
+    17
+  ],
+  "passAtAll": [
+    10
+  ],
+  "flaky": [],
+  "failing": [],
+  "strict": {
+    "passAtAll": [],
+    "flaky": [],
+    "failing": [
+      10
+    ]
+  }
+}

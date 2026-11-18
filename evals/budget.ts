@@ -9,9 +9,13 @@
  * - **While** a response streams it reads usage incrementally (JSON `usage`,
  *   or SSE `message_start` then `message_delta`, merging every non-null field),
  *   so usage already reported survives a broken stream.
- * - A body it cannot account for (a read error, unparseable JSON, a stream
- *   with no usage) marks the meter `incomplete`; the runner then starts no
- *   further paid work. An unpriced model is refused, never guessed.
+ * - A request aborted before or during its response (a deadline, a dropped
+ *   connection) is charged its full reservation, the most it could cost, and
+ *   the run carries on: a deadline abort is a normal outcome the app handles.
+ * - A response that breaks the protocol (no usage, events out of order, an
+ *   error event, a cost above its reservation) marks the meter `incomplete`;
+ *   the runner then starts no further paid work. An unpriced model is
+ *   refused, never guessed.
  *
  * Prices: USD per million tokens, from Anthropic's published list as given in
  * the `claude-api` skill's "Current Models" table (cached 2026-11-03):
@@ -236,6 +240,8 @@ export class SpendMeter {
   incomplete: string | null = null;
   /** Requests refused because they could have passed the budget. */
   refused = 0;
+  /** Requests aborted (a deadline, a dropped connection) and charged at their reserved worst case. */
+  aborted = 0;
 
   constructor(readonly budgetUsd: number) {}
 
@@ -247,6 +253,19 @@ export class SpendMeter {
     const usd = costUsd(model, usage);
     entry.usd += usd;
     this.byModel.set(model, entry);
+    return usd;
+  }
+
+  /**
+   * An aborted request's tokens are unknown, so it is charged its reservation:
+   * the most it could have cost. The cap holds and the run carries on.
+   */
+  private chargeWorstCase(model: string, usd: number): number {
+    const entry = this.byModel.get(model) ?? { calls: 0, usage: emptyUsage(), usd: 0 };
+    entry.calls += 1;
+    entry.usd += usd;
+    this.byModel.set(model, entry);
+    this.aborted += 1;
     return usd;
   }
 
@@ -312,9 +331,9 @@ export class SpendMeter {
       try {
         response = await base(input, init);
       } catch (error) {
-        // Nothing came back: the request may or may not have been billed.
+        // Nothing came back (a deadline abort, a dropped connection): charge the worst case.
         release();
-        this.markIncomplete('a request failed before a response arrived');
+        this.chargeWorstCase(facts.model, reserve);
         throw error;
       }
       if (!response.ok) {
@@ -328,7 +347,7 @@ export class SpendMeter {
       }
       const streaming = (response.headers.get('content-type') ?? '').includes('text/event-stream');
       const [forCaller, forMeter] = response.body.tee();
-      const reading = this.read(facts.model, streaming, forMeter)
+      const reading = this.read(facts.model, streaming, forMeter, reserve)
         .then((usd) => {
           if (usd > reserve + 1e-12) this.markIncomplete('a response cost more than its reservation');
         })
@@ -342,7 +361,12 @@ export class SpendMeter {
   }
 
   /** Reads a response body for its usage; returns the cost recorded for it. */
-  private async read(model: string, streaming: boolean, body: ReadableStream<Uint8Array>): Promise<number> {
+  private async read(
+    model: string,
+    streaming: boolean,
+    body: ReadableStream<Uint8Array>,
+    reserve: number,
+  ): Promise<number> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     const sse = new SseUsageReader();
@@ -355,24 +379,37 @@ export class SpendMeter {
         if (streaming) sse.push(chunk);
         else text += chunk;
       }
-      if (streaming) {
-        sse.end();
-        const problem = sse.problem;
-        if (problem !== null) this.markIncomplete(problem);
-        return this.record(model, sse.usage);
-      }
-      const parsed = JSON.parse(text) as { usage?: Record<string, unknown>; model?: unknown };
-      const usage = emptyUsage();
-      mergeUsage(usage, parsed.usage);
-      if (typeof parsed.usage?.input_tokens !== 'number' || typeof parsed.usage?.output_tokens !== 'number') {
-        this.markIncomplete('a response did not report both input and output tokens');
-      }
-      return this.record(model, usage);
     } catch {
-      // Keep what the stream already reported; the rest is unknown, so stop paid work.
-      this.markIncomplete('a response body could not be read to the end');
-      return streaming && sse.sawUsage ? this.record(model, sse.usage) : 0;
+      // Transport only: the body broke off (an abort or a dropped connection). Charge the worst case,
+      // but never less than the usage the stream already reported; above the reservation, stop paid work.
+      const observed = streaming && sse.sawUsage ? costUsd(model, sse.usage) : 0;
+      if (observed > reserve + 1e-12) this.markIncomplete('a broken response had already reported more than its reservation');
+      return this.chargeWorstCase(model, Math.max(reserve, observed));
     }
+    // The whole body arrived: anything wrong from here on is a protocol failure, not an abort.
+    if (streaming) {
+      sse.end();
+      const problem = sse.problem;
+      if (problem !== null) this.markIncomplete(problem);
+      return this.record(model, sse.usage);
+    }
+    let parsed: { usage?: Record<string, unknown> } | null = null;
+    try {
+      const value = JSON.parse(text) as unknown;
+      if (value !== null && typeof value === 'object') parsed = value as { usage?: Record<string, unknown> };
+    } catch {
+      parsed = null;
+    }
+    if (parsed === null) {
+      this.markIncomplete('a response body was not a JSON object');
+      return this.chargeWorstCase(model, reserve);
+    }
+    const usage = emptyUsage();
+    mergeUsage(usage, parsed.usage);
+    if (typeof parsed.usage?.input_tokens !== 'number' || typeof parsed.usage?.output_tokens !== 'number') {
+      this.markIncomplete('a response did not report both input and output tokens');
+    }
+    return this.record(model, usage);
   }
 }
 

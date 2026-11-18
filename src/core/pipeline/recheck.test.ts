@@ -1,5 +1,6 @@
+import { claimLabel } from '../claimLabel';
 import { describe, expect, it } from 'vitest';
-import type { AgentEvent, Claim, SearchResult, SourceRef } from '../contracts';
+import type { AgentEvent, Claim, ClaimScope, SearchResult, SourceRef } from '../contracts';
 import { rememberEvidence } from './evidence';
 import { assistantTurn, claim, config, lastAssistant, plan, rig, source, textOf, types, userTurn } from './testSupport';
 
@@ -16,7 +17,7 @@ function verdicts(events: AgentEvent[]) {
 }
 
 /** Seeds a stored question/answer pair on 9 Nov with the given claims. */
-function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attribute?: string; value?: string; quote?: string; url?: string; firstParty?: boolean; pageText?: string }[]) {
+function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attribute?: string; value?: string; quote?: string; url?: string; firstParty?: boolean; pageText?: string; scope?: ClaimScope }[]) {
   const user = userTurn(r.store, { content: 'What does Neon Launch cost?', localDate: '2026-11-09' });
   const answer = assistantTurn(r.store, { localDate: '2026-11-09' });
   const refs: SourceRef[] = [];
@@ -31,6 +32,7 @@ function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attr
       attribute: spec.attribute ?? 'price',
       value: spec.value ?? '19 USD/month',
       quote: spec.quote ?? 'costs 19 USD per month',
+      ...(spec.scope !== undefined ? { scope: spec.scope } : {}),
     });
     refs.push({
       n: refs.length + 1,
@@ -342,6 +344,22 @@ describe('recheck', () => {
     await r.run({ message: 'anything new since?' });
     const newsQueries = r.search.searchCalls.map((call) => call.query).filter((query) => query.endsWith(' news'));
     expect(newsQueries).toEqual(['Closewise news', 'Leadharbor news']);
+  });
+
+  it('a fallback search names the plan, so two plans of one product are searched and labelled apart', async () => {
+    const r = recheckRig({
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true }), write: ['Summary.'] },
+      search: { results: {} },
+    });
+    storedAnswer(r, [
+      { entity: 'Basalt DB', attribute: 'price', value: '9 USD', quote: 'Basic costs 9 USD', firstParty: false, scope: { plan: 'Basic' } },
+      { entity: 'Basalt DB', attribute: 'price', value: '25 USD', quote: 'Pro costs 25 USD', firstParty: false, scope: { plan: 'Pro' } },
+    ]);
+    const events = await r.run({ message: 'Is that still right?' });
+    const queries = r.search.searchCalls.map((call) => call.query);
+    expect(queries).toContain('Basalt DB Basic price');
+    expect(queries).toContain('Basalt DB Pro price');
+    expect(verdicts(events).map((row) => claimLabel(row.claim)).sort()).toEqual(['Basalt DB Basic price', 'Basalt DB Pro price']);
   });
 
   it('the judge gets one retry on a rate-limit error', async () => {

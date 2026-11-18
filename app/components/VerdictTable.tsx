@@ -1,5 +1,6 @@
 'use client';
 
+import { claimLabel } from '../../src/core/claimLabel';
 import type { Provenance, Verdict, VerdictRow } from '../../src/core/contracts';
 
 const BADGE: Record<Provenance, string> = {
@@ -45,9 +46,7 @@ export function VerdictTable({ rows }: { rows: VerdictRow[] }) {
                   : row.claim.value;
             return (
               <tr key={row.claim.id} data-verdict={row.check.verdict}>
-                <td className="verdict-claim">
-                  {row.claim.entity} {row.claim.attribute}
-                </td>
+                <td className="verdict-claim">{claimLabel(row.claim)}</td>
                 {/* data-label and the inner div let a phone show each row as a stacked, labelled block. */}
                 <td data-label="Then">
                   <div className="cell">

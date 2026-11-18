@@ -23,6 +23,7 @@ import type {
   RecalledQuestion,
   Turn,
 } from '../contracts';
+import { claimLabel } from '../claimLabel';
 import { noRecord } from './noRecord';
 import { recheck } from './recheck';
 import { evidenceFor, extractInto } from './evidence';
@@ -205,7 +206,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   if (plan.intent === 'recall') {
     const lines = resolved.baseline.map(
       (claim) =>
-        `- ${claim.entity} ${claim.attribute}: ${claim.value} (as of ${ctx.time.formatLocal(
+        `- ${claimLabel(claim)}: ${claim.value} (as of ${ctx.time.formatLocal(
           claim.asOfUtc,
           ctx.tz,
         )}; from memory, not re-checked)`,

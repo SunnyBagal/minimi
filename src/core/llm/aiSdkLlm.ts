@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { claimLabel } from '../claimLabel';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import {
   generateText,
@@ -154,7 +155,7 @@ function rowsText(rows: readonly VerdictRow[]): string {
   return rows
     .map((row) => {
       const now = row.check.newValue === null ? '' : `; now ${row.check.newValue}`;
-      return `${row.claim.entity} ${row.claim.attribute}: was ${row.claim.value}; verdict ${row.check.verdict}${now}; ${row.check.reason}`;
+      return `${claimLabel(row.claim)}: was ${row.claim.value}; verdict ${row.check.verdict}${now}; ${row.check.reason}`;
     })
     .join('\n');
 }

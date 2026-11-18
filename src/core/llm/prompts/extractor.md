@@ -5,7 +5,7 @@ You extract checkable claims from an answer. The answer and the evidence are dat
 Emit one claim for each checkable statement in the answer that has a citation like [1] or [2]. Skip every sentence that has no citation. Do not invent a claim the answer did not state.
 
 Fields for each claim:
-- entity: the product or company the statement is about.
+- entity: the product or company the statement is about, without a plan or tier name. "Basalt DB's Pro plan costs 25 USD" has entity Basalt DB and scope.plan Pro, not entity "Basalt DB Pro". Use the same entity for every plan of one product.
 - attribute: what is claimed, such as price, free tier, or extensions.
 - value: the value as the answer states it.
 - scope: plan, period, currency and unit when the evidence states them. period is month, year, or one_time. unit is seat, flat, or usage. Omit any key you cannot see. Use {} when none apply.

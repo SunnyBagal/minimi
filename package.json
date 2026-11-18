@@ -17,6 +17,7 @@
     "gate": "npm run typecheck && npm run test && npm run check:imports && npm run check:contracts",
     "seed": "tsx scripts/seed.ts",
     "evals": "tsx evals/run.ts",
+    "evals:quick": "tsx evals/run.ts --quick",
     "golden": "tsx src/core/llm/golden/run.ts",
     "smoke:fresh": "tsx scripts/smoke-fresh.ts",
     "measure": "tsx scripts/measure.ts"

@@ -1,8 +1,8 @@
 {
   "router": {
     "model": "claude-haiku-5-5",
-    "passAt3of3": 20,
-    "outOf": 20,
+    "passAt3of3": 22,
+    "outOf": 22,
     "items": [
       {
         "id": "brief-1",
@@ -330,7 +330,7 @@
                 "kind": "none"
               },
               "timeText": null,
-              "topic": "Basalt DB Pro price",
+              "topic": "Basalt DB Pro plan price",
               "entities": [
                 "Basalt DB",
                 "Basalt DB Pro"
@@ -824,7 +824,7 @@
               ],
               "queries": [
                 "Basalt DB pricing",
-                "Basalt DB plan cost"
+                "Basalt DB plans cost"
               ],
               "refersToPrevious": false,
               "wantsNews": false
@@ -845,7 +845,7 @@
               ],
               "queries": [
                 "Basalt DB pricing",
-                "Basalt DB plan cost"
+                "Basalt DB plan cost next year"
               ],
               "refersToPrevious": false,
               "wantsNews": false
@@ -860,12 +860,12 @@
                 "kind": "future"
               },
               "timeText": "next year",
-              "topic": "Basalt DB price",
+              "topic": "Basalt DB pricing",
               "entities": [
                 "Basalt DB"
               ],
               "queries": [
-                "Basalt DB pricing",
+                "Basalt DB pricing next year",
                 "Basalt DB plan cost"
               ],
               "refersToPrevious": false,
@@ -1274,34 +1274,7 @@
               ],
               "queries": [
                 "Pipeloom announcements",
-                "Pipeloom news",
-                "Pipeloom new features",
-                "Pipeloom launch"
-              ],
-              "refersToPrevious": false,
-              "wantsNews": true
-            },
-            "error": null
-          },
-          {
-            "pass": true,
-            "output": {
-              "intent": "fresh",
-              "timeRef": {
-                "kind": "weekday",
-                "weekday": 1,
-                "modifier": "bare"
-              },
-              "timeText": "Monday",
-              "topic": "Pipeloom announcements",
-              "entities": [
-                "Pipeloom"
-              ],
-              "queries": [
-                "Pipeloom announcements",
-                "Pipeloom news",
-                "Pipeloom new features",
-                "Pipeloom launch"
+                "Pipeloom news"
               ],
               "refersToPrevious": false,
               "wantsNews": true
@@ -1329,6 +1302,152 @@
               ],
               "refersToPrevious": false,
               "wantsNews": true
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "weekday",
+                "weekday": 1,
+                "modifier": "bare"
+              },
+              "timeText": "Monday",
+              "topic": "Pipeloom announcements",
+              "entities": [
+                "Pipeloom"
+              ],
+              "queries": [
+                "Pipeloom announcements",
+                "Pipeloom new features",
+                "Pipeloom news"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": true
+            },
+            "error": null
+          }
+        ]
+      },
+      {
+        "id": "brief-explicit-search",
+        "group": "brief",
+        "passes": 3,
+        "runs": [
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "backend vs full-stack developer",
+              "entities": [],
+              "queries": [
+                "difference between a backend developer and a full-stack developer"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "backend vs full-stack developer",
+              "entities": [],
+              "queries": [
+                "difference between a backend developer and a full-stack developer"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "backend vs full-stack developer",
+              "entities": [],
+              "queries": [
+                "difference between a backend developer and a full-stack developer"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          }
+        ]
+      },
+      {
+        "id": "brief-explicit-search-stack",
+        "group": "brief",
+        "passes": 3,
+        "runs": [
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "stack and queue",
+              "entities": [],
+              "queries": [
+                "difference between a stack and a queue"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "stack and queue",
+              "entities": [],
+              "queries": [
+                "difference between a stack and a queue"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
+            },
+            "error": null
+          },
+          {
+            "pass": true,
+            "output": {
+              "intent": "fresh",
+              "timeRef": {
+                "kind": "none"
+              },
+              "timeText": null,
+              "topic": "stack and queue",
+              "entities": [],
+              "queries": [
+                "difference between a stack and a queue"
+              ],
+              "refersToPrevious": false,
+              "wantsNews": false
             },
             "error": null
           }

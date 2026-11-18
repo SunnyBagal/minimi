@@ -2,7 +2,8 @@
 //
 //   node scripts/contracts-accept.mjs [root]
 //
-// Run it only when a contract change has been agreed (see docs/briefs/RULES.md).
+// Run it only after a contract change is agreed. It writes the sha256 of
+// src/core/contracts.ts to docs/contracts.sha256.
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { CONTRACTS_FILE, HASH_FILE, contractsHash, rootFromArgs } from './check-contracts.mjs';

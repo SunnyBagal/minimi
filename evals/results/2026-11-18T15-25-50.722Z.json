@@ -1,0 +1,272 @@
+{
+  "mode": "live",
+  "sha": "cae312020f54d706520b4bc48fad6278acad6ae8",
+  "runs": 3,
+  "cases": [
+    {
+      "id": 17,
+      "runs": 3,
+      "passedRuns": 3,
+      "results": [
+        {
+          "run": 1,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "provider log is empty",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "shorter has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter does not mention a stored claim",
+              "pass": true,
+              "observed": "\"The meeting has been moved.\"\n\nOr, if you want a slightly friendlier tone: \"Just letting you know the meeting has been moved.\""
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "mutex done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "mutex has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex does not mention a stored claim",
+              "pass": true,
+              "observed": "**Mutex:** A lock for mutual exclusion. A thread locks it, uses the protected resource, then unlocks it. It has ownership: only the thread that locked it should unlock it. It's meant for protecting a critical section.\n\n**Semaphore:** A counter that controls access or signals between threads. Waiting decrements the counter (blocking if it's at zero), and signaling increments it. There's no ownership, so any thread can signal it. It's useful for limiting access to a pool of resources or for telling one thread that another has finished something.\n\n**In short:** A mutex is about exclusive access and ownership. A semaphore is about counting and signaling. A semaphore whose count only goes between zero and its maximum of a single permit can mimic a mutex, but it lacks the ownership guarantee."
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (mutex)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+              "pass": true,
+              "observed": []
+            }
+          ],
+          "judge": null
+        },
+        {
+          "run": 2,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "provider log is empty",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "shorter has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter does not mention a stored claim",
+              "pass": true,
+              "observed": "\"The meeting has been moved.\"\n\nOr, if you want it a bit softer: \"Heads up: the meeting has been moved.\""
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "mutex done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "mutex has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex does not mention a stored claim",
+              "pass": true,
+              "observed": "A mutex is a lock that guards a shared resource so only a single thread can use it at a time. It has an owner: the thread that locks it must be the one to unlock it.\n\nA semaphore is a counter that controls how many threads can access a resource at once. Threads wait when the count is exhausted and signal when they release. It has no owner, so any thread can signal it.\n\nIn short:\n- **Mutex:** mutual exclusion, with ownership. It is used to protect a critical section.\n- **Semaphore:** a signaling and counting tool. It is used to limit access to a pool of resources or to coordinate between threads, such as a producer telling a consumer that data is ready.\n\nA semaphore with a count that allows only a single holder (a binary semaphore) behaves like a mutex, but without the ownership rule."
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (mutex)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+              "pass": true,
+              "observed": []
+            }
+          ],
+          "judge": null
+        },
+        {
+          "run": 3,
+          "passed": true,
+          "assertions": [
+            {
+              "name": "provider log is empty",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "shorter has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "shorter does not mention a stored claim",
+              "pass": true,
+              "observed": "\"The meeting has been moved.\"\n\nOr, if you want a slightly friendlier tone: \"Heads up: the meeting has been moved.\""
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "mutex done.intent is chat",
+              "pass": true,
+              "observed": "chat"
+            },
+            {
+              "name": "mutex has no recall event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no verdict event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex has no citations event",
+              "pass": true,
+              "observed": 0
+            },
+            {
+              "name": "mutex does not mention a stored claim",
+              "pass": true,
+              "observed": "**Mutex:** A lock that gives exclusive access to a resource. A thread locks it, uses the resource, then unlocks it. It has an owner, so only the thread that locked it should unlock it. Use it to protect a critical section.\n\n**Semaphore:** A counter that controls how many threads can access a resource at once. Threads wait when the count is zero and proceed when it's positive. It has no owner, so any thread can release it. This makes it useful for limiting access to a pool of resources and for signaling between threads.\n\n**In short:** A mutex is for mutual exclusion, while a semaphore is for counting and signaling. A semaphore with a maximum count of a single permit behaves like a mutex, but without ownership."
+            },
+            {
+              "name": "numbers are in the message, claims, rows or evidence (mutex)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (shorter)",
+              "pass": true,
+              "observed": []
+            },
+            {
+              "name": "numbersIn(answerText) is a subset of the numbers in evidence, verdict rows, stored claims and the user message (mutex)",
+              "pass": true,
+              "observed": []
+            }
+          ],
+          "judge": null
+        }
+      ]
+    }
+  ],
+  "passAtAll": [
+    17
+  ],
+  "flaky": [],
+  "failing": [],
+  "strict": {
+    "passAtAll": [
+      17
+    ],
+    "flaky": [],
+    "failing": []
+  }
+}

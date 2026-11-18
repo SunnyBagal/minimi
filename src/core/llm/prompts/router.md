@@ -31,10 +31,11 @@ Choose intent by the first rule that matches:
 1. A short reply that only answers the assistant's last question. If the assistant offered days for a pricing recheck, choosing a day stays recheck. If the assistant asked for names so it can look them up, the list of names is fresh.
 2. recheck: the user asks whether something said before is still true or has changed, including "has anything changed", "is that still right", and "is your answer still correct". A message about an earlier conversation that also asks what changed is recheck, not recall.
 3. recall: the user asks what was said or asked before, and does not ask whether it is still true.
-4. fresh: the user asks for a current fact that could change (a price, a plan, a version, news, an announcement) and is not asking about an earlier conversation. "What will X cost next year?" is fresh with timeRef future. News about a company, with no earlier conversation, is fresh even when wantsNews is true.
-5. chat: no fact that could have changed, and no reference to an earlier conversation. Rewriting a sentence is chat. A definition of a stable idea, such as a mutex and a semaphore, is chat.
+4. fresh: the user explicitly asks to search the web. Phrases include "search for this", "do an internet search", "internet search", "google it", "google search", "look it up online", and "check the web". This is fresh even when the subject is a stable idea. Build the queries from the subject. If the message asks whether an earlier answer is still true, or what was said before, rule 2 or 3 has already matched.
+5. fresh: the user asks for a current fact that could change (a price, a plan, a version, news, an announcement) and is not asking about an earlier conversation. "What will X cost next year?" is fresh with timeRef future. News about a company, with no earlier conversation, is fresh even when wantsNews is true.
+6. chat: no fact that could have changed, and no reference to an earlier conversation. Rewriting a sentence is chat. A definition of a stable idea, such as a mutex and a semaphore, is chat. An explicit request to search the web is rule 4, not this rule.
 
-queries is an empty array for chat and recall. Otherwise give search queries that name the products, at most the queries limit in the user prompt, never more. entities lists product, company and plan names and obvious synonyms, or is empty. topic is a short noun phrase, or null for chat.
+queries is an empty array for chat and recall. Otherwise give search queries that name the subject, at most the queries limit in the user prompt, never more. entities lists product, company and plan names and obvious synonyms, or is empty. topic is a short noun phrase, or null for chat.
 
 Every field is required. Use null, [], true and false. Do not add any other field.
 
@@ -71,6 +72,9 @@ Message: Make this shorter: 'We are reaching out to inform you that the meeting 
 
 Message: What's the difference between a mutex and a semaphore?
 {"intent":"chat","timeRef":{"kind":"none"},"timeText":null,"topic":null,"entities":[],"queries":[],"refersToPrevious":false,"wantsNews":false}
+
+Message: What's the difference between a mutex and a semaphore? Look it up online.
+{"intent":"fresh","timeRef":{"kind":"none"},"timeText":null,"topic":"mutex and semaphore","entities":[],"queries":["difference between a mutex and a semaphore"],"refersToPrevious":false,"wantsNews":false}
 
 Message: What did I ask you yesterday?
 {"intent":"recall","timeRef":{"kind":"named","name":"yesterday"},"timeText":"yesterday","topic":null,"entities":[],"queries":[],"refersToPrevious":false,"wantsNews":false}

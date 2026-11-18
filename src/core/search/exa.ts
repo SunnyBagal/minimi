@@ -2,8 +2,10 @@
  * SearchProvider on Exa, via fetch. Never throws for expected failures:
  * timeouts, aborts and provider-reported errors come back as statuses or [].
  *
- * Request shapes follow references/search.md and references/contents.md in
- * .agents/skills/build-with-exa plus the recorded probes in fixtures/.
+ * Request shapes follow Exa's public docs for search
+ * (https://exa.ai/docs/reference/search) and contents
+ * (https://exa.ai/docs/reference/get-contents), plus the recorded probes in
+ * fixtures/.
  */
 import type {
   AgentConfig,

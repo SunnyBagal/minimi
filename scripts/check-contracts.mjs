@@ -34,7 +34,7 @@ export function checkContracts(root) {
     return `${HASH_FILE} is missing. Run "npm run contracts:accept" once the contracts are agreed.`;
   }
   if (recorded !== actual) {
-    return `${CONTRACTS_FILE} has changed: recorded ${recorded || '(empty)'}, found ${actual}. The file is frozen; see "contracts.ts" in docs/briefs/RULES.md.`;
+    return `${CONTRACTS_FILE} has changed: recorded ${recorded || '(empty)'}, found ${actual}. The file is frozen; a change is accepted only by recording the new hash with "npm run contracts:accept" after the change is agreed.`;
   }
   return null;
 }

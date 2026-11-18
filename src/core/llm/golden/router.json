@@ -312,6 +312,34 @@
         "refersToPrevious": false,
         "wantsNews": true
       }
+    },
+    {
+      "id": "brief-explicit-search",
+      "group": "brief",
+      "message": "difference between a backend developer and a full-stack developer? Do internet search for this.",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
+    },
+    {
+      "id": "brief-explicit-search-stack",
+      "group": "brief",
+      "message": "What is the difference between a stack and a queue? Look it up online.",
+      "recent": [],
+      "nowLocal": "Fri 13 Nov 2026, 18:30 IST",
+      "tz": "Asia/Kolkata",
+      "expected": {
+        "intent": "fresh",
+        "timeRef": { "kind": "none" },
+        "refersToPrevious": false,
+        "wantsNews": false
+      }
     }
   ]
 }

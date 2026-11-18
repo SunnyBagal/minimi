@@ -1,10 +1,17 @@
 /**
  * Eval runner. `npm run evals -- --selftest` proves the harness with no network.
- * A full run writes results and prints the totals. It does not round 2 of 3 up.
+ * `latest.json` is only a live run of all 19 cases with at least 3 runs.
+ * A full run with fewer runs writes `full.json` and a dated stamp.
+ * A partial run writes a dated stamp and does not replace either file.
+ * It does not round 2 of 3 up.
  *
  * Usage:
  *   npm run evals -- --selftest
+ *   npm run evals
+ *   npm run evals -- --runs 3
  *   npm run evals -- --case 17 --runs 3
+ *   npm run evals -- --cases 1,2,3
+ *   npm run evals:quick
  */
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -39,20 +46,41 @@ export interface ExecuteOptions {
    * so a gate run never touches `evals/results/` in the repo.
    */
   resultsDir?: string;
+  /**
+   * Replaces the eval harness. A test passes a stub so a live-mode run can
+   * write results with no network and no API key.
+   */
+  runHarness?: typeof runHarness;
 }
 
 export interface ExecuteResult {
   exitCode: number;
   stdout: string;
   networkCalls: number;
-  /** The stamp file this call wrote, or null when it exited before writing. */
+  /** The stamp file or `quick.json` this call wrote, or null when it exited before writing. */
   resultsFile: string | null;
 }
 
-function readFlag(argv: string[], name: string): string | undefined {
+/** Cases 1–3 are the brief's prompts. 17 is the chat case. 4 is the empty-store no-record case. */
+export const QUICK_IDS: readonly number[] = [1, 2, 3, 17, 4];
+
+export interface EvalSelection {
+  selftest: boolean;
+  quick: boolean;
+  runs: number;
+  ids: number[];
+  error: string | null;
+}
+
+/** The value after a flag. `error` is set when the flag is present and has no value. */
+function readFlag(argv: string[], name: string): { value: string | undefined; error: string | null } {
   const index = argv.indexOf(name);
-  if (index === -1) return undefined;
-  return argv[index + 1];
+  if (index === -1) return { value: undefined, error: null };
+  const next = argv[index + 1];
+  if (next === undefined || next.startsWith('--') || next.trim() === '') {
+    return { value: undefined, error: `evals: ${name} needs a value` };
+  }
+  return { value: next, error: null };
 }
 
 function loadKey(): string {
@@ -75,27 +103,94 @@ function fail(exitCode: number, networkCalls: number): ExecuteResult {
   return { exitCode, stdout: '', networkCalls, resultsFile: null };
 }
 
-export async function execute(argv: string[], options: ExecuteOptions = {}): Promise<ExecuteResult> {
-  const sha = headSha();
+function allIds(): number[] {
+  return CASES.map((item) => item.id);
+}
+
+function parseIdList(text: string): number[] {
+  return text.split(',').map((part) => Number(part.trim()));
+}
+
+function emptySelection(selftest: boolean, quick: boolean, error: string): EvalSelection {
+  return { selftest, quick, runs: 0, ids: [], error };
+}
+
+function isFullSet(ids: number[]): boolean {
+  const all = allIds();
+  const got = new Set(ids);
+  return ids.length === all.length && all.every((id) => got.has(id));
+}
+
+/** Reads `--runs`, `--case`, `--cases`, `--quick` and `--selftest`. Default runs is 1. */
+export function parseEvalArgs(argv: string[]): EvalSelection {
   const selftest = argv.includes('--selftest');
+  const quick = argv.includes('--quick');
   const caseFlag = readFlag(argv, '--case');
+  const casesFlag = readFlag(argv, '--cases');
   const runsFlag = readFlag(argv, '--runs');
-  const runs = runsFlag === undefined ? (selftest ? 1 : 3) : Number(runsFlag);
+  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error;
+  if (missing !== null) return emptySelection(selftest, quick, missing);
+  if (quick && (caseFlag.value !== undefined || casesFlag.value !== undefined || runsFlag.value !== undefined)) {
+    return emptySelection(selftest, quick, 'evals: --quick does not take --case, --cases or --runs');
+  }
+  const runs = runsFlag.value === undefined ? 1 : Number(runsFlag.value);
   if (!Number.isInteger(runs) || runs < 1) {
-    console.error('evals: --runs must be a positive integer');
-    return fail(1, 0);
+    return emptySelection(selftest, quick, 'evals: --runs must be a positive integer');
+  }
+  if (caseFlag.value !== undefined && casesFlag.value !== undefined) {
+    return emptySelection(selftest, quick, 'evals: pass --case or --cases, not both');
   }
 
-  // Selftest always runs cases 1, 4 and 17. That is the plumbing set.
-  const ids = selftest ? [1, 4, 17] : caseFlag === undefined ? CASES.map((item) => item.id) : [Number(caseFlag)];
-  if (ids.some((id) => !Number.isInteger(id) || caseById(id) === undefined)) {
-    console.error('evals: --case must be an integer from 1 to 19');
+  let ids: number[];
+  if (caseFlag.value !== undefined) ids = [Number(caseFlag.value)];
+  else if (casesFlag.value !== undefined) ids = parseIdList(casesFlag.value);
+  else if (selftest) ids = [1, 4, 17];
+  else if (quick) ids = [...QUICK_IDS];
+  else ids = allIds();
+
+  if (ids.length === 0 || ids.some((id) => !Number.isInteger(id) || caseById(id) === undefined)) {
+    return emptySelection(selftest, quick, 'evals: --case must be an integer from 1 to 19');
+  }
+  if (new Set(ids).size !== ids.length) {
+    return emptySelection(selftest, quick, 'evals: --cases lists a case more than once');
+  }
+  return { selftest, quick, runs, ids, error: null };
+}
+
+/** `latest.json` is the 3-of-3 reading: a live run of every case, at least 3 runs. */
+export function writesLatest(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
+  if (selection.selftest || selection.quick || selection.runs < 3) return false;
+  return isFullSet(selection.ids);
+}
+
+/** A live run of every case with fewer than 3 runs. It never replaces `latest.json`. */
+export function writesFull(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
+  if (selection.selftest || selection.quick || selection.runs >= 3) return false;
+  return isFullSet(selection.ids);
+}
+
+/** A quick live run stays in `quick.json`. Every other run keeps a dated stamp. */
+export function resultsFileName(
+  selection: Pick<EvalSelection, 'selftest' | 'quick'>,
+  stamp: string,
+): string {
+  return selection.quick && !selection.selftest ? 'quick.json' : `${stamp}.json`;
+}
+
+export async function execute(argv: string[], options: ExecuteOptions = {}): Promise<ExecuteResult> {
+  const sha = headSha();
+  const selection = parseEvalArgs(argv);
+  if (selection.error !== null) {
+    console.error(selection.error);
     return fail(1, 0);
   }
+  const { selftest, runs, ids } = selection;
+  const harness = options.runHarness ?? runHarness;
+  const offline = selftest || options.runHarness !== undefined;
 
   let networkCalls = 0;
   const originalFetch = globalThis.fetch;
-  if (selftest) {
+  if (offline) {
     globalThis.fetch = (async (input: Parameters<typeof fetch>[0]) => {
       networkCalls += 1;
       throw new Error(`selftest blocked a network call to ${String(input)}`);
@@ -103,7 +198,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   }
 
   let apiKey = '';
-  if (!selftest) {
+  if (!offline) {
     apiKey = loadKey();
     if (apiKey === '') {
       console.error('evals: ANTHROPIC_API_KEY is missing');
@@ -118,7 +213,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
       if (evalCase === undefined) continue;
       const results: RunRecord[] = [];
       for (let run = 1; run <= runs; run += 1) {
-        const result = await runHarness(evalCase, { selftest, apiKey });
+        const result = await harness(evalCase, { selftest, apiKey });
         results.push({ run, passed: result.passed, assertions: result.assertions, judge: result.judge });
       }
       const passedRuns = results.filter((result) => result.passed).length;
@@ -130,7 +225,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     console.error(`evals: ${apiKey === '' ? message : message.replaceAll(apiKey, '[redacted]')}`);
     return fail(1, networkCalls);
   } finally {
-    if (selftest) globalThis.fetch = originalFetch;
+    if (offline) globalThis.fetch = originalFetch;
   }
 
   const totals = classify(records);
@@ -154,14 +249,15 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   const dir = options.resultsDir ?? repoResultsDir;
   mkdirSync(dir, { recursive: true });
   const stamp = systemClock.now().toISOString().replaceAll(':', '-');
-  const file = join(dir, `${stamp}.json`);
+  const file = join(dir, resultsFileName(selection, stamp));
   writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`);
-  // A selftest record is not an eval run. latest.json is what Lane 8 and
-  // DESIGN.md read, so only a live run replaces it.
-  if (!selftest) copyFileSync(file, join(dir, 'latest.json'));
+  // latest.json is the 3-of-3 reading. A one-run full pass goes to full.json.
+  // A selftest, a quick run, or any run that is not all 19 cases leaves both alone.
+  if (writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
+  if (writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
 
   const stdout = summaryLine(totals.passAtAll.length, totals.flaky.length, totals.failing.length);
-  if (selftest && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
+  if (offline && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
   return { exitCode: 0, stdout, networkCalls, resultsFile: file };
 }
 

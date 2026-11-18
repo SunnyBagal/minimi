@@ -1,6 +1,6 @@
 # Decisions (Lane 0)
 
-One line per VERIFY item in `docs/briefs/lane-0-skeleton.md`: `V<n>: <what was found> → <what the repo uses>`. Checked on Node 26.13.1 and repeated where noted on Node 22.13.0, the engines floor.
+One line per Lane 0 VERIFY item (V1–V8): `V<n>: <what was found> → <what the repo uses>`. Checked on Node 26.13.1 and repeated where noted on Node 22.13.0, the engines floor.
 
 - V1: `ai` 7.0.173 with `@ai-sdk/anthropic` 4.0.105, `createAnthropic({ apiKey })` and a model object (never a bare `provider/model` string), streamed a chat reply through `/api/chat` with only `ANTHROPIC_API_KEY` and `EXA_API_KEY` set and no gateway variable present; repeated from a clean clone on Node 22.13.0 → the repo uses AI SDK 7, no fallback.
 - V2: `generateText` with `output: Output.object({ schema })` (zod 4.6.7) returned an object that passed `schema.safeParse` on `claude-haiku-5-5` → structured output uses `output`, no fallback.

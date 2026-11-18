@@ -25,9 +25,9 @@ const evalMessages = [
 ];
 
 describe('golden sets', () => {
-  it('router.json has 20 messages, including the brief prompts and every eval message', () => {
+  it('router.json has 22 messages, including the brief prompts and every eval message', () => {
     const items = read('router.json').items;
-    expect(items).toHaveLength(20);
+    expect(items).toHaveLength(22);
     const messages = items.map((item) => item.message);
     for (const message of evalMessages) {
       expect(messages).toContain(message);

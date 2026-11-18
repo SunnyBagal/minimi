@@ -1,118 +1,117 @@
 import { describe, expect, it } from 'vitest';
-import { initialNeko, NEKO_SPEED, nekoFrame, restoreNeko, spritePosition, SPRITE_SETS, type NekoInput, type NekoState } from './onekoCore';
+import {
+  angleToDir,
+  initialNeko,
+  NEKO_IDLE_TICKS,
+  NEKO_NEAR_PX,
+  NEKO_SPEED,
+  NEKO_TIRED_TICKS,
+  nekoFrame,
+  spritePosition,
+  SPRITE_SETS,
+  type NekoInput,
+  type NekoState,
+} from './onekoCore';
 
 const VIEW = { innerWidth: 1280, innerHeight: 800 };
-const never = () => 0.5; // Math.floor(0.5 * 200) is 100, never 0: no idle animation starts
-const always = () => 0; // Math.floor(0 * 200) is 0: an idle animation starts, the first one listed
 
-function input(mousePosX: number, mousePosY: number, random = never): NekoInput {
-  return { mousePosX, mousePosY, random, ...VIEW };
+function at(targetX: number, targetY: number): NekoInput {
+  return { targetX, targetY, ...VIEW };
 }
 
-function run(state: NekoState, frames: number, at: NekoInput): NekoState {
+function run(state: NekoState, ticks: number, input: NekoInput): NekoState {
   let current = state;
-  for (let i = 0; i < frames; i += 1) current = nekoFrame(current, at);
+  for (let i = 0; i < ticks; i += 1) current = nekoFrame(current, input);
   return current;
 }
 
-describe('oneko port', () => {
-  it('keeps the original sprite sheet offsets (32 px cells)', () => {
+const sprites = (name: keyof typeof SPRITE_SETS) => SPRITE_SETS[name].map(([x, y]) => `${x * 32}px ${y * 32}px`);
+
+describe('oneko, ported from the portfolio useNeko hook (follow mode)', () => {
+  it('keeps the portfolio sprite map and its sheet offsets (32 px cells)', () => {
+    expect(Object.keys(SPRITE_SETS)).toEqual(['idle', 'alert', 'tired', 'sleeping', 'N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
     expect(spritePosition('idle', 0)).toBe('-96px -96px');
     expect(spritePosition('alert', 0)).toBe('-224px -96px');
     expect(spritePosition('E', 0)).toBe('-96px 0px');
     expect(spritePosition('E', 1)).toBe('-96px -32px');
-    expect(spritePosition('scratchSelf', 4)).toBe('-192px 0px');
-    expect(Object.keys(SPRITE_SETS)).toHaveLength(17); // as in oneko.js
+    expect(spritePosition('sleeping', 3)).toBe('-64px -32px');
   });
 
-  it('starts at (32, 32) facing idle', () => {
-    expect(initialNeko()).toMatchObject({ nekoPosX: 32, nekoPosY: 32, frameCount: 0, idleTime: 0, bgPos: '-96px -96px' });
+  it('starts in the middle of the viewport, idle', () => {
+    expect(initialNeko(1280, 800)).toMatchObject({ x: 640, y: 400, frame: 0, tickCount: 0, phase: 'idle', bgPos: '-96px -96px' });
   });
 
-  it('chases the pointer 10 px per frame, facing the way it runs', () => {
-    const start = { ...initialNeko(), nekoPosX: 100, nekoPosY: 100 };
-    const next = nekoFrame(start, input(600, 100));
-    expect(next.nekoPosX).toBeCloseTo(100 + NEKO_SPEED);
-    expect(next.nekoPosY).toBeCloseTo(100);
-    expect(SPRITE_SETS.E.map(([x, y]) => `${x * 32}px ${y * 32}px`)).toContain(next.bgPos);
-    const diagonal = nekoFrame(start, input(400, 400));
-    expect(SPRITE_SETS.SE.map(([x, y]) => `${x * 32}px ${y * 32}px`)).toContain(diagonal.bgPos);
-    const north = nekoFrame(start, input(100, 20));
-    expect(SPRITE_SETS.N.map(([x, y]) => `${x * 32}px ${y * 32}px`)).toContain(north.bgPos);
+  it('maps angles to the eight directions as the portfolio does', () => {
+    expect(angleToDir(0)).toBe('E');
+    expect(angleToDir(45)).toBe('SE');
+    expect(angleToDir(90)).toBe('S');
+    expect(angleToDir(135)).toBe('SW');
+    expect(angleToDir(180)).toBe('W');
+    expect(angleToDir(-45)).toBe('NE');
+    expect(angleToDir(-90)).toBe('N');
+    expect(angleToDir(-135)).toBe('NW');
   });
 
-  it('stops within 48 px of the pointer and idles', () => {
-    const arrived = run({ ...initialNeko(), nekoPosX: 100, nekoPosY: 100 }, 80, input(600, 300));
-    const distance = Math.hypot(arrived.nekoPosX - 600, arrived.nekoPosY - 300);
-    expect(distance).toBeLessThan(48);
-    expect(distance).toBeGreaterThan(48 - NEKO_SPEED - 0.001);
+  it('runs toward the target 10 px per tick, facing the way it runs', () => {
+    const start = { ...initialNeko(1280, 800), x: 100, y: 100 };
+    const east = nekoFrame(start, at(600, 100));
+    expect(east.x).toBeCloseTo(100 + NEKO_SPEED);
+    expect(east.y).toBeCloseTo(100);
+    expect(east.phase).toBe('running');
+    expect(sprites('E')).toContain(east.bgPos);
+    expect(sprites('SE')).toContain(nekoFrame(start, at(400, 400)).bgPos);
+    expect(sprites('N')).toContain(nekoFrame(start, at(100, 20)).bgPos);
+  });
+
+  it('stops within 48 px of the target and idles', () => {
+    let arrived = { ...initialNeko(1280, 800), x: 100, y: 100 };
+    for (let tick = 0; tick < 80 && (tick === 0 || arrived.phase === 'running'); tick += 1) arrived = nekoFrame(arrived, at(600, 300));
+    const distance = Math.hypot(arrived.x - 600, arrived.y - 300);
+    expect(distance).toBeLessThan(NEKO_NEAR_PX);
+    expect(distance).toBeGreaterThan(NEKO_NEAR_PX - NEKO_SPEED - 0.001);
+    expect(arrived.phase).toBe('idle');
     expect(arrived.bgPos).toBe(spritePosition('idle', 0));
   });
 
-  it('is alerted before it runs again after idling, counting down from at most 7', () => {
-    const idled = run({ ...initialNeko(), nekoPosX: 600, nekoPosY: 300 }, 20, input(600, 300));
-    expect(idled.idleTime).toBe(20);
-    const alerted = nekoFrame(idled, input(1000, 300));
-    expect(alerted.bgPos).toBe(spritePosition('alert', 0));
-    expect(alerted.idleTime).toBe(6);
-    expect(alerted.nekoPosX).toBe(600); // does not move while alerted
-    const moving = run(alerted, 5, input(1000, 300));
-    expect(moving.idleTime).toBe(1);
-    expect(nekoFrame(moving, input(1000, 300)).nekoPosX).toBeGreaterThan(600);
-  });
-
-  it('falls asleep: tired for 8 frames, then the two sleeping sprites', () => {
-    let state = run({ ...initialNeko(), nekoPosX: 600, nekoPosY: 300 }, 11, input(600, 300));
-    state = nekoFrame(state, input(600, 300, always));
-    expect(state.idleAnimation).toBe('sleeping');
+  it('gets tired after 10 idle ticks and falls asleep after 15 tired ticks', () => {
+    let state = nekoFrame({ ...initialNeko(1280, 800), x: 600, y: 300, phase: 'running' }, at(600, 300));
+    expect(state.phase).toBe('idle');
+    state = run(state, NEKO_IDLE_TICKS + 1, at(600, 300));
+    expect(state.phase).toBe('tired');
+    state = nekoFrame(state, at(600, 300));
     expect(state.bgPos).toBe(spritePosition('tired', 0));
-    state = run(state, 8, input(600, 300));
-    expect(state.bgPos).toBe(spritePosition('sleeping', 2));
-    state = run(state, 4, input(600, 300));
-    expect(state.bgPos).toBe(spritePosition('sleeping', 3));
-    // The sleep ends after 192 frames.
-    state = run(state, 200, input(600, 300));
-    expect(state.idleAnimation).toBeNull();
+    state = run(state, NEKO_TIRED_TICKS, at(600, 300));
+    expect(state.phase).toBe('sleeping');
+    state = nekoFrame(state, at(600, 300));
+    expect(sprites('sleeping')).toContain(state.bgPos);
   });
 
-  it('can scratch itself or, at an edge, the wall', () => {
-    const scratching = nekoFrame(
-      run({ ...initialNeko(), nekoPosX: 600, nekoPosY: 300 }, 11, input(600, 300)),
-      input(600, 300, (() => {
-        const values = [0, 0.99];
-        return () => values.shift() ?? 0.5;
-      })()),
-    );
-    expect(scratching.idleAnimation).toBe('scratchSelf');
-    const atWall = nekoFrame(
-      run({ ...initialNeko(), nekoPosX: 20, nekoPosY: 300 }, 11, input(20, 300)),
-      input(20, 300, (() => {
-        const values = [0, 0.99];
-        return () => values.shift() ?? 0.5;
-      })()),
-    );
-    expect(atWall.idleAnimation).toBe('scratchWallW');
+  it('woken from sleep, is alerted for a tick without moving, then runs', () => {
+    const asleep = { ...initialNeko(1280, 800), x: 600, y: 300, phase: 'sleeping' as const };
+    const alerted = nekoFrame(asleep, at(1000, 300));
+    expect(alerted.phase).toBe('alert');
+    expect(alerted.bgPos).toBe(spritePosition('alert', 0));
+    expect(alerted.x).toBe(600);
+    const running = nekoFrame(alerted, at(1000, 300));
+    expect(running.phase).toBe('running');
+    expect(running.x).toBeCloseTo(600 + NEKO_SPEED);
+  });
+
+  it('never steps past the target', () => {
+    const near = nekoFrame({ ...initialNeko(1280, 800), x: 100, y: 100 }, at(100 + NEKO_NEAR_PX + 3, 100));
+    expect(near.x).toBeCloseTo(100 + NEKO_SPEED);
   });
 
   it('stays inside the window', () => {
-    const far = run({ ...initialNeko(), nekoPosX: 1200, nekoPosY: 700 }, 200, input(5000, 5000));
-    expect(far.nekoPosX).toBeLessThanOrEqual(VIEW.innerWidth - 16);
-    expect(far.nekoPosY).toBeLessThanOrEqual(VIEW.innerHeight - 16);
+    const far = run({ ...initialNeko(1280, 800), x: 1200, y: 700 }, 200, at(5000, 5000));
+    expect(far.x).toBeLessThanOrEqual(VIEW.innerWidth - 16);
+    expect(far.y).toBeLessThanOrEqual(VIEW.innerHeight - 16);
   });
 
   it('returns a new state and leaves the old one alone', () => {
-    const state = initialNeko();
+    const state = initialNeko(1280, 800);
     const copy = structuredClone(state);
-    expect(nekoFrame(state, input(600, 600))).not.toBe(state);
+    expect(nekoFrame(state, at(100, 100))).not.toBe(state);
     expect(state).toEqual(copy);
-  });
-
-  it('restores a saved state and rejects junk', () => {
-    const saved = JSON.stringify({ ...initialNeko(), nekoPosX: 200, idleAnimation: 'sleeping', mousePosX: 1, mousePosY: 2 });
-    expect(restoreNeko(saved)).toMatchObject({ nekoPosX: 200, idleAnimation: 'sleeping' });
-    expect(restoreNeko(null)).toBeNull();
-    expect(restoreNeko('not json')).toBeNull();
-    expect(restoreNeko('{"nekoPosX":"x"}')).toBeNull();
-    expect(restoreNeko(JSON.stringify({ ...initialNeko(), bgPos: 'url(javascript:x)' }))?.bgPos).toBe('-96px -96px');
   });
 });

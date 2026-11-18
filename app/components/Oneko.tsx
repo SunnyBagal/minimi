@@ -1,21 +1,27 @@
 'use client';
 
 /**
- * The oneko cat (port of https://github.com/adryd325/oneko.js, MIT, Copyright ©
- * 2022 adryd; the licence is in onekoCore.ts and public/oneko/LICENSE). The logic is
- * onekoCore.ts; this draws it on one fixed 32 px element with the original sprite
- * sheet, one frame per 100 ms, following `mousemove` as the original does.
+ * The oneko cat: the `useNeko` hook from the site owner's portfolio (follow mode),
+ * ported to React and TypeScript. The logic is onekoCore.ts and nekoColumn.ts; this
+ * draws it on one fixed 32 px element with the oneko.gif sprite sheet served from
+ * public/oneko/, one tick per 100 ms. Credits are in CREDITS.md.
  *
- * Differences from the original script, all about fitting this page:
- * - Rendered once by React inside the app layer, so it sits above the cat field
- *   and below the header and composer (z-index in globals.css), and unmounting
- *   stops its timer and listeners. New chat and the theme toggle do not remount it.
- * - prefers-reduced-motion: reduce shows no cat, as the original; turning it on
- *   later hides the cat too.
- * - localStorage reads and writes are wrapped in try/catch.
+ * Fitted to this page:
+ * - The cat stays off the conversation column (the thread and the composer). When the
+ *   pointer is over the column it runs to the nearest point on the column's edge and
+ *   waits there; it never crosses the column. The column is measured again on resize,
+ *   scroll and when the thread or composer changes size.
+ * - Where neither side of the column has room for the cat (a phone), there is no cat.
+ * - prefers-reduced-motion: reduce shows no cat; turning it on later hides it too.
+ * - pointer-events: none (globals.css), so it never takes a click. Rendered once in
+ *   the page, so New chat and the theme toggle do not remount it.
  */
 import { useEffect, useRef } from 'react';
-import { initialNeko, NEKO_FRAME_MS, NEKO_STORAGE_KEY, nekoFrame, restoreNeko, type NekoState } from './onekoCore';
+import { columnBand, insideRect, keepOut, nekoTarget, placeOutside, type Point, type Rect } from './nekoColumn';
+import { initialNeko, NEKO_FRAME_MS, NEKO_SIZE, nekoFrame, type NekoState } from './onekoCore';
+
+/** The elements that make up the conversation column. */
+const COLUMN_SELECTORS = ['.thread', '.composer-form'];
 
 export function Oneko() {
   const ref = useRef<HTMLDivElement>(null);
@@ -25,41 +31,49 @@ export function Oneko() {
     if (el === null) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-    let state: NekoState = initialNeko();
-    let mousePosX = 0;
-    let mousePosY = 0;
-    try {
-      const saved = window.localStorage.getItem(NEKO_STORAGE_KEY);
-      const restored = restoreNeko(saved);
-      if (restored !== null) {
-        state = restored;
-        const raw = JSON.parse(saved as string) as { mousePosX?: unknown; mousePosY?: unknown };
-        if (typeof raw.mousePosX === 'number') mousePosX = raw.mousePosX;
-        if (typeof raw.mousePosY === 'number') mousePosY = raw.mousePosY;
-      }
-    } catch {
-      // No saved position; start at the original's corner.
-    }
+    let state: NekoState = initialNeko(window.innerWidth, window.innerHeight);
+    let pointer: Point = { x: state.x, y: state.y };
+    let column: Rect | null = null;
+
+    const viewport = () => ({ width: window.innerWidth, height: window.innerHeight });
+    const measure = () => {
+      const rects = COLUMN_SELECTORS.flatMap((selector) => {
+        const node = document.querySelector(selector);
+        return node === null ? [] : [node.getBoundingClientRect()];
+      });
+      column = columnBand(rects, viewport());
+    };
 
     const draw = () => {
-      el.style.left = `${state.nekoPosX - 16}px`;
-      el.style.top = `${state.nekoPosY - 16}px`;
+      el.style.left = `${state.x - NEKO_SIZE / 2}px`;
+      el.style.top = `${state.y - NEKO_SIZE / 2}px`;
       el.style.backgroundPosition = state.bgPos;
     };
 
-    const onMouse = (event: MouseEvent) => {
-      mousePosX = event.clientX;
-      mousePosY = event.clientY;
-    };
-    const save = () => {
-      try {
-        window.localStorage.setItem(NEKO_STORAGE_KEY, JSON.stringify({ ...state, mousePosX, mousePosY }));
-      } catch {
-        // Storage refused; the cat starts in the corner next time.
+    /** One tick. Returns false when there is no room for the cat beside the column. */
+    const tick = (): boolean => {
+      const view = viewport();
+      let target: Point | null = pointer;
+      if (column !== null) {
+        const cat = { x: state.x, y: state.y };
+        if (insideRect(cat, keepOut(column, NEKO_SIZE))) {
+          const outside = placeOutside(cat, NEKO_SIZE, column, view);
+          if (outside === null) return false;
+          state = { ...state, x: outside.x, y: outside.y };
+        }
+        target = nekoTarget(pointer, { x: state.x, y: state.y }, NEKO_SIZE, column, view);
+        if (target === null) return false;
       }
+      state = nekoFrame(state, { targetX: target.x, targetY: target.y, innerWidth: view.width, innerHeight: view.height });
+      return true;
     };
 
     let interval = 0;
+    const step = () => {
+      const room = tick();
+      el.hidden = !room;
+      if (room) draw();
+    };
     const start = () => {
       window.clearInterval(interval);
       interval = 0;
@@ -67,30 +81,32 @@ export function Oneko() {
         el.hidden = true;
         return;
       }
-      el.hidden = false;
-      draw();
-      interval = window.setInterval(() => {
-        state = nekoFrame(state, {
-          mousePosX,
-          mousePosY,
-          innerWidth: window.innerWidth,
-          innerHeight: window.innerHeight,
-          random: Math.random,
-        });
-        draw();
-      }, NEKO_FRAME_MS);
+      measure();
+      step();
+      interval = window.setInterval(step, NEKO_FRAME_MS);
     };
+
+    const onMouse = (event: MouseEvent) => {
+      pointer = { x: event.clientX, y: event.clientY };
+    };
+    const observer = new ResizeObserver(measure);
+    for (const selector of COLUMN_SELECTORS) {
+      const node = document.querySelector(selector);
+      if (node !== null) observer.observe(node);
+    }
 
     start();
     document.addEventListener('mousemove', onMouse);
-    window.addEventListener('beforeunload', save);
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { capture: true, passive: true });
     reduced.addEventListener('change', start);
     return () => {
       window.clearInterval(interval);
+      observer.disconnect();
       document.removeEventListener('mousemove', onMouse);
-      window.removeEventListener('beforeunload', save);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, { capture: true });
       reduced.removeEventListener('change', start);
-      save();
     };
   }, []);
 

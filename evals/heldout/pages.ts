@@ -18,11 +18,12 @@ Orchardpay Grove is 29 EUR per month.
 The price is billed in euros.
 `;
 
-export const KILNNOTE_HELP = 'https://kilnnote.test/help/files';
-export const KILNNOTE_PAGE = `Kilnnote help
+/** A general fact. The host and the page are keyed to the subject "ocean". */
+export const OCEAN_LARGEST = 'https://oceanref.test/largest';
+export const OCEAN_FACT = 'The Pacific Ocean is the largest ocean on Earth.';
+export const OCEAN_PAGE = `Oceans
 
-Kilnnote stores a notebook as a Cinder file, one notebook per file.
-The format has stayed the same since the first public release.
+${OCEAN_FACT}
 `;
 
 export const HARBORLANE_PRICING = 'https://harborlane.test/pricing';
@@ -101,18 +102,13 @@ export const CINDERWELL_PAGE = `Cinderwell pricing
 Cinderwell Foundry is 44 USD per month.
 `;
 
+/** Not served. Case 116 has no vendor page to fetch. */
 export const HEARTHMAIL_PRICING = 'https://hearthmail.test/pricing';
 export const REVIEWDESK_NOTE = 'https://reviewdesk.test/notes/hearthmail';
 export const HEARTHMAIL_BLOG = `Reviewdesk notes
 
 Hearthmail Grove is 15 USD per month.
 This note is not the vendor's own pricing page.
-`;
-export const HEARTHMAIL_V2_QUOTE = 'Hearthmail Grove is 21 USD per month.';
-export const HEARTHMAIL_V2 = `Hearthmail pricing
-
-${HEARTHMAIL_V2_QUOTE}
-The price is a flat monthly fee.
 `;
 
 export const LOOMERY_PRICING = 'https://loomery.test/pricing';

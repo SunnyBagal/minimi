@@ -10,12 +10,8 @@ import {
   FERNLEDGER_PAGE,
   FERNLEDGER_PRICING,
   HEARTHMAIL_BLOG,
-  HEARTHMAIL_PRICING,
-  HEARTHMAIL_V2,
   IVYLEDGER_PAGE,
   IVYLEDGER_PRICING,
-  KILNNOTE_HELP,
-  KILNNOTE_PAGE,
   LOOMERY_CHANGELOG,
   LOOMERY_NEWS,
   LOOMERY_PAGE,
@@ -24,6 +20,8 @@ import {
   LUMENBOARD_PRICING,
   NIMBUSMAIL_PRICING,
   NIMBUSMAIL_V2,
+  OCEAN_LARGEST,
+  OCEAN_PAGE,
   ORCHARDPAY_PAGE,
   ORCHARDPAY_PRICING,
   PALLETORY_CHANGELOG,
@@ -53,7 +51,7 @@ export function pageScenario(url: string, text: string, match: string): FixtureS
 
 export const lumenboardScenario = pageScenario(LUMENBOARD_PRICING, LUMENBOARD_PAGE, 'lumenboard');
 export const orchardpayScenario = pageScenario(ORCHARDPAY_PRICING, ORCHARDPAY_PAGE, 'orchardpay');
-export const kilnnoteScenario = pageScenario(KILNNOTE_HELP, KILNNOTE_PAGE, 'kilnnote');
+export const oceanScenario = pageScenario(OCEAN_LARGEST, OCEAN_PAGE, 'ocean');
 export const nimbusmailScenario = pageScenario(NIMBUSMAIL_PRICING, NIMBUSMAIL_V2, 'nimbusmail');
 export const rowanhostScenario = pageScenario(ROWANHOST_PRICING, ROWANHOST_PAGE, 'rowanhost');
 export const fernledgerScenario = pageScenario(FERNLEDGER_PRICING, FERNLEDGER_PAGE, 'fernledger');
@@ -68,15 +66,12 @@ export const cinderwellScenario: FixtureScenario = {
 };
 
 /**
- * The stored quote lives on a review site. The vendor page has the new price.
- * A query that names the product returns the vendor page.
+ * Third-party note only. No vendor hit and no vendor page to fetch.
+ * A query that names the product returns the review note.
  */
 export const hearthmailScenario: FixtureScenario = {
-  pages: {
-    [REVIEWDESK_NOTE]: { text: HEARTHMAIL_BLOG },
-    [HEARTHMAIL_PRICING]: { text: HEARTHMAIL_V2 },
-  },
-  searches: [{ match: 'hearthmail', results: [hit(HEARTHMAIL_PRICING, HEARTHMAIL_V2)] }],
+  pages: { [REVIEWDESK_NOTE]: { text: HEARTHMAIL_BLOG } },
+  searches: [{ match: 'hearthmail', results: [hit(REVIEWDESK_NOTE, HEARTHMAIL_BLOG)] }],
 };
 
 /**

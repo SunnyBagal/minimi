@@ -2,17 +2,19 @@
  * Held-out cases 101–119. Written from docs/02-evals.md and the product brief.
  * Each comment names the spec rule the case tests.
  */
-import type { AgentEvent, MemoryStore } from '../../src/core/contracts';
+import type { AgentEvent, Claim, MemoryStore } from '../../src/core/contracts';
 import {
+  allClaims,
   asksToConfirm,
   candidateDates,
   chosenIs,
   claimsNoChangeAbout,
+  datesNamedIn,
   intentIs,
   judgeSaysNo,
   noVerdicts,
   numbersAllowed,
-  offersIn,
+  numbersIn,
   ofType,
   ok,
   quoteInPage,
@@ -22,6 +24,7 @@ import {
   verdictFor,
   verdictIs,
   verdictsOf,
+  writerTextOf,
 } from '../assert';
 import type { FixtureScenario } from '../fixtureSearch';
 import { CLOCK, TZ, type Assertion, type CasePart, type CaseRun, type EvalCase } from '../types';
@@ -39,16 +42,13 @@ import {
   HARBORLANE_PRICING,
   HEARTHMAIL_BLOG,
   HEARTHMAIL_PRICING,
-  HEARTHMAIL_V2,
   IVYLEDGER_PAGE,
   IVYLEDGER_PRICING,
   IVYLEDGER_QUOTE,
-  KILNNOTE_PAGE,
-  LOOMERY_NEWS,
+  LOOMERY_CHANGELOG,
   LOOMERY_PAGE,
   LOOMERY_PRICING,
   LOOMERY_QUOTE,
-  LUMENBOARD_PAGE,
   LUMENBOARD_PRICING,
   MOTHLIGHT_PAGE,
   MOTHLIGHT_PRICING,
@@ -57,8 +57,9 @@ import {
   NIMBUSMAIL_PRICING,
   NIMBUSMAIL_V1_OLDER,
   NIMBUSMAIL_V2,
-  ORCHARDPAY_PAGE,
+  OCEAN_LARGEST,
   ORCHARDPAY_PRICING,
+  PALLETORY_CHANGELOG,
   PALLETORY_PAGE,
   PALLETORY_PRICING,
   PALLETORY_QUOTE,
@@ -72,7 +73,6 @@ import {
   VELLUMSTACK_PRICING,
   VELLUMSTACK_V1,
   VELLUMSTACK_V1_QUOTE,
-  VELLUMSTACK_V2,
 } from './pages';
 import {
   brasslineScenario,
@@ -81,37 +81,42 @@ import {
   fernledgerScenario,
   hearthmailScenario,
   ivyledgerScenario,
-  kilnnoteScenario,
   lumenboardScenario,
   newsScenario,
   nimbusmailScenario,
+  oceanScenario,
   orchardpayScenario,
   rowanhostScenario,
   vellumstackScenario,
 } from './scenarios';
+import { servedEvidence } from './served';
+
+const MONTHLY = /\b(?:per month|a month|each month|monthly|\/month)\b/i;
+const USD = /(?:\bUSD\b|US\$|\$|\bdollars?\b)/i;
+const EURO = /(?:€|\bEUR\b|\beuros?\b)/i;
+const NOT_USD = /(?:\bUSD\b|US\$|\$|\bdollars?\b)/i;
+const OFFER = /\b(?:I can|I could|I'll|I will|I'd be happy|happy to|let me|want me to|shall I|should I|would you like|do you want)\b/i;
+const REFUSAL = /\b(?:can't|cannot|can not|unable|won't|will not|not able|don't|do not|never)\b/i;
+
+const PEBBLE_QUESTION = 'What does Pebblecart\'s Harbor plan cost?';
+const NIMBUS_QUESTION = 'What does the Nimbusmail Plus plan cost?';
+const ROWAN_QUESTION = 'What does the Rowanhost Cabin plan cost?';
+const FERN_QUESTION = 'What does Fernledger pricing look like for the Growth plan?';
+const EAST_STUDIO = 'Please let the client know the workshop has been moved to the east studio.';
+const CINDERWELL_VERIFIED_AT = '2026-11-06T04:30:00.000Z';
 
 function namesDate(text: string, day: number, month: string): boolean {
   const m = month.slice(0, 3);
   return new RegExp(`\\b${day}\\s+${m}`, 'i').test(text) || new RegExp(`\\b${m}[a-z]*\\s+${day}\\b`, 'i').test(text);
 }
 
-/** "8 November 2026" or "November 8, 2026": the date in words, with the year. */
-function saysDay(text: string, day: number, month: string, year = 2026): boolean {
-  const m = month.slice(0, 3);
-  return (
-    new RegExp(`\\b${day}\\s+${m}[a-z]*\\s+${year}\\b`, 'i').test(text) ||
-    new RegExp(`\\b${m}[a-z]*\\s+${day},?\\s+${year}\\b`, 'i').test(text)
-  );
-}
-
 function part(
   messages: readonly string[],
   scenario: FixtureScenario,
   prepare?: (store: MemoryStore) => void,
-  clock = CLOCK,
-  tz = TZ,
+  clock?: string,
 ): CasePart {
-  return { seeds: [], prepare, clock, tz, scenario, messages };
+  return { seeds: [], prepare, clock: clock ?? CLOCK, tz: TZ, scenario, messages };
 }
 
 function shown(run: CaseRun, index = 0): string {
@@ -122,15 +127,182 @@ function eventsAt(run: CaseRun, index = 0): AgentEvent[] {
   return turnOf(run, 0, index).events;
 }
 
-function cites(events: AgentEvent[], url: string): boolean {
-  return ofType(events, 'citations').some((event) => event.items.some((item) => item.url === url));
+function sourcesFor(scenario: FixtureScenario, run: CaseRun, index = 0): string[] {
+  return servedEvidence(scenario, turnOf(run, 0, index).log, run.parts[0]?.tz ?? TZ);
 }
 
-function uncitedEmpty(events: AgentEvent[]): boolean {
-  return ofType(events, 'flags').every((event) => event.uncitedNumbers.length === 0);
+function citationUrl(events: AgentEvent[], n: number): string | undefined {
+  for (const event of ofType(events, 'citations')) {
+    const item = event.items.find((entry) => entry.n === n);
+    if (item !== undefined) return item.url;
+  }
+  return undefined;
 }
 
-// Spec: a fresh answer cites the page it got the figures from, and every number is on that page.
+function citesUrl(text: string, events: AgentEvent[], url: string): boolean {
+  for (const match of text.matchAll(/\[(\d+)\]/g)) {
+    if (citationUrl(events, Number(match[1])) === url) return true;
+  }
+  return false;
+}
+
+function containersOf(answer: string): string[] {
+  const lines = answer.split('\n');
+  const rows = lines.filter((line) => line.includes('|'));
+  const prose = lines.filter((line) => !line.includes('|')).join('\n');
+  return [...rows, ...sentencesOf(prose)];
+}
+
+function clausesIn(container: string): string[] {
+  if (container.includes('|')) return [container];
+  const parts = container
+    .split(/[,;]|\s(?:but|while|whereas|although|and)\s/i)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause !== '');
+  return parts.length > 0 ? parts : [container];
+}
+
+/** Plan, amount, currency and period in one clause or table row; a marker on that sentence may cover every price in it. */
+function priceBound(
+  answer: string,
+  events: AgentEvent[],
+  url: string,
+  plan: RegExp,
+  amount: string,
+  currency: RegExp,
+  otherAmounts: readonly string[],
+  rejectCurrency?: RegExp,
+): boolean {
+  const amountPattern = new RegExp(`\\b${amount}\\b`);
+  return containersOf(answer).some((container) => {
+    if (!citesUrl(container, events, url)) return false;
+    return clausesIn(container).some((clause) => {
+      if (!plan.test(clause) || !amountPattern.test(clause) || !currency.test(clause) || !MONTHLY.test(clause)) return false;
+      if (otherAmounts.some((other) => new RegExp(`\\b${other}\\b`).test(clause))) return false;
+      if (rejectCurrency !== undefined && rejectCurrency.test(clause)) return false;
+      return true;
+    });
+  });
+}
+
+function flagsEmpty(events: AgentEvent[]): Assertion[] {
+  const flags = ofType(events, 'flags');
+  return [
+    ok('a flags event is present', flags.length > 0, flags.length),
+    ok(
+      'uncitedNumbers is empty',
+      flags.length > 0 && flags.every((event) => event.uncitedNumbers.length === 0),
+      flags.map((event) => event.uncitedNumbers),
+    ),
+  ];
+}
+
+/** Full month name, in the same sentence as the numeric date the user typed. */
+function readsNumericDate(text: string, raw: string, day: number, month: string, year = 2026): boolean {
+  const forward = new RegExp(`\\b${day}\\s+${month}\\s+${year}\\b`, 'i');
+  const reverse = new RegExp(`\\b${month}\\s+${day},?\\s+${year}\\b`, 'i');
+  return sentencesOf(text).some((sentence) => sentence.includes(raw) && (forward.test(sentence) || reverse.test(sentence)));
+}
+
+function confirmationAt(answer: string): number {
+  const match = answer.match(/\b(?:which one do you mean|which (?:day|date|thursday|monday|conversation|one)|did you mean|do you mean)\b[^?\n]*\?/i);
+  return match?.index ?? -1;
+}
+
+/** Each date shares a line with the stored question, and that block is before the confirmation. */
+function showsDatedOptions(answer: string, question: string, days: readonly number[]): boolean {
+  const at = confirmationAt(answer);
+  if (at < 0) return false;
+  const before = answer.slice(0, at);
+  return days.every((day) =>
+    before.split('\n').some((line) => namesDate(line, day, 'Nov') && /\b2026\b/.test(line) && line.includes(question)),
+  );
+}
+
+function renewsDateQuestion(text: string): boolean {
+  return sentencesOf(text).some((sentence) => {
+    if (!sentence.endsWith('?')) return false;
+    if (/which one do you mean/i.test(sentence)) return true;
+    return /\b(?:which|what)\b/i.test(sentence) && /\b(?:day|date|thursday|one)\b/i.test(sentence);
+  });
+}
+
+function claimOn(run: CaseRun, entity: string, value: string, localDate: string): Claim | undefined {
+  const hits = run.store.findTurns({ dates: [localDate], excludeTurnIds: [], limit: 50 });
+  const turnIds = new Set(hits.flatMap((hit) => (hit.assistantTurn === null ? [] : [hit.assistantTurn.id])));
+  return allClaims(run.store).find((claim) => claim.entity === entity && claim.value === value && turnIds.has(claim.turnId));
+}
+
+function offersRelayLookup(text: string): boolean {
+  return sentencesOf(text).some((sentence) => {
+    if (REFUSAL.test(sentence) || !OFFER.test(sentence)) return false;
+    if (!/\b(?:look(?:\s+\w+){0,3}\s+up|check)\b/i.test(sentence)) return false;
+    return /\bRelay\b/.test(sentence) && /\b(?:pric\w*|cost)\b/i.test(sentence) && /\b(?:current|now|today|latest)\b/i.test(sentence);
+  });
+}
+
+function attributesHistoricalPrice(text: string): boolean {
+  return sentencesOf(text).some(
+    (sentence) =>
+      /\b(?:Relay|Copperlane)\b/.test(sentence) &&
+      /\b(?:was|were|used to|previously|historically|back then|at the time)\b/i.test(sentence) &&
+      /\b(?:pric|cost|\$|USD|euros?)\b/i.test(sentence),
+  );
+}
+
+function stillHolds(answer: string): boolean {
+  if (claimsNoChangeAbout(answer, /Cinderwell/)) return true;
+  return sentencesOf(answer).some(
+    (sentence) =>
+      /\b(?:still costs|still priced|price still|still holds|continues to cost|remains \d)\b/i.test(sentence) &&
+      /(?:Cinderwell|Foundry|\b44\b)/.test(sentence),
+  );
+}
+
+function saysItCannotIdentify(text: string): boolean {
+  return sentencesOf(text).some(
+    (sentence) =>
+      /\b(?:can't|cannot|can not|don't know|do not know|unable|not able|couldn't|could not|not sure)\b/i.test(sentence) &&
+      /\b(?:which|what|identify|tell)\b/i.test(sentence) &&
+      /\b(?:answer|claim|conversation|message|one|that)\b/i.test(sentence),
+  );
+}
+
+function asksWhichToCheck(text: string): boolean {
+  return sentencesOf(text).some(
+    (sentence) => sentence.includes('?') && /\b(?:which|what)\b/i.test(sentence) && /\b(?:answer|claim|conversation|one|message)\b/i.test(sentence),
+  );
+}
+
+function claimsACompletedCheck(text: string): boolean {
+  if (claimsNoChangeAbout(text, /price|plan|that/i)) return true;
+  return sentencesOf(text).some((sentence) => {
+    if (/\b(?:can't|cannot|can not|couldn't|could not|whether|not sure|don't know|do not know|unable)\b/i.test(sentence)) return false;
+    return /\b(?:I checked|I verified|I confirmed|I looked (?:it|that|this) up|still (?:right|correct|true)|that is (?:right|correct)|no change|unchanged)\b/i.test(sentence);
+  });
+}
+
+function namesALookupDate(text: string): boolean {
+  if (/\b\d{4}-\d{2}-\d{2}\b/.test(text) || /\b\d{1,2}\/\d{1,2}\b/.test(text) || /\b20\d{2}\b/.test(text)) return true;
+  return sentencesOf(text).some((sentence) => datesNamedIn(sentence).length > 0);
+}
+
+function shorterMove(text: string): boolean {
+  const body = text.trim();
+  return body.length > 0 && body.length < EAST_STUDIO.length && /east studio/i.test(body) && /\b(?:moved|move|moving|relocated|relocate)\b/i.test(body);
+}
+
+function explainsCompass(text: string): boolean {
+  return /needle/i.test(text) && /earth/i.test(text) && /magnetic field/i.test(text) && /\b(?:align\w*|points?|lines up|follows)\b/i.test(text);
+}
+
+function newsSearch(run: CaseRun, entity: string): boolean {
+  return turnOf(run, 0, 0).log.some(
+    (call) => call.kind === 'search' && call.query.toLowerCase().includes(`${entity.toLowerCase()} news`) && call.publishedOnOrAfter === '2026-11-09',
+  );
+}
+
+// Spec: a fresh answer cites each plan price from the page, and every number was on a page this turn served.
 const case101: EvalCase = {
   id: 101,
   parts: [part(['What do Lumenboard\'s Studio and Field plans cost per month?'], lumenboardScenario)],
@@ -140,15 +312,23 @@ const case101: EvalCase = {
     return [
       intentIs(events, 'fresh'),
       ok('searched', turnOf(run, 0, 0).log.some((call) => call.kind === 'search'), turnOf(run, 0, 0).log),
-      ok('cites the Lumenboard pricing page', cites(events, LUMENBOARD_PRICING), ofType(events, 'citations')),
-      ok('states both plan prices', /\b36\b/.test(answer) && /\b64\b/.test(answer), answer),
-      ok('uncitedNumbers is empty', uncitedEmpty(events), ofType(events, 'flags')),
-      numbersAllowed(run, events, [LUMENBOARD_PAGE]),
+      ok(
+        'Studio is 36 USD/month with a marker to the pricing page',
+        priceBound(answer, events, LUMENBOARD_PRICING, /\bStudio\b/, '36', USD, ['64']),
+        answer,
+      ),
+      ok(
+        'Field is 64 USD/month with a marker to the pricing page',
+        priceBound(answer, events, LUMENBOARD_PRICING, /\bField\b/, '64', USD, ['36']),
+        answer,
+      ),
+      ...flagsEmpty(events),
+      numbersAllowed(run, events, sourcesFor(lumenboardScenario, run)),
     ];
   },
 };
 
-// Brief: a fresh price stated in a currency other than US dollars, still cited.
+// Brief: a fresh euro price, with the amount, currency and month bound together and cited.
 const case102: EvalCase = {
   id: 102,
   parts: [part(['What does Orchardpay\'s Grove plan cost per month?'], orchardpayScenario)],
@@ -157,27 +337,32 @@ const case102: EvalCase = {
     const answer = shown(run);
     return [
       intentIs(events, 'fresh'),
-      ok('cites the Orchardpay pricing page', cites(events, ORCHARDPAY_PRICING), ofType(events, 'citations')),
-      ok('states the price in euros', /\b29\b/.test(answer) && /EUR|euros?/i.test(answer), answer),
-      ok('uncitedNumbers is empty', uncitedEmpty(events), ofType(events, 'flags')),
-      numbersAllowed(run, events, [ORCHARDPAY_PAGE]),
+      ok(
+        'Grove is 29 euros per month with a marker to the pricing page',
+        priceBound(answer, events, ORCHARDPAY_PRICING, /\bGrove\b/, '29', EURO, [], NOT_USD),
+        answer,
+      ),
+      ...flagsEmpty(events),
+      numbersAllowed(run, events, sourcesFor(orchardpayScenario, run)),
     ];
   },
 };
 
-// Brief: an explicit "search for this" on a stable topic still searches and uses the page.
+// Brief: an explicit "search for this" on a stable topic still searches and cites the page.
 const case103: EvalCase = {
   id: 103,
-  parts: [part(['Search the web for the name of Kilnnote\'s notebook file format.'], kilnnoteScenario)],
+  parts: [part(['Search the web for which ocean is the largest.'], oceanScenario)],
   check(run) {
     const events = eventsAt(run);
     const answer = shown(run);
+    const stated = sentencesOf(answer).some(
+      (sentence) => /Pacific/i.test(sentence) && /largest/i.test(sentence) && /ocean/i.test(sentence) && citesUrl(sentence, events, OCEAN_LARGEST),
+    );
     return [
       intentIs(events, 'fresh'),
       ok('at least one search', turnOf(run, 0, 0).log.some((call) => call.kind === 'search'), turnOf(run, 0, 0).log),
-      ok('answer names the Cinder file', /Cinder file/.test(answer), answer),
-      ok('uncitedNumbers is empty', uncitedEmpty(events), ofType(events, 'flags')),
-      numbersAllowed(run, events, [KILNNOTE_PAGE]),
+      ok('answer states the Pacific is the largest ocean and cites the page', stated, answer),
+      numbersAllowed(run, events, sourcesFor(oceanScenario, run)),
     ];
   },
 };
@@ -187,10 +372,7 @@ const case104: EvalCase = {
   id: 104,
   parts: [
     part(
-      [
-        "Make this shorter: 'Please let the client know the workshop has been moved to the east studio.'",
-        'How does a compass find north?',
-      ],
+      [`Make this shorter: '${EAST_STUDIO}'`, 'How does a compass find north?'],
       emptyScenario,
       (store) => {
         seedExchange(
@@ -217,30 +399,44 @@ const case104: EvalCase = {
   ],
   check(run) {
     const traces = run.parts[0]?.traces ?? [];
+    const rewrite = traces[0]?.answerText ?? '';
+    const compass = traces[1]?.answerText ?? '';
     const answer = traces.map((trace) => trace.answerText).join('\n');
     return [
+      ok('two traces', traces.length === 2, traces.length),
       ...traces.flatMap((trace) => [
         intentIs(trace.events, 'chat'),
         ok('provider log is empty', trace.log.length === 0, trace.log),
         ok('no recall event', recallOf(trace.events) === undefined, recallOf(trace.events)?.chosen ?? null),
         noVerdicts(trace.events),
         ok('no citations', ofType(trace.events, 'citations').length === 0, ofType(trace.events, 'citations').length),
-        numbersAllowed(run, trace.events, []),
+        numbersAllowed(run, trace.events, servedEvidence(emptyScenario, trace.log, TZ)),
       ]),
-      ok('the stored Harborlane claim is not mentioned', !/Harborlane/.test(answer), answer),
+      ok('the rewrite is shorter and keeps the east-studio move', shorterMove(rewrite), rewrite),
+      ok('the compass answer says the needle aligns with Earth\'s magnetic field', explainsCompass(compass), compass),
+      ok('the stored Harborlane claim is not mentioned', !/harborlane/i.test(answer), answer),
     ];
   },
 };
 
-// Spec case 3's date rule: "last Thursday" has two candidate dates; only one is about this product.
+// Spec case 3's date rule: "last Thursday" has two candidate dates; the one about this product is chosen.
 const case105: EvalCase = {
   id: 105,
   parts: [
     part(['What did I ask you last Thursday about Pebblecart?'], emptyScenario, (store) => {
       seedExchange(
         store,
+        ist('2026-11-05', '2026-11-05T04:00:00.000Z'),
+        'Where is the spare kiln key kept?',
+        'The spare kiln key hangs on the hook.',
+        'kiln key',
+        ['kiln'],
+        [],
+      );
+      seedExchange(
+        store,
         ist('2026-11-12', '2026-11-12T04:30:00.000Z'),
-        'What does Pebblecart\'s Harbor plan cost?',
+        PEBBLE_QUESTION,
         'Pebblecart Harbor is 33 USD per month.',
         'Pebblecart',
         ['Pebblecart'],
@@ -265,10 +461,10 @@ const case105: EvalCase = {
       intentIs(events, 'recall'),
       candidateDates(events, ['2026-11-12', '2026-11-05']),
       chosenIs(events, '2026-11-12'),
-      ok('answer names 12 Nov', namesDate(answer, 12, 'Nov'), answer),
-      ok('answer restates Pebblecart', /Pebblecart/.test(answer), answer),
+      ok('recall.asked.question is the 12 Nov Pebblecart question', recallOf(events)?.asked?.question === PEBBLE_QUESTION, recallOf(events)?.asked?.question ?? null),
+      ok('the shown answer restates that question', answer.includes(PEBBLE_QUESTION), answer),
       noVerdicts(events),
-      numbersAllowed(run, events, [PEBBLECART_PAGE]),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
@@ -305,14 +501,14 @@ const case106: EvalCase = {
     return [
       intentIs(events, 'recall'),
       chosenIs(events, '2026-11-12'),
-      ok('answer restates Mothlight', /Mothlight/.test(answer), answer),
+      ok('answer mentions Mothlight', /Mothlight/.test(answer), answer),
       noVerdicts(events),
-      numbersAllowed(run, events, [MOTHLIGHT_PAGE]),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
 
-// Spec case 8: a numeric date with no year has both readings; the one with a turn is chosen and said in words.
+// Spec case 8: a numeric date with no year has both readings; the chosen one is said in words.
 const case107: EvalCase = {
   id: 107,
   parts: [
@@ -345,17 +541,15 @@ const case107: EvalCase = {
       intentIs(events, 'recall'),
       candidateDates(events, ['2026-11-08', '2026-08-11']),
       chosenIs(events, '2026-11-08'),
-      ok('answer says 8 November 2026 in words', saysDay(answer, 8, 'November'), answer),
+      ok('answer reads 8/11 as 8 November 2026', readsNumericDate(answer, '8/11', 8, 'November'), answer),
       ok('answer restates Quillharbor', /Quillharbor/.test(answer), answer),
       noVerdicts(events),
-      numbersAllowed(run, events, [QUILLHARBOR_PAGE]),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
 
 // Spec case 11: after an ambiguous date, "the 12th" chooses that day and does not ask again.
-const NIMBUS_QUESTION = 'What does the Nimbusmail Plus plan cost?';
-
 const case108: EvalCase = {
   id: 108,
   parts: [
@@ -409,22 +603,34 @@ const case108: EvalCase = {
     const second = eventsAt(run, 1);
     const follow = shown(run, 1);
     const rows = verdictsOf(second);
+    const claim = claimOn(run, 'Nimbusmail', '18 USD/month', '2026-11-12');
+    const only = rows.length === 1 ? rows[0] : undefined;
     return [
       candidateDates(first, ['2026-11-12', '2026-11-05']),
       chosenIs(first, null),
       ok('candidates are ambiguous', recallOf(first)?.candidates.ambiguous === true, recallOf(first)?.candidates.ambiguous ?? null),
-      ok('turn 1 asks which conversation', asksToConfirm(shown(run, 0)), shown(run, 0)),
+      ok(
+        'turn 1 shows each Thursday with its question, then asks which',
+        showsDatedOptions(shown(run, 0), NIMBUS_QUESTION, [12, 5]),
+        shown(run, 0),
+      ),
       noVerdicts(first),
       chosenIs(second, '2026-11-12'),
-      ok('turn 2 does not ask the date again', !asksToConfirm(follow), follow),
+      ok('turn 2 does not ask the date again', !renewsDateQuestion(follow), follow),
       ok(
-        'verdicts cover only the 12 Nov claim',
-        rows.length >= 1 && rows.every((row) => row.claim.value.includes('18') && !row.claim.value.includes('14')),
-        rows.map((row) => row.claim.value),
+        'turn 2 is exactly the 12 Nov Nimbusmail Plus claim at 18 USD/month',
+        claim !== undefined &&
+          only !== undefined &&
+          only.claim.id === claim.id &&
+          only.claim.value === '18 USD/month' &&
+          only.claim.scope.plan === 'Plus' &&
+          only.claim.scope.period === 'month' &&
+          only.claim.scope.currency === 'USD',
+        rows.map((row) => ({ id: row.claim.id, value: row.claim.value })),
       ),
       verdictIs(second, 'Nimbusmail', 'price', 'unchanged'),
-      numbersAllowed(run, first, [NIMBUSMAIL_V2]),
-      numbersAllowed(run, second, [NIMBUSMAIL_V2]),
+      numbersAllowed(run, first, sourcesFor(nimbusmailScenario, run, 0)),
+      numbersAllowed(run, second, sourcesFor(nimbusmailScenario, run, 1)),
     ];
   },
 };
@@ -464,14 +670,12 @@ const case109: EvalCase = {
       ),
       ok('answer restates the tide-table question', /tide table/.test(answer), answer),
       noVerdicts(events),
-      numbersAllowed(run, events, []),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
 
 // Spec case 7: both candidate dates match the topic, so the answer asks and does not pick one.
-const ROWAN_QUESTION = 'What does the Rowanhost Cabin plan cost?';
-
 const case110: EvalCase = {
   id: 110,
   parts: [
@@ -479,10 +683,7 @@ const case110: EvalCase = {
       ['Last Monday I asked about the Rowanhost Cabin plan. Has the price changed since then?'],
       rowanhostScenario,
       (store) => {
-        for (const when of [
-          ist('2026-11-09', '2026-11-09T10:30:00.000Z'),
-          ist('2026-11-02', '2026-11-02T10:30:00.000Z'),
-        ]) {
+        for (const when of [ist('2026-11-09', '2026-11-09T10:30:00.000Z'), ist('2026-11-02', '2026-11-02T10:30:00.000Z')]) {
           seedExchange(store, when, ROWAN_QUESTION, 'Rowanhost Cabin is 52 USD per month.', 'Rowanhost Cabin', ['Rowanhost'], [
             {
               entity: 'Rowanhost',
@@ -500,7 +701,6 @@ const case110: EvalCase = {
   ],
   check(run) {
     const events = eventsAt(run);
-    const answer = shown(run);
     const hits = recallOf(events)?.hits ?? [];
     return [
       candidateDates(events, ['2026-11-09', '2026-11-02']),
@@ -511,9 +711,13 @@ const case110: EvalCase = {
         ['2026-11-09', '2026-11-02'].every((date) => hits.some((hit) => hit.userTurn.localDate === date)),
         hits.map((hit) => hit.userTurn.localDate),
       ),
-      ok('asks which conversation', asksToConfirm(answer), answer),
+      ok(
+        'shows each Monday with its question, then asks which',
+        showsDatedOptions(shown(run), ROWAN_QUESTION, [9, 2]),
+        shown(run),
+      ),
       noVerdicts(events),
-      numbersAllowed(run, events, [ROWANHOST_PAGE]),
+      numbersAllowed(run, events, sourcesFor(rowanhostScenario, run)),
     ];
   },
 };
@@ -521,16 +725,12 @@ const case110: EvalCase = {
 // Spec case 4: nothing stored on the dates named, and nothing near them. Judge J1.
 const case111: EvalCase = {
   id: 111,
-  parts: [
-    part(
-      ['Last Thursday I asked what Copperlane\'s Relay plan costs. Has that price changed?'],
-      emptyScenario,
-    ),
-  ],
+  parts: [part(['Last Thursday I asked what Copperlane\'s Relay plan costs. Has that price changed?'], emptyScenario)],
   judges: ['J1'],
   check(run) {
     const events = eventsAt(run);
     const answer = shown(run);
+    const writer = writerTextOf(run, events);
     const recall = recallOf(events);
     return [
       ok('recall.hits is empty', (recall?.hits.length ?? -1) === 0, recall?.hits.length ?? null),
@@ -538,9 +738,10 @@ const case111: EvalCase = {
       ok('answer names 12 Nov', namesDate(answer, 12, 'Nov'), answer),
       ok('answer names 5 Nov', namesDate(answer, 5, 'Nov'), answer),
       noVerdicts(events),
-      ok('offers a fresh lookup', offersIn(answer, /Copperlane|Relay|pric/i), answer),
+      ok('writer offers to look up or check current Relay pricing', offersRelayLookup(writer), writer),
+      ok('writer does not attribute a historical Relay price', !attributesHistoricalPrice(writer), writer),
       ...judgeSaysNo(run, 'J1'),
-      numbersAllowed(run, events, []),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
@@ -556,7 +757,7 @@ const case112: EvalCase = {
         seedExchange(
           store,
           ist('2026-11-07', '2026-11-07T06:30:00.000Z'),
-          'What does Fernledger pricing look like for the Growth plan?',
+          FERN_QUESTION,
           'Fernledger Growth is 17 USD per month.',
           'Fernledger pricing',
           ['Fernledger'],
@@ -581,17 +782,18 @@ const case112: EvalCase = {
     const nearest = recallOf(events)?.nearest ?? [];
     return [
       chosenIs(events, null),
+      ok('exact hits are empty', (recallOf(events)?.hits.length ?? -1) === 0, recallOf(events)?.hits.length ?? null),
       ok('answer names 11 Nov', namesDate(answer, 11, 'Nov'), answer),
       ok('answer names 4 Nov', namesDate(answer, 4, 'Nov'), answer),
       ok(
-        'nearest is the Fernledger conversation on 7 Nov',
-        nearest.some((hit) => hit.userTurn.localDate === '2026-11-07' && hit.matched === 'topic'),
-        nearest.map((hit) => [hit.userTurn.localDate, hit.matched]),
+        'nearest is the seeded Fernledger question on 7 Nov',
+        nearest.some((hit) => hit.userTurn.localDate === '2026-11-07' && hit.matched === 'topic' && hit.userTurn.content === FERN_QUESTION),
+        nearest.map((hit) => [hit.userTurn.localDate, hit.matched, hit.userTurn.content]),
       ),
       ok('answer names 7 Nov', namesDate(answer, 7, 'Nov'), answer),
-      ok('offers that conversation', offersIn(answer, /Fernledger|Growth|pric/i), answer),
+      ok('writer asks to confirm that conversation', asksToConfirm(writerTextOf(run, events)), writerTextOf(run, events)),
       noVerdicts(events),
-      numbersAllowed(run, events, [FERNLEDGER_PAGE]),
+      numbersAllowed(run, events, sourcesFor(fernledgerScenario, run)),
     ];
   },
 };
@@ -637,12 +839,12 @@ const case113: EvalCase = {
       ok('decidedBy is fast_path', row?.check.decidedBy === 'fast_path', row?.check.decidedBy ?? null),
       ok('exactly one fetch, of the vendor page', fetches.length === 1 && fetches[0]?.url === IVYLEDGER_PRICING, fetches),
       ok('the source is live', row?.nowSource?.live === true, row?.nowSource?.live ?? null),
-      numbersAllowed(run, events, [IVYLEDGER_PAGE]),
+      numbersAllowed(run, events, sourcesFor(ivyledgerScenario, run)),
     ];
   },
 };
 
-// Spec case 3's changed row: the new value is on the live v2 page.
+// Spec case 3's changed row: the new Meter price is exactly 31 USD/month on the live vendor page.
 const case114: EvalCase = {
   id: 114,
   parts: [
@@ -675,19 +877,44 @@ const case114: EvalCase = {
   check(run) {
     const events = eventsAt(run);
     const row = verdictFor(events, 'Brassline', 'price');
+    const value = row?.check.newValue ?? '';
+    const amounts = numbersIn(value);
+    const quote = row?.check.newQuote ?? null;
+    const source = row?.nowSource ?? null;
     return [
       intentIs(events, 'recheck'),
       chosenIs(events, '2026-11-05'),
       verdictIs(events, 'Brassline', 'price', 'changed'),
-      ok('newValue contains 31', (row?.check.newValue ?? '').includes('31'), row?.check.newValue ?? null),
-      ok('newQuote is on the v2 page', quoteInPage(row?.check.newQuote ?? null, BRASSLINE_V2), row?.check.newQuote ?? null),
-      ok('the source is live', row?.nowSource?.live === true, row?.nowSource?.live ?? null),
-      numbersAllowed(run, events, [BRASSLINE_V2]),
+      ok(
+        'newValue is exactly 31 USD per month for Meter',
+        row !== undefined &&
+          amounts.length === 1 &&
+          Number(amounts[0]) === 31 &&
+          USD.test(value) &&
+          MONTHLY.test(value) &&
+          row.claim.scope.plan === 'Meter' &&
+          row.claim.scope.period === 'month' &&
+          row.claim.scope.currency === 'USD',
+        row?.check ?? null,
+      ),
+      ok(
+        'the quote holds 31 and comes from the live Brassline page',
+        quote !== null &&
+          /\b31\b/.test(quote) &&
+          !/\b310\b/.test(quote) &&
+          /Meter/.test(quote) &&
+          quoteInPage(quote, BRASSLINE_V2) &&
+          source !== null &&
+          source.url === BRASSLINE_PRICING &&
+          source.live === true,
+        { quote, url: source?.url ?? null, live: source?.live ?? null },
+      ),
+      numbersAllowed(run, events, sourcesFor(brasslineScenario, run)),
     ];
   },
 };
 
-// Spec case 16, without the original product's judge: the page timed out, so the answer must not call the price unchanged.
+// Spec case 16: the page timed out. The last verified day is not the day of the question.
 const case115: EvalCase = {
   id: 115,
   parts: [
@@ -713,6 +940,7 @@ const case115: EvalCase = {
               text: CINDERWELL_PAGE,
             },
           ],
+          CINDERWELL_VERIFIED_AT,
         );
       },
     ),
@@ -720,6 +948,18 @@ const case115: EvalCase = {
   check(run) {
     const events = eventsAt(run);
     const answer = shown(run);
+    const paired = sentencesOf(answer).some(
+      (sentence) =>
+        /Cinderwell/.test(sentence) &&
+        /Foundry/.test(sentence) &&
+        /\b44\b/.test(sentence) &&
+        /\bUSD\b/.test(sentence) &&
+        /month/.test(sentence) &&
+        namesDate(sentence, 6, 'Nov') &&
+        /\b2026\b/.test(sentence) &&
+        /page/i.test(sentence) &&
+        /could not be fetched|could not be reached|timed out|unavailable/i.test(sentence),
+    );
     return [
       intentIs(events, 'recheck'),
       chosenIs(events, '2026-11-10'),
@@ -729,20 +969,14 @@ const case115: EvalCase = {
         turnOf(run, 0, 0).log.some((call) => call.kind === 'fetchPage' && call.url === CINDERWELL_PRICING),
         turnOf(run, 0, 0).log,
       ),
-      ok(
-        'answer says the page could not be reached',
-        /could not be fetched|could not be reached|timed out|unavailable/i.test(answer),
-        answer,
-      ),
-      ok('answer gives the last verified value', /\b44\b/.test(answer), answer),
-      ok('answer gives that value\'s date', namesDate(answer, 10, 'Nov'), answer),
-      ok('answer does not say no change about Cinderwell', !claimsNoChangeAbout(answer, /Cinderwell/), answer),
-      numbersAllowed(run, events, []),
+      ok('Cinderwell Foundry pairs 44 USD/month with 6 Nov and the failed fetch', paired, answer),
+      ok('answer does not say the price still holds', !stillHolds(answer), answer),
+      numbersAllowed(run, events, sourcesFor(cinderwellScenario, run)),
     ];
   },
 };
 
-// Spec case 15: a third-party page that still shows the old price must not produce unchanged.
+// Brief: the only page is a third-party note, so the verdict cannot affirm a replacement.
 const case116: EvalCase = {
   id: 116,
   parts: [
@@ -776,21 +1010,26 @@ const case116: EvalCase = {
   check(run) {
     const events = eventsAt(run);
     const row = verdictFor(events, 'Hearthmail', 'price');
+    const verdict = row?.check.verdict;
+    const nonAffirmative = verdict === 'unverifiable' || verdict === 'source_unavailable';
     return [
       intentIs(events, 'recheck'),
       chosenIs(events, '2026-11-04'),
-      verdictIs(events, 'Hearthmail', 'price', 'changed'),
-      ok('newValue contains 21', (row?.check.newValue ?? '').includes('21'), row?.check.newValue ?? null),
-      ok('newQuote is on the vendor page', quoteInPage(row?.check.newQuote ?? null, HEARTHMAIL_V2), row?.check.newQuote ?? null),
-      ok('the source is the vendor page', row?.nowSource?.url === HEARTHMAIL_PRICING, row?.nowSource?.url ?? null),
-      ok('the source is live', row?.nowSource?.live === true, row?.nowSource?.live ?? null),
+      ok('verdict is unverifiable or source_unavailable', nonAffirmative, verdict ?? null),
+      ok('newValue is null', row?.check.newValue === null, row?.check.newValue ?? null),
+      ok('there is no verified replacement', row?.nowSource === null, row?.nowSource?.url ?? null),
       ok('decidedBy is not fast_path', row !== undefined && row.check.decidedBy !== 'fast_path', row?.check.decidedBy ?? null),
-      numbersAllowed(run, events, [HEARTHMAIL_V2, HEARTHMAIL_BLOG]),
+      ok(
+        'the vendor page was not fetched',
+        !turnOf(run, 0, 0).log.some((call) => call.kind === 'fetchPage' && call.url === HEARTHMAIL_PRICING),
+        turnOf(run, 0, 0).log,
+      ),
+      numbersAllowed(run, events, sourcesFor(hearthmailScenario, run)),
     ];
   },
 };
 
-// Spec case 1's news rule: a post on or after the asked day is reported with its date; an older post is not "since" that day.
+// Spec case 1's news rule: both products are one Monday exchange, and only news on or after that day is reported.
 const case117: EvalCase = {
   id: 117,
   parts: [
@@ -801,10 +1040,10 @@ const case117: EvalCase = {
         seedExchange(
           store,
           ist('2026-11-09', '2026-11-09T04:30:00.000Z'),
-          'What does Loomery\'s Studio plan cost?',
-          LOOMERY_QUOTE,
-          'Loomery',
-          ['Loomery'],
+          'What do the Loomery Studio and Palletory Studio plans cost?',
+          `${LOOMERY_QUOTE} ${PALLETORY_QUOTE}`,
+          'Loomery and Palletory',
+          ['Loomery', 'Palletory'],
           [
             {
               entity: 'Loomery',
@@ -815,16 +1054,6 @@ const case117: EvalCase = {
               url: LOOMERY_PRICING,
               text: LOOMERY_PAGE,
             },
-          ],
-        );
-        seedExchange(
-          store,
-          ist('2026-11-09', '2026-11-09T05:30:00.000Z'),
-          'What does Palletory\'s Studio plan cost?',
-          PALLETORY_QUOTE,
-          'Palletory',
-          ['Palletory'],
-          [
             {
               entity: 'Palletory',
               attribute: 'price',
@@ -842,11 +1071,10 @@ const case117: EvalCase = {
   check(run) {
     const events = eventsAt(run);
     const answer = shown(run);
-    const news = turnOf(run, 0, 0).log.filter(
-      (call) => call.kind === 'search' && call.query.toLowerCase().includes('news'),
-    );
     const entities = verdictsOf(events).map((row) => row.claim.entity);
-    const oldAsSince = sentencesOf(answer).filter((sentence) => /barcode labels/i.test(sentence) && /\bsince\b/i.test(sentence));
+    const passage = sentencesOf(answer).some(
+      (sentence) => /shared drafts/i.test(sentence) && namesDate(sentence, 12, 'Nov') && citesUrl(sentence, events, LOOMERY_CHANGELOG),
+    );
     return [
       intentIs(events, 'recheck'),
       chosenIs(events, '2026-11-09'),
@@ -857,14 +1085,16 @@ const case117: EvalCase = {
         entities.length === 2 && entities.includes('Loomery') && entities.includes('Palletory'),
         entities,
       ),
+      ok('Loomery news was searched from the asked day', newsSearch(run, 'Loomery'), turnOf(run, 0, 0).log),
+      ok('Palletory news was searched from the asked day', newsSearch(run, 'Palletory'), turnOf(run, 0, 0).log),
+      ok('shared drafts and 12 Nov cite the Loomery changelog', passage, answer),
+      ok('the 2 Nov Palletory post is not in the answer', !/barcode labels/i.test(answer), answer),
       ok(
-        'a news search is bounded to the asked day',
-        news.some((call) => call.kind === 'search' && call.publishedOnOrAfter === '2026-11-09'),
-        news,
+        'dated news does not cite the Palletory changelog',
+        !ofType(events, 'citations').some((event) => event.items.some((item) => item.url === PALLETORY_CHANGELOG)),
+        ofType(events, 'citations'),
       ),
-      ok('the 12 Nov post is reported with its date', /shared drafts/i.test(answer) && namesDate(answer, 12, 'Nov'), answer),
-      ok('the older post is not reported as since that day', oldAsSince.length === 0, oldAsSince),
-      numbersAllowed(run, events, [LOOMERY_PAGE, PALLETORY_PAGE, LOOMERY_NEWS]),
+      numbersAllowed(run, events, sourcesFor(newsScenario, run)),
     ];
   },
 };
@@ -876,13 +1106,23 @@ const case118: EvalCase = {
   judges: ['J1'],
   check(run) {
     const events = eventsAt(run);
-    const answer = shown(run);
+    const writer = writerTextOf(run, events);
+    const recall = recallOf(events);
     return [
+      intentIs(events, 'recheck'),
+      ok(
+        'date lookup is empty',
+        recall !== undefined && recall.candidates.dates.length === 0 && recall.candidates.range === null,
+        recall?.candidates ?? null,
+      ),
+      ok('recall hits are empty', (recall?.hits.length ?? -1) === 0, recall?.hits.length ?? null),
       noVerdicts(events),
-      ok('recall does not claim a stored hit', (recallOf(events)?.hits.length ?? 0) === 0, recallOf(events)?.hits.length ?? null),
-      ok('answer does not say a price is unchanged', !claimsNoChangeAbout(answer, /price|plan|that/i), answer),
+      ok('answer says what it cannot identify', saysItCannotIdentify(writer), writer),
+      ok('answer asks which earlier answer or claim to check', asksWhichToCheck(writer), writer),
+      ok('answer does not claim a completed check', !claimsACompletedCheck(writer), writer),
+      ok('answer names no lookup date', !namesALookupDate(writer), writer),
       ...judgeSaysNo(run, 'J1'),
-      numbersAllowed(run, events, []),
+      numbersAllowed(run, events, sourcesFor(emptyScenario, run)),
     ];
   },
 };
@@ -920,17 +1160,21 @@ const case119: EvalCase = {
   check(run) {
     const events = eventsAt(run);
     const row = verdictFor(events, 'Vellumstack', 'price');
-    const changedToAnnual = row?.check.verdict === 'changed' && /\b480\b/.test(row.check.newValue ?? '');
-    const periodReason = /period|month|annual|year/i.test(row?.check.reason ?? '');
+    const reason = row?.check.reason ?? '';
+    const originalId = row?.claim.id;
+    const superseding = originalId === undefined ? [] : allClaims(run.store).filter((claim) => claim.supersedesId === originalId);
     return [
       intentIs(events, 'recheck'),
       chosenIs(events, '2026-11-12'),
       ok(
-        'Vellumstack Pro is unverifiable rather than changed to the annual figure',
-        row?.check.verdict === 'unverifiable' && periodReason && !changedToAnnual,
+        'the reason distinguishes annual-only evidence from the monthly claim',
+        row?.check.verdict === 'unverifiable' && /(?:annual|annually|\byear\b)/i.test(reason) && /month/i.test(reason),
         row?.check ?? null,
       ),
-      numbersAllowed(run, events, [VELLUMSTACK_V2]),
+      ok('replacement value is null', row?.check.newValue === null, row?.check.newValue ?? null),
+      ok('no new claim supersedes the monthly claim', superseding.length === 0, superseding.map((claim) => claim.value)),
+      ok('the verdict is not changed to 480', row?.check.verdict !== 'changed' && !/\b480\b/.test(row?.check.newValue ?? ''), row?.check.newValue ?? null),
+      numbersAllowed(run, events, sourcesFor(vellumstackScenario, run)),
     ];
   },
 };

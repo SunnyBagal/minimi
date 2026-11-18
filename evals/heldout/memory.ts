@@ -33,7 +33,11 @@ export function ist(localDate: string, createdAtUtc: string): HeldoutWhen {
   return { localDate, createdAtUtc, tz: 'Asia/Kolkata' };
 }
 
-/** One user question, the assistant answer, and the claims that answer stored. */
+/**
+ * One user question, the assistant answer, and the claims that answer stored.
+ * `lastVerifiedAtUtc` defaults to the exchange time. Pass another instant when
+ * the last verification day must differ from the question's local date.
+ */
 export function seedExchange(
   store: MemoryStore,
   when: HeldoutWhen,
@@ -42,6 +46,7 @@ export function seedExchange(
   topic: string,
   entities: string[],
   claims: readonly HeldoutClaim[],
+  lastVerifiedAtUtc?: string,
 ): void {
   const base = {
     sessionId: SESSION,
@@ -97,7 +102,7 @@ export function seedExchange(
       quote: claim.quote,
       asOfUtc: when.createdAtUtc,
       volatility: claim.volatility ?? 'high',
-      lastVerifiedAtUtc: when.createdAtUtc,
+      lastVerifiedAtUtc: lastVerifiedAtUtc ?? when.createdAtUtc,
       supersedesId: null,
     });
   }

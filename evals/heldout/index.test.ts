@@ -6,10 +6,12 @@ import { defaultConfig } from '../../src/core/config';
 import { containsQuote } from '../../src/core/search/quote';
 import { createStore } from '../../src/core/store/index';
 import { FakeClock } from '../../src/core/testing/fakes';
-import { numbersIn } from '../assert';
-import { FixtureSearch } from '../fixtureSearch';
-import { CLOCK } from '../types';
+import { formatLocalDate, numbersIn } from '../assert';
+import { FixtureSearch, type FixtureCall, type FixtureScenario } from '../fixtureSearch';
+import { CLOCK, TZ } from '../types';
 import { HELDOUT_CASES } from './index';
+import { hearthmailScenario } from './scenarios';
+import { servedEvidence } from './served';
 
 const heldoutDir = join(import.meta.dirname, '.');
 
@@ -54,6 +56,19 @@ describe('held-out cases', () => {
     const vendorSource = store.getSources([vendor?.sourceId ?? ''])[0];
     expect(vendorSource?.firstParty).toBe(true);
     expect(vendorSource?.url).toBe('https://ivyledger.test/pricing');
+    const loomery = claims.find((claim) => claim.entity === 'Loomery');
+    const palletory = claims.find((claim) => claim.entity === 'Palletory');
+    expect(loomery?.turnId).toBeDefined();
+    expect(loomery?.turnId).toBe(palletory?.turnId);
+    const cinderwell = claims.find((claim) => claim.entity === 'Cinderwell');
+    expect(formatLocalDate(cinderwell?.asOfUtc ?? '', TZ)).toBe('2026-11-10');
+    expect(formatLocalDate(cinderwell?.lastVerifiedAtUtc ?? '', TZ)).toBe('2026-11-06');
+    const fifth = store.findTurns({ dates: ['2026-11-05'], excludeTurnIds: [], limit: 50 });
+    expect(fifth.some((hit) => hit.userTurn.content === 'Where is the spare kiln key kept?')).toBe(true);
+    expect(Object.keys(hearthmailScenario.pages)).toEqual(['https://reviewdesk.test/notes/hearthmail']);
+    expect(hearthmailScenario.searches.flatMap((entry) => entry.results.map((result) => result.url))).toEqual([
+      'https://reviewdesk.test/notes/hearthmail',
+    ]);
   });
 
   it('serves a held-out page from inline text', async () => {
@@ -65,6 +80,61 @@ describe('held-out cases', () => {
     expect(page.status).toBe('ok');
     expect(page.live).toBe(true);
     expect(page.text).toContain('36 USD per month');
+  });
+
+  it('licenses kept news and fetched inline text, not a dropped or failed page', () => {
+    const scenario: FixtureScenario = {
+      pages: {
+        'https://loomery.test/changelog': { text: '12 Nov 2026: Loomery shipped shared drafts.' },
+        'https://cinderwell.test/pricing': { failure: 'timeout' },
+      },
+      searches: [
+        {
+          match: 'loomery news',
+          results: [
+            {
+              url: 'https://loomery.test/changelog',
+              title: 'loomery.test',
+              publishedAt: '2026-11-12T04:00:00.000Z',
+              text: '12 Nov 2026: Loomery shipped shared drafts.',
+            },
+          ],
+        },
+        {
+          match: 'palletory news',
+          results: [
+            {
+              url: 'https://palletory.test/changelog',
+              title: 'palletory.test',
+              publishedAt: '2026-11-02T04:00:00.000Z',
+              text: '2 Nov 2026: Palletory added barcode labels.',
+            },
+          ],
+        },
+        {
+          match: 'undated news',
+          results: [
+            {
+              url: 'https://loomery.test/changelog',
+              title: 'loomery.test',
+              publishedAt: null,
+              text: 'Undated note.',
+            },
+          ],
+        },
+      ],
+    };
+    const calls: FixtureCall[] = [
+      { kind: 'search', query: 'Loomery news', numResults: 5, publishedOnOrAfter: '2026-11-09' },
+      { kind: 'search', query: 'Palletory news', numResults: 5, publishedOnOrAfter: '2026-11-09' },
+      { kind: 'search', query: 'undated news', numResults: 5, publishedOnOrAfter: '2026-11-09' },
+      { kind: 'fetchPage', url: 'https://loomery.test/changelog', deadlineMs: 1000 },
+      { kind: 'fetchPage', url: 'https://cinderwell.test/pricing', deadlineMs: 1000 },
+    ];
+    const texts = servedEvidence(scenario, calls, TZ).join('\n');
+    expect(texts).toContain('shared drafts');
+    expect(texts).not.toContain('barcode');
+    expect(texts).not.toContain('Undated');
   });
 
   it('does not reuse the scripted set\'s vendors or the 3/11 date', () => {

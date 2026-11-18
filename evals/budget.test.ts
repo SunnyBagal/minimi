@@ -197,6 +197,17 @@ describe('SpendMeter', () => {
       await meter.settle();
       expect(meter.incomplete).toBe(reason);
     }
+    // Out-of-order sequences stay incomplete even when later frames look valid.
+    const start = 'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}\n\n';
+    const delta = 'data: {"type":"message_delta","usage":{"output_tokens":10}}\n\n';
+    const stop = 'data: {"type":"message_stop"}\n\n';
+    for (const body of [delta + start + stop, start + delta + stop + delta, start + stop + delta + stop]) {
+      const meter = new SpendMeter(100);
+      await (await meter.wrap((async () => sseResponse(body)) as typeof fetch)(URL_MESSAGES, sonnetBody(100))).text();
+      await meter.settle();
+      expect(meter.incomplete).not.toBeNull();
+      expect(meter.exhausted()).toBe(true);
+    }
     // An explicit zero input count is valid.
     const zeroInput = new SpendMeter(100);
     const ok =
@@ -215,7 +226,7 @@ describe('SpendMeter', () => {
     const fetched = meter.wrap((async () => sseResponse(body)) as typeof fetch);
     await (await fetched(URL_MESSAGES, sonnetBody(100))).text();
     await meter.settle();
-    expect(meter.incomplete).toBe('a stream ended without final usage');
+    expect(meter.incomplete).toBe('a stream stopped before its final usage');
   });
 
   it('marks a successful response with no body, or JSON without both counts, as incomplete', async () => {

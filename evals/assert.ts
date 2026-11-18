@@ -94,6 +94,9 @@ function mentionsIn(clause: string, entity: RegExp, others: RegExp | undefined):
 }
 
 /** Between two coordinated names: the rest of the first name (capitalised tails such as "PG"), then a joiner. */
+/** Only the rest of a name (capitalised tails such as "PG"), a joiner or end punctuation. */
+const NAME_TAIL_ONLY = /^(?:\s+[A-Z][\w.-]*)*\s*(?:,|and|&|, and|[.!?])?\s*$/;
+
 const COORDINATION_GAP = /^(?:\s+[A-Z][\w.-]*)*\s*(?:,|and|&|, and)\s*(?:the\s+)?$/;
 
 /**
@@ -132,6 +135,10 @@ function subjectsAfter(clause: string, mentions: Mention[], from: number): Subje
     const current = after[index];
     if (previous === undefined || current === undefined) break;
     if (!COORDINATION_GAP.test(clause.slice(previous.end, current.start))) break;
+    // A name followed by its own predicate ("... and Northwind PG timed out") is not coordinated to the phrase.
+    const next = after[index + 1];
+    const rest = clause.slice(current.end, next === undefined ? clause.length : next.start);
+    if (!NAME_TAIL_ONLY.test(rest)) break;
     subjects.push(current.subject);
   }
   return subjects;

@@ -119,17 +119,28 @@ function mergeUsage(into: Usage, raw: unknown): boolean {
 export class SseUsageReader {
   readonly usage: Usage = emptyUsage();
   sawUsage = false;
-  /** message_start arrived and reported an input count (zero is valid). */
-  sawStartInput = false;
-  /** A message_delta reported the output total. */
-  sawFinalUsage = false;
-  /** message_stop arrived after the final usage. */
-  sawStop = false;
-  /** message_stop arrived before any final usage. */
-  stopBeforeUsage = false;
+  /** The first ordering problem seen; latched, later frames cannot clear it. */
+  sequenceError: string | null = null;
   /** The stream carried an `error` event. */
   sawError = false;
+  /** Where the accounting sequence is: start, then deltas, then stop, then nothing. */
+  private phase: 'before-start' | 'started' | 'final-usage' | 'stopped' = 'before-start';
   private buffer = '';
+
+  /** True when the stream was well ordered and complete: start with input, a final output total, then stop. */
+  get complete(): boolean {
+    return this.sequenceError === null && !this.sawError && this.phase === 'stopped';
+  }
+
+  /** Why the stream is not complete, or null. */
+  get problem(): string | null {
+    if (this.sawError) return 'a stream carried an error event';
+    if (this.sequenceError !== null) return this.sequenceError;
+    if (this.phase === 'before-start') return 'a stream did not report its input tokens at message_start';
+    if (this.phase === 'started') return 'a stream ended without final usage';
+    if (this.phase === 'final-usage') return 'a stream ended without message_stop';
+    return null;
+  }
 
   push(chunk: string): void {
     this.buffer += chunk;
@@ -143,6 +154,10 @@ export class SseUsageReader {
     this.buffer = '';
   }
 
+  private fail(reason: string): void {
+    if (this.sequenceError === null) this.sequenceError = reason;
+  }
+
   private line(line: string): void {
     if (!line.startsWith('data:')) return;
     let event: { type?: string; message?: { usage?: unknown }; usage?: unknown };
@@ -154,14 +169,19 @@ export class SseUsageReader {
     if (event.type === 'message_start') {
       if (mergeUsage(this.usage, event.message?.usage)) this.sawUsage = true;
       const input = (event.message?.usage as Record<string, unknown> | undefined)?.input_tokens;
-      if (typeof input === 'number') this.sawStartInput = true;
+      if (this.phase !== 'before-start') this.fail('a stream sent message_start more than once or out of order');
+      else if (typeof input !== 'number') this.fail('a stream did not report its input tokens at message_start');
+      else this.phase = 'started';
     } else if (event.type === 'message_delta') {
       if (mergeUsage(this.usage, event.usage)) this.sawUsage = true;
       const output = (event.usage as Record<string, unknown> | undefined)?.output_tokens;
-      if (typeof output === 'number') this.sawFinalUsage = true;
+      if (this.phase === 'before-start') this.fail('a stream sent message_delta before message_start');
+      else if (this.phase === 'stopped') this.fail('a stream sent message_delta after message_stop');
+      else if (typeof output === 'number') this.phase = 'final-usage';
     } else if (event.type === 'message_stop') {
-      if (this.sawFinalUsage) this.sawStop = true;
-      else this.stopBeforeUsage = true;
+      if (this.phase === 'final-usage') this.phase = 'stopped';
+      else if (this.phase === 'stopped') this.fail('a stream sent message_stop more than once');
+      else this.fail('a stream stopped before its final usage');
     } else if (event.type === 'error') {
       this.sawError = true;
     }
@@ -337,14 +357,8 @@ export class SpendMeter {
       }
       if (streaming) {
         sse.end();
-        if (sse.sawError) this.markIncomplete('a stream carried an error event');
-        else if (!sse.sawStartInput) this.markIncomplete('a stream did not report its input tokens at message_start');
-        else if (!sse.sawFinalUsage) this.markIncomplete('a stream ended without final usage');
-        else if (!sse.sawStop) {
-          this.markIncomplete(
-            sse.stopBeforeUsage ? 'a stream stopped before its final usage' : 'a stream ended without message_stop',
-          );
-        }
+        const problem = sse.problem;
+        if (problem !== null) this.markIncomplete(problem);
         return this.record(model, sse.usage);
       }
       const parsed = JSON.parse(text) as { usage?: Record<string, unknown>; model?: unknown };

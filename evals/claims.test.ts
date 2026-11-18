@@ -77,3 +77,10 @@ describe('claimsNoChangeAbout: every phrase, names on either side', () => {
     expect(claimsNoChangeAbout('Basalt DB is unchanged and Northwind PG timed out.', /northwind/i, /basalt/i)).toBe(false);
   });
 });
+
+describe('claimsNoChangeAbout: a name with its own predicate after the phrase', () => {
+  it('does not give the phrase to a later name that has its own verb', () => {
+    expect(claimsNoChangeAbout('No change for Basalt DB and Northwind PG timed out.', /northwind/i, /basalt/i)).toBe(false);
+    expect(claimsNoChangeAbout('No change for Basalt DB and Northwind PG.', /northwind/i, /basalt/i)).toBe(true);
+  });
+});

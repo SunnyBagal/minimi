@@ -5,6 +5,7 @@ import { InMemoryStore } from '../testing/inMemoryStore';
 import { defaultConfig } from '../config';
 import { runTurn } from './runTurn';
 import { assistantTurn, claim, lastAssistant, plan, rig, source, textOf, types, userTurn, NOW, SESSION, TZ } from './testSupport';
+import { recallHeadline } from '../recallHeadline';
 
 const SELF_MSG = 'On Monday we shortlisted 5 CRM tools for a 20-person sales team. Has any of them changed pricing or shipped something big since?';
 const WEEKDAY_1_BARE = { kind: 'weekday', weekday: 1, modifier: 'bare' } as const;
@@ -71,7 +72,7 @@ describe('recall', () => {
     expect(events.filter((e) => e.type === 'verdict')).toHaveLength(0);
   });
 
-  it('the recall line is built by code from the stored user turn', async () => {
+  it('the recalled question is a structured field on the recall event, not repeated in the answer text', async () => {
     const store = new InMemoryStore();
     userTurn(store, { content: 'Tell me about Postgres hosting.', localDate: '2026-11-10', createdAtUtc: '2026-11-10T08:35:00.000Z', topic: 'Postgres' });
     assistantTurn(store, { localDate: '2026-11-10', topic: 'Postgres' });
@@ -81,12 +82,16 @@ describe('recall', () => {
       llm: { route: plan({ intent: 'recall', timeRef: { kind: 'weekday', weekday: 2, modifier: 'last' }, topic: 'Postgres' }) },
     });
     const events = await run({ message: 'last Tuesday I asked about Postgres' });
-    const text = textOf(events);
-    expect(text).toContain('you asked: "Tell me about Postgres hosting."');
-    expect(text).toContain('On ');
+    const asked = recallEvent(events).asked;
+    expect(asked).toMatchObject({
+      question: 'Tell me about Postgres hosting.',
+      createdAtUtc: '2026-11-10T08:35:00.000Z',
+      origin: 'live',
+    });
+    expect(textOf(events)).not.toContain('you asked');
   });
 
-  it('the recall line marks seeded history and a different zone', async () => {
+  it('the recalled question keeps its origin and zone, and the headline marks seeded history and a different zone', async () => {
     const store = new InMemoryStore();
     userTurn(store, { content: 'seeded question', localDate: '2026-11-10', origin: 'seed', tz: 'America/New_York', createdAtUtc: '2026-11-10T14:00:00.000Z' });
     assistantTurn(store, { localDate: '2026-11-10' });
@@ -96,9 +101,13 @@ describe('recall', () => {
       llm: { route: plan({ intent: 'recall', timeRef: { kind: 'named', name: 'today' } }) },
     });
     const events = await run({ message: 'what did I ask today' });
-    const text = textOf(events);
-    expect(text).toContain('(America/New_York)');
-    expect(text).toContain('(seeded demo history)');
+    const asked = recallEvent(events).asked;
+    expect(asked).toMatchObject({ question: 'seeded question', origin: 'seed', tz: 'America/New_York' });
+    if (asked === undefined || asked === null) throw new Error('no asked');
+    const line = recallHeadline(asked, (utc, tz) => `${utc} in ${tz}`, 'Asia/Kolkata');
+    expect(line).toContain('(America/New_York)');
+    expect(line).toContain('(seeded demo history)');
+    expect(line).toContain('you asked: "seeded question".');
   });
 
   it('event order: no record', async () => {
@@ -118,6 +127,26 @@ describe('recall', () => {
     const recalled = recallEvent(events);
     expect(recalled.hits).toEqual([]);
     expect(recalled.chosen).toBeNull();
+    expect(recalled.asked).toBeNull();
+    expect(recalled.nearest).toEqual([]);
+  });
+
+  it('no record: the recall event carries the nearest turns handed to the writer', async () => {
+    const store = new InMemoryStore();
+    userTurn(store, { content: 'Postgres hosting prices?', localDate: '2026-11-05', createdAtUtc: '2026-11-05T09:00:00.000Z', topic: 'Postgres hosting' });
+    assistantTurn(store, { localDate: '2026-11-05', topic: 'Postgres hosting' });
+    const { run } = rig({
+      store,
+      llm: {
+        route: plan({ intent: 'recall', timeRef: { kind: 'weekday', weekday: 2, modifier: 'last' }, topic: 'Postgres hosting' }),
+        write: ['Nothing on that day.'],
+      },
+      timeTable: [{ ref: { kind: 'weekday', weekday: 2, modifier: 'last' }, result: { dates: ['2026-11-10'], range: null, ambiguous: false, rule: 'last Tuesday' } }],
+    });
+    const events = await run({ message: 'last Tuesday I asked about Postgres hosting' });
+    const recalled = recallEvent(events);
+    expect(recalled.hits).toEqual([]);
+    expect(recalled.nearest?.map((hit) => hit.userTurn.localDate)).toContain('2026-11-05');
   });
 
   it('every findTurns and nearestTurns call passes currentId', async () => {
@@ -213,9 +242,8 @@ describe('recall', () => {
       llm: { route: plan({ intent: 'recall', timeRef: { kind: 'named', name: 'today' }, topic: 'Postgres' }) },
     });
     const events = await run({ message: 'what did I ask today about Postgres' });
-    const text = textOf(events);
-    expect(text).toContain('you asked: "What about Postgres hosting?"');
-    expect(text).not.toContain('Totally unrelated');
+    expect(recallEvent(events).asked?.question).toBe('What about Postgres hosting?');
+    expect(textOf(events)).not.toContain('Totally unrelated');
   });
 
   it('refersToPrevious finds the last assistant turn without a time ref', async () => {

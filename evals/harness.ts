@@ -14,7 +14,8 @@ import { guardVerdict } from '../src/core/pipeline/guards';
 import { createStore } from '../src/core/store/index';
 import { FakeClock, FakeLlm, fakeTime, passThroughGuard } from '../src/core/testing/fakes';
 import { time } from '../src/core/time/index';
-import { answerOf, literalAssertions } from './assert';
+import { allClaims, literalAssertions, shownAnswerOf } from './assert';
+import { RecordingLlm } from './recordingLlm';
 import { scoredPass } from './score';
 import { FixtureSearch } from './fixtureSearch';
 import { askJudge, type JudgeAnswer } from './judge';
@@ -26,12 +27,38 @@ export interface HarnessOptions {
   selftest: boolean;
   /** Real-model path. Ignored during selftest. */
   apiKey?: string;
+  /** The fetch the model client uses; the runner passes a spend-metering one. */
+  fetch?: typeof fetch;
+}
+
+/** Everything a failed run needs for diagnosis: each turn's events and every stored claim. */
+export interface RunTrace {
+  parts: {
+    tz: string;
+    turns: { message: string; answerText: string; modelText: string; events: AgentEvent[] }[];
+  }[];
+  claims: {
+    id: string;
+    turnId: string;
+    entity: string;
+    attribute: string;
+    value: string;
+    quote: string;
+    supersedesId: string | null;
+  }[];
 }
 
 export interface HarnessResult {
   assertions: Assertion[];
   judge: JudgeAnswer[] | null;
   passed: boolean;
+  /** Absent from stub harnesses in tests. */
+  trace?: RunTrace;
+}
+
+/** Text deltas are in `answerText`; status and timing events carry nothing to diagnose. */
+function keptEvents(events: AgentEvent[]): AgentEvent[] {
+  return events.filter((event) => event.type !== 'text' && event.type !== 'status' && event.type !== 'timing');
 }
 
 async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]> {
@@ -40,17 +67,20 @@ async function collect(events: AsyncIterable<AgentEvent>): Promise<AgentEvent[]>
   return out;
 }
 
-function answerText(events: AgentEvent[]): string {
-  return answerOf(events);
+/** What the user sees: the recall card's headline, then the streamed text. */
+function answerText(events: AgentEvent[], tz: string): string {
+  return shownAnswerOf(events, tz);
 }
 
 export async function runHarness(evalCase: EvalCase, options: HarnessOptions): Promise<HarnessResult> {
   const clock = new FakeClock(evalCase.parts[0]?.clock ?? '2026-11-13T13:00:00.000Z');
   const dir = mkdtempSync(join(tmpdir(), 'minimi-eval-'));
   const store = createStore(join(dir, 'store.db'), clock, defaultConfig);
-  const llm: Llm = options.selftest
+  const innerLlm: Llm = options.selftest
     ? new FakeLlm(selftestScript(evalCase.id))
-    : createLlm(options.apiKey ?? '', defaultConfig);
+    : createLlm(options.apiKey ?? '', defaultConfig, options.fetch !== undefined ? { fetch: options.fetch } : {});
+  // Records the writer's own output per turn: the provenance the number checks use.
+  const llm = new RecordingLlm(innerLlm);
   const depsTime = options.selftest ? fakeTime(selftestTime(evalCase.id)) : time;
   const depsGuard = options.selftest ? passThroughGuard : guardVerdict;
 
@@ -74,11 +104,14 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
     const traces: TurnTrace[] = [];
     for (const message of part.messages) {
       const mark = search.log.length;
+      llm.startTurn();
       const events = await collect(runTurn({ sessionId, message, tz: part.tz }, deps));
+      const modelText = llm.endTurn();
       traces.push({
         message,
         events,
-        answerText: answerText(events),
+        answerText: answerText(events, part.tz),
+        modelText,
         log: search.log.slice(mark),
       });
     }
@@ -96,5 +129,25 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
 
   const run: CaseRun = { parts, store, judge };
   const assertions = [...evalCase.check(run), ...literalAssertions(run)];
-  return { assertions, judge, passed: scoredPass(assertions) };
+  const trace: RunTrace = {
+    parts: parts.map((part) => ({
+      tz: part.tz,
+      turns: part.traces.map((turn) => ({
+        message: turn.message,
+        answerText: turn.answerText,
+        modelText: turn.modelText ?? '',
+        events: keptEvents(turn.events),
+      })),
+    })),
+    claims: allClaims(store).map((claim) => ({
+      id: claim.id,
+      turnId: claim.turnId,
+      entity: claim.entity,
+      attribute: claim.attribute,
+      value: claim.value,
+      quote: claim.quote,
+      supersedesId: claim.supersedesId ?? null,
+    })),
+  };
+  return { assertions, judge, passed: scoredPass(assertions), trace };
 }

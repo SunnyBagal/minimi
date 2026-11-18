@@ -765,6 +765,11 @@ mark.uncited small {
   color: var(--ink-muted);
 }
 
+.recall-asked {
+  margin-top: 4px;
+  color: var(--ink);
+}
+
 .recall-others {
   color: var(--ink-muted);
 }

@@ -1,4 +1,4 @@
-import { judgeSaysNo, numbersAllowed, ok, verdictIs } from '../assert';
+import { claimsNoChangeAbout, judgeSaysNo, numbersAllowed, ok, verdictIs } from '../assert';
 import { MSG_CASE_3 } from '../messages';
 import { scenarioNorthwindTimeout } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
@@ -12,7 +12,8 @@ export const evalCase: EvalCase = {
     const answer = run.parts[0]?.traces[0]?.answerText ?? '';
     const reached = /could not|couldn't|timed out|unavailable|not reach|not be reached/i.test(answer);
     const lastValue = answer.includes('19') && /10 Nov|Nov/.test(answer);
-    const saysNoChange = /northwind[\s\S]{0,80}no change|no change[\s\S]{0,80}northwind|unchanged/i.test(answer);
+    // Scoped to sentences about Northwind: "Basalt DB is unchanged" is not a claim about Northwind.
+    const saysNoChange = claimsNoChangeAbout(answer, /northwind/i, /basalt/i);
     return [
       verdictIs(events, 'Northwind PG', 'price', 'source_unavailable'),
       ok('answer says the page could not be reached', reached && /northwind/i.test(answer), answer),

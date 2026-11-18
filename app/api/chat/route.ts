@@ -79,7 +79,13 @@ export async function POST(request: Request): Promise<Response> {
             closeText();
             writer.write({
               type: 'data-recall',
-              data: { candidates: event.candidates, hits: event.hits, chosen: event.chosen },
+              data: {
+                candidates: event.candidates,
+                hits: event.hits,
+                chosen: event.chosen,
+                asked: event.asked ?? null,
+                ...(event.nearest !== undefined ? { nearest: event.nearest } : {}),
+              },
             });
             break;
           case 'verdict':

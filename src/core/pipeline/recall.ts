@@ -1,8 +1,9 @@
 /**
  * Recall and recheck share the first half: resolve which stored answer the
- * user means (a date ref or "the previous answer"), emit the recall event and
- * the code-built recall line, then either list the claims from memory or hand
- * off to the re-check.
+ * user means (a date ref or "the previous answer"), emit the recall event
+ * (which carries the chosen question as `asked`; the UI shows it above the
+ * answer, so the answer text does not repeat it), then either list the claims
+ * from memory or hand off to the re-check.
  *
  * Choosing: group the store's hits by their user turn's local date. When the
  * plan names a topic, only dates with a 'date+topic' hit qualify; otherwise
@@ -19,6 +20,7 @@ import type {
   Id,
   LocalDate,
   MemoryHit,
+  RecalledQuestion,
   Turn,
 } from '../contracts';
 import { noRecord } from './noRecord';
@@ -65,12 +67,15 @@ function datesWithHits(hits: MemoryHit[], withTopic: boolean): Map<LocalDate, Me
   return byDate;
 }
 
-/** The code-built "On <date> you asked: ..." line shown before the answer. */
-function recallLine(ctx: TurnContext, userTurn: Turn): string {
-  const when = ctx.time.formatLocal(userTurn.createdAtUtc, userTurn.tz);
-  const zoneNote = userTurn.tz !== ctx.tz ? ` (${userTurn.tz})` : '';
-  const seeded = userTurn.origin === 'seed' ? ' (seeded demo history)' : '';
-  return `On ${when}${zoneNote} you asked: "${userTurn.content}".${seeded}\n`;
+/** The chosen question as a structured field; the UI renders it with `recallHeadline`. */
+function askedOf(userTurn: Turn): RecalledQuestion {
+  return {
+    turnId: userTurn.id,
+    question: userTurn.content,
+    createdAtUtc: userTurn.createdAtUtc,
+    tz: userTurn.tz,
+    origin: userTurn.origin,
+  };
 }
 
 /** The code-built "which one do you mean?" question for an ambiguous match. */
@@ -170,7 +175,8 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
     }
   }
 
-  yield { type: 'recall', candidates, hits, chosen };
+  const asked = chosen !== null && chosenHit !== null ? askedOf(chosenHit.userTurn) : null;
+  yield { type: 'recall', candidates, hits, chosen, asked };
   yield doneResolve();
 
   if (chosen === null) {
@@ -180,8 +186,6 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
     ctx.saveAssistant({ intent: plan.intent, extraction: 'skipped', targetTurnIds: [] });
     return;
   }
-
-  if (chosenHit !== null) yield ctx.textEvent(recallLine(ctx, chosenHit.userTurn));
 
   if (referenced === null) {
     // The chosen question has no stored answer: nothing to check.

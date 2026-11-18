@@ -3,6 +3,7 @@
  */
 import type { AgentEvent, Claim, MemoryStore, Verdict, VerdictRow } from '../src/core/contracts';
 import { containsQuote } from '../src/core/search/index';
+import { recallHeadline } from '../src/core/recallHeadline';
 import { formatLocal } from '../src/core/time/format';
 import type { JudgeAnswer, JudgeId } from './judge';
 import { TZ, type Assertion, type CaseRun, type TurnTrace } from './types';
@@ -30,6 +31,157 @@ export function answerOf(events: AgentEvent[]): string {
   return ofType(events, 'text')
     .map((event) => event.delta)
     .join('');
+}
+
+/**
+ * The recall card's headline ("On <date> you asked: ..."), built from the
+ * recall event's `asked` field with the same function the UI uses.
+ */
+export function headlineOf(events: AgentEvent[], viewerTz: string): string | null {
+  const asked = recallOf(events)?.asked ?? null;
+  return asked === null ? null : recallHeadline(asked, formatLocal, viewerTz);
+}
+
+/** What the user sees for a turn: the recall card's headline, then the streamed text. */
+export function shownAnswerOf(events: AgentEvent[], viewerTz: string): string {
+  const headline = headlineOf(events, viewerTz);
+  const text = answerOf(events);
+  return headline === null ? text : `${headline}\n${text}`;
+}
+
+/** Sentences of an answer, split at . ! ? before whitespace, and at line breaks. */
+export function sentencesOf(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== '');
+}
+
+const NO_CHANGE =
+  /\b(?:no change|unchanged|not changed|hasn't changed|has not changed|nothing has changed|still holds|still the same|same price)\b/i;
+const UNSURE = /\b(?:can't|cannot|can not|couldn't|could not|unable|not able|whether|unclear|not sure|unknown)\b/i;
+
+/** Clauses of a sentence, split at , ; : and at "but", "while", "whereas", "although". */
+function clausesOf(sentence: string): string[] {
+  return sentence
+    .split(/[,;:]|\s(?:but|while|whereas|although)\s/i)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause !== '');
+}
+
+/** A clause that opens by referring back to the current subject. */
+const BACK_REFERENCE = /^(?:it|its|it's|this|that|the price|the page|the plan|their|they)\b/i;
+
+type Subject = 'entity' | 'other';
+
+interface Mention {
+  subject: Subject;
+  start: number;
+  end: number;
+}
+
+function mentionsIn(clause: string, entity: RegExp, others: RegExp | undefined): Mention[] {
+  const found: Mention[] = [];
+  const scan = (pattern: RegExp, subject: Subject): void => {
+    const global = new RegExp(pattern.source, pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`);
+    for (const match of clause.matchAll(global)) {
+      found.push({ subject, start: match.index, end: match.index + match[0].length });
+    }
+  };
+  scan(entity, 'entity');
+  if (others !== undefined) scan(others, 'other');
+  return found.sort((a, b) => a.start - b.start);
+}
+
+/** Between two coordinated names: the rest of the first name (capitalised tails such as "PG"), then a joiner. */
+/** Only the rest of a name (capitalised tails such as "PG"), a joiner or end punctuation. */
+const NAME_TAIL_ONLY = /^(?:\s+[A-Z][\w.-]*)*\s*(?:,|and|&|, and|[.!?])?\s*$/;
+
+const COORDINATION_GAP = /^(?:\s+[A-Z][\w.-]*)*\s*(?:,|and|&|, and)\s*(?:the\s+)?$/;
+
+/**
+ * The subjects a phrase at `at` is about: the product named last before it,
+ * plus any named just before that and joined to it by "and", "&" or a comma
+ * ("Northwind PG and Basalt DB are unchanged"). Empty when nothing is named
+ * before the phrase.
+ */
+function subjectsBefore(clause: string, mentions: Mention[], at: number): Subject[] {
+  const before = mentions.filter((mention) => mention.end <= at);
+  const last = before.at(-1);
+  if (last === undefined) return [];
+  const subjects: Subject[] = [last.subject];
+  for (let index = before.length - 2; index >= 0; index -= 1) {
+    const current = before[index];
+    const next = before[index + 1];
+    if (current === undefined || next === undefined) break;
+    if (!COORDINATION_GAP.test(clause.slice(current.end, next.start))) break;
+    subjects.push(current.subject);
+  }
+  return subjects;
+}
+
+/**
+ * The subjects a phrase ending at `from` is about when nothing is named
+ * before it ("No change for Basalt DB and Northwind PG"): the first product
+ * named after it, plus any coordinated to it.
+ */
+function subjectsAfter(clause: string, mentions: Mention[], from: number): Subject[] {
+  const after = mentions.filter((mention) => mention.start >= from);
+  const first = after[0];
+  if (first === undefined) return [];
+  const subjects: Subject[] = [first.subject];
+  for (let index = 1; index < after.length; index += 1) {
+    const previous = after[index - 1];
+    const current = after[index];
+    if (previous === undefined || current === undefined) break;
+    if (!COORDINATION_GAP.test(clause.slice(previous.end, current.start))) break;
+    // A name followed by its own predicate ("... and Northwind PG timed out") is not coordinated to the phrase.
+    const next = after[index + 1];
+    const rest = clause.slice(current.end, next === undefined ? clause.length : next.start);
+    if (!NAME_TAIL_ONLY.test(rest)) break;
+    subjects.push(current.subject);
+  }
+  return subjects;
+}
+
+/**
+ * True when some clause asserts that nothing changed for the entity. Every
+ * no-change phrase in a clause is attributed separately: to the product named
+ * closest before it (with any products coordinated to that one by "and"),
+ * else to the first one named after it with its coordinated names ("no change
+ * for Basalt DB and Northwind PG"); with none named, a clause that opens with
+ * a back reference ("Its price is unchanged") belongs to the current subject,
+ * which carries across clauses that name no product. Naming one of `others`
+ * makes that the subject. Uncertainty ("can't say whether ... still holds")
+ * vetoes only its own clause. Prose this does not resolve is left to the
+ * case's semantic judge (J2).
+ */
+export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: RegExp): boolean {
+  const phrases = new RegExp(NO_CHANGE.source, 'gi');
+  let current: Subject | null = null;
+  for (const sentence of sentencesOf(answer)) {
+    for (const clause of clausesOf(sentence)) {
+      const mentions = mentionsIn(clause, entity, others);
+      if (!UNSURE.test(clause)) {
+        for (const phrase of clause.matchAll(phrases)) {
+          const named = subjectsBefore(clause, mentions, phrase.index);
+          const after = named.length > 0 ? [] : subjectsAfter(clause, mentions, phrase.index + phrase[0].length);
+          const subjects =
+            named.length > 0
+              ? named
+              : after.length > 0
+                ? after
+                : BACK_REFERENCE.test(clause) && current !== null
+                  ? [current]
+                  : [];
+          if (subjects.includes('entity')) return true;
+        }
+      }
+      const lastMention = mentions.at(-1);
+      if (lastMention !== undefined) current = lastMention.subject;
+    }
+  }
+  return false;
 }
 
 export function recallOf(events: AgentEvent[]): Extract<AgentEvent, { type: 'recall' }> | undefined {
@@ -114,35 +266,9 @@ export const LITERAL_NUMBERS_PREFIX =
 
 export const SCORED_NUMBERS_PREFIX = 'numbers are in the message, claims, rows or evidence';
 
-const SEARCH_FAILED_LINE =
-  "Search failed: I could not get any web results for this, so I can't give you current facts on it. Try again, or rephrase the question.";
-
-/** Whole lines the pipeline builds in code. Anchored to the fixed wording. */
-const CODE_LINE: readonly RegExp[] = [
-  /^On .+ you asked: ".*"\.(?: \(seeded demo history\))?$/,
-  /^I found more than one conversation that could match:$/,
-  /^Which one do you mean\?$/,
-  /^- .+?, \d{2}:\d{2} .+: ".*"$/,
-  /^- .+ \(as of .+; from memory, not re-checked\)$/,
-  /^Skipped \d+ lower-priority claim\(s\) over the limit of \d+: .+\.$/,
-  /^\(\d+ undated search result\(s\) were set aside\.\)$/,
-];
-
 const literalByRun = new WeakMap<CaseRun, Assertion[]>();
 
-function withoutChecked(answer: string): string {
-  return answer.replace(/^Checked [^\n]*\n?/gm, '');
-}
-
-/** Drops the code-built lines. The Checked line is removed by the caller. */
-export function withoutCodeBuiltLines(text: string): string {
-  return text
-    .split('\n')
-    .filter((line) => line !== SEARCH_FAILED_LINE && !CODE_LINE.some((pattern) => pattern.test(line)))
-    .join('\n');
-}
-
-function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], answer: string): Set<string> {
+function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[]): Set<string> {
   return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
     ...claimNumbers(allClaims(run.store)),
@@ -154,7 +280,6 @@ function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], answ
       ),
     ),
     ...sources.flatMap((text) => numbersIn(text)),
-    ...numbersIn(answer.match(/^Checked [^\n]*/gm)?.join(' ') ?? ''),
   ]);
 }
 
@@ -178,6 +303,8 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
       texts.push(hit.userTurn.localDate);
       texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
     }
+    // The no-record writer is given each nearest turn's local date and question, not its time.
+    for (const hit of recall.nearest ?? []) texts.push(hit.userTurn.localDate);
   }
   for (const row of verdictsOf(events)) {
     texts.push(formatLocal(row.claim.asOfUtc, zone));
@@ -197,25 +324,46 @@ export function literalAssertions(run: CaseRun): Assertion[] {
   return literalByRun.get(run) ?? [];
 }
 
+/** The writer's own text for the turn that produced `events`; all streamed text when no record exists. */
+function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
+  for (const part of run.parts) {
+    for (const trace of part.traces) {
+      if (trace.events === events && trace.modelText !== undefined) return trace.modelText;
+    }
+  }
+  return answerOf(events);
+}
+
 /**
- * Scored reading: code-built lines are not the model's numbers, and digits of
- * dates the system emitted are allowed. The spec's literal reading is recorded
- * beside it and does not decide `passed`.
+ * Both readings check only what the model's writer produced on the turn
+ * (`TurnTrace.modelText`, recorded by the harness). Text the app's code
+ * injected (the recall card's headline, the "Checked" line, memory rows,
+ * ambiguity choices, the undated-results note) is outside it by provenance,
+ * not by its wording, so a model sentence styled like one of those lines is
+ * still checked.
+ *
+ * Literal reading (the spec's subset check on the model's text): every digit,
+ * list markers and citation digits included, must appear in the message,
+ * claims, verdict rows or evidence. Recorded; it does not decide `passed`.
+ *
+ * Scored reading: as literal, plus line-start list markers and digits inside
+ * `[n]` are skipped (the `validateAnswer` rules), and digits of dates the
+ * system emitted on this turn (recall candidates and hits, the nearest turns'
+ * local dates, verdict dates) are allowed.
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
-  const answer = answerOf(events);
-  const literalBody = withoutChecked(answer);
-  const scoredBody = withoutCodeBuiltLines(literalBody);
-  const allowed = baseAllowed(run, events, sources, answer);
-  const literalExtra = extras(numbersIn(literalBody), allowed);
-  const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, caseZone(run, events))]);
-  const scoredExtra = extras(numbersIn(scoredBody, true), scoredAllowed);
+  const zone = caseZone(run, events);
+  const modelBody = modelTextOf(run, events);
+  const allowed = baseAllowed(run, events, sources);
+  const literalExtra = extras(numbersIn(modelBody), allowed);
+  const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
+  const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);
   const suffix = label === '' ? '' : ` (${label})`;
   recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
   return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);
 }
 
-function allClaims(store: MemoryStore): Claim[] {
+export function allClaims(store: MemoryStore): Claim[] {
   // InMemoryStore returns nothing when a query has no date and no topic overlap.
   // Every seed and eval clock in docs/02-evals.md is in November 2026.
   const hits = store.findTurns({

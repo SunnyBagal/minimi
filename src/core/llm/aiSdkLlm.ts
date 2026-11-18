@@ -85,6 +85,8 @@ export interface LlmDeps {
   generateObject?: (call: GenerateObjectCall) => Promise<unknown>;
   /** Replaces the writer stream. Yields text deltas. */
   stream?: (call: StreamCall) => AsyncIterable<string>;
+  /** The HTTP fetch the provider uses. The eval runner passes one that meters token spend. */
+  fetch?: typeof fetch;
 }
 
 const promptDir = join(dirname(fileURLToPath(import.meta.url)), 'prompts');
@@ -283,7 +285,7 @@ async function formatSearchMore(searchMore: SearchMore, query: string): Promise<
 export function createAiSdkLlm(apiKey: string, config: AgentConfig, deps?: LlmDeps): Llm {
   // Explicit provider with an explicit key: a model object, never a bare
   // "provider/model" string, so no gateway key is involved.
-  const anthropic = createAnthropic({ apiKey });
+  const anthropic = createAnthropic({ apiKey, ...(deps?.fetch !== undefined ? { fetch: deps.fetch } : {}) });
 
   async function produce(call: GenerateObjectCall, schema: z.ZodType): Promise<unknown> {
     if (deps?.generateObject) return deps.generateObject(call);

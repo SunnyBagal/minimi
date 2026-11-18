@@ -4,6 +4,7 @@
  * answers never leave the server.
  */
 import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 export interface CaseLists {
   passAtAll: number[];
@@ -63,6 +64,41 @@ export function summarizeEvals(raw: unknown): EvalSummary | null {
   };
 }
 
+/**
+ * The result sets GET /api/evals serves (`?set=`), each a file in evals/results/:
+ * the main set (cases 1–19), the held-out set's latest run (cases 101–119), and the
+ * held-out set's first run, kept as it was before any fix.
+ */
+export const EVAL_SETS = {
+  main: 'latest.json',
+  heldout: 'heldout.json',
+  'heldout-first': 'heldout-first.json',
+} as const;
+
+export type EvalSet = keyof typeof EVAL_SETS;
+
+/** The set named by `?set=`: main when absent, null when it is not a known set. */
+export function evalSetOf(param: string | null): EvalSet | null {
+  if (param === null || param === '') return 'main';
+  return Object.hasOwn(EVAL_SETS, param) ? (param as EvalSet) : null;
+}
+
+/**
+ * GET /api/evals?set=…: 400 for an unknown set, otherwise the summary of the file `fileFor`
+ * gives for that set. route.ts passes literal paths, so the build traces only those files.
+ */
+export async function evalsRequest(url: string, fileFor: (set: EvalSet) => string): Promise<Response> {
+  const param = new URL(url).searchParams.get('set');
+  const set = evalSetOf(param);
+  if (set === null) {
+    return Response.json(
+      { error: `Unknown set "${param}". Use one of: ${Object.keys(EVAL_SETS).join(', ')}.` },
+      { status: 400 },
+    );
+  }
+  return evalsResponse(fileFor(set));
+}
+
 /** 200 with the summary, 404 when the file is missing, 500 when it cannot be read as results. */
 export async function evalsResponse(file: string): Promise<Response> {
   let text: string;
@@ -70,7 +106,10 @@ export async function evalsResponse(file: string): Promise<Response> {
     text = await readFile(file, 'utf8');
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return Response.json({ error: 'No eval results yet: evals/results/latest.json is missing.' }, { status: 404 });
+      return Response.json(
+        { error: `No eval results yet: evals/results/${path.basename(file)} is missing.` },
+        { status: 404 },
+      );
     }
     return Response.json({ error: 'The eval results could not be read.' }, { status: 500 });
   }

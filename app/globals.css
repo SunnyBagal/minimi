@@ -1797,6 +1797,15 @@ details[open] > summary > .mb-row-chevron {
   padding: 6px 10px 0;
 }
 
+/* ui-r5: the held-out section's note and its two tiles (First run, After fixes). */
+.mb-pad-x {
+  padding: 0 8px;
+}
+
+.mb-tiles-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .mb-plain-text {
   flex: 1 1 auto;
   min-width: 0;

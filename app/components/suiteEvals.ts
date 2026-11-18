@@ -94,3 +94,103 @@ export const STATUS_LABEL: Record<CaseStatus, string> = {
   fail: 'fails every run',
   incomplete: 'runs incomplete',
 };
+
+/** One result set as the popover loaded it from /api/evals. */
+export type LoadedSet =
+  { kind: 'ready'; summary: EvalSummary } | { kind: 'missing'; message: string } | { kind: 'error'; message: string };
+
+/** Whether two summaries describe the same run: same commit, counts, case lists and spend. */
+export function sameRun(a: EvalSummary, b: EvalSummary): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export interface HeldoutView {
+  /** First run: "15/19", or "—". */
+  firstTile: string;
+  firstShare: number | null;
+  /** Why the first-run figure is "—". */
+  firstReason: string | null;
+  /** After fixes: the latest held-out run, but only once it differs from the first run. */
+  afterTile: string;
+  afterShare: number | null;
+  afterReason: string | null;
+  /** The slider: the first-run pass rate. */
+  sliderText: string;
+  caption: string;
+  /** One square per case of the latest held-out run, and a line saying which run that is. */
+  cells: CaseCell[];
+  cellsLabel: string;
+  cellsSummary: string;
+}
+
+const tileOf = (summary: EvalSummary) => `${summary.passAtAll.length}/${summary.cases}`;
+const shareOf = (summary: EvalSummary) => (summary.cases === 0 ? null : summary.passAtAll.length / summary.cases);
+
+/**
+ * The held-out section from the two held-out files: heldout-first.json (the first run,
+ * before any fix: the honest number) and heldout.json (the latest run). "After fixes"
+ * stays "—" while the latest run is the first run.
+ */
+export function heldoutView(first: LoadedSet, latest: LoadedSet): HeldoutView {
+  let firstTile = '—';
+  let firstShare: number | null = null;
+  let firstReason: string | null = null;
+  let sliderText = '—';
+  let caption: string;
+  if (first.kind === 'ready' && first.summary.cases > 0) {
+    const s = first.summary;
+    firstTile = tileOf(s);
+    firstShare = shareOf(s);
+    sliderText = `${s.passAtAll.length} / ${s.cases}`;
+    caption = `${s.passAtAll.length} of ${s.cases} cases passed all ${s.runs} ${s.runs === 1 ? 'run' : 'runs'} on the first run (commit ${s.sha}), before any fix.`;
+  } else if (first.kind === 'ready') {
+    firstReason = 'no cases';
+    caption = 'The first held-out run has no cases, so there is no pass rate.';
+  } else {
+    firstReason = first.kind === 'missing' ? 'no first-run file' : 'could not load';
+    caption = first.message;
+  }
+
+  let afterTile = '—';
+  let afterShare: number | null = null;
+  let afterReason: string | null = null;
+  let cells: CaseCell[] = [];
+  let cellsLabel: string;
+  let cellsSummary = '—';
+  if (latest.kind !== 'ready') {
+    afterReason = latest.kind === 'missing' ? 'no held-out run file' : 'could not load';
+    cellsLabel = latest.message;
+  } else {
+    const s = latest.summary;
+    cells = suiteView(s).cells;
+    cellsSummary = `${s.passAtAll.length} pass · ${s.flaky.length} flaky · ${s.failing.length} fail`;
+    if (first.kind !== 'ready') {
+      afterReason = 'no first run to compare';
+      cellsLabel = `Latest held-out run (commit ${s.sha}), one square per case`;
+    } else if (sameRun(first.summary, s)) {
+      afterReason = 'no run after fixes yet';
+      cellsLabel = `Latest held-out run, which is still the first run (commit ${s.sha})`;
+    } else if (s.cases === 0) {
+      afterReason = 'no cases';
+      cellsLabel = 'The latest held-out run has no cases.';
+    } else {
+      afterTile = tileOf(s);
+      afterShare = shareOf(s);
+      cellsLabel = `Latest held-out run, after fixes (commit ${s.sha})`;
+    }
+  }
+
+  return {
+    firstTile,
+    firstShare,
+    firstReason,
+    afterTile,
+    afterShare,
+    afterReason,
+    sliderText,
+    caption,
+    cells,
+    cellsLabel,
+    cellsSummary,
+  };
+}

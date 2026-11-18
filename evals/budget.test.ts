@@ -101,7 +101,7 @@ describe('SpendMeter', () => {
     expect(meter.incomplete).toBeNull();
   });
 
-  it('keeps usage already streamed when the stream breaks, gives the caller the same error, and marks accounting incomplete', async () => {
+  it('charges a stream that breaks part-way its full reservation and carries on; the caller gets the same error', async () => {
     const encoder = new TextEncoder();
     const broken = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -113,12 +113,29 @@ describe('SpendMeter', () => {
     const meter = new SpendMeter(100);
     const fetched = meter.wrap((async () =>
       new Response(broken, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch);
-    const response = await fetched(URL_MESSAGES, sonnetBody(1000));
+    const init = sonnetBody(1000);
+    const response = await fetched(URL_MESSAGES, init);
     await expect(response.text()).rejects.toThrow('connection reset');
     await meter.settle();
-    expect(meter.spentUsd()).toBeCloseTo(0.1, 9);
-    expect(meter.incomplete).not.toBeNull();
-    expect(meter.exhausted()).toBe(true);
+    const reserved = reserveUsd('claude-sonnet-5-5', new TextEncoder().encode(String(init.body)).length, 1000);
+    expect(meter.spentUsd()).toBeCloseTo(reserved, 9);
+    expect(meter.aborted).toBe(1);
+    expect(meter.incomplete).toBeNull();
+    expect(meter.exhausted()).toBe(false);
+  });
+
+  it('charges a request aborted before any response (a deadline) its full reservation and carries on', async () => {
+    const meter = new SpendMeter(100);
+    const fetched = meter.wrap((async () => {
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    }) as typeof fetch);
+    const init = sonnetBody(1000);
+    await expect(fetched(URL_MESSAGES, init)).rejects.toThrow('timeout');
+    const reserved = reserveUsd('claude-sonnet-5-5', new TextEncoder().encode(String(init.body)).length, 1000);
+    expect(meter.spentUsd()).toBeCloseTo(reserved, 9);
+    expect(meter.aborted).toBe(1);
+    expect(meter.incomplete).toBeNull();
+    expect(meter.exhausted()).toBe(false);
   });
 
   it('marks accounting incomplete for a JSON response with no usage, and refuses the next request', async () => {

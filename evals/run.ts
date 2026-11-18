@@ -322,6 +322,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
         spentUsd: meter.spentUsd(),
         byModel: meter.report(),
         refusedRequests: meter.refused,
+        abortedRequestsChargedAtReservation: meter.aborted,
         incompleteAccounting: meter.incomplete,
         stoppedBefore,
         priceSource: PRICE_SOURCE,

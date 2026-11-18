@@ -434,7 +434,7 @@ describe('createAiSdkLlm', () => {
     expect(triedOnly).toContain('Tue 3 Nov 2026');
     expect(triedOnly).not.toContain('2026-11-');
     // Code now prints the tried dates and nearest matches above the writer's text (noRecord.ts), so the writer must not repeat them.
-    expect(calls[0]?.instructions).toContain('Do not repeat any date');
+    expect(calls[0]?.instructions).toContain('do not repeat any date');
 
     const withNearest = body(calls[1]);
     expect(withNearest).toContain('Thu 5 Nov 2026');

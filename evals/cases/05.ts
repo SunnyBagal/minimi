@@ -15,9 +15,12 @@ export const evalCase: EvalCase = {
       noVerdicts(events),
       ok('answer contains no fixture CRM name', invented.length === 0, invented),
       ok(
-        'answer says the shortlist is not saved and asks or offers a fresh one',
-        /not saved|don't have|do not have|no shortlist|isn't saved|is not saved/i.test(answer) &&
-          (/name/i.test(answer) || /shortlist/i.test(answer)),
+        'answer says the shortlist is not saved and asks for the names or offers a fresh shortlist',
+        /not saved|don't have|do not have|no shortlist|isn't saved|is not saved|no saved|nothing saved/i.test(answer) &&
+          // Asks for the names (a question about which tools / their names) or offers to build a fresh shortlist.
+          (/\b(which|what)\b[^.?!]*\b(tools?|names?|crms?)\b[^.?!]*\?/i.test(answer) ||
+            /\b(tell|send|share|give|list)\b[^.?!]*\b(names?|tools?)\b/i.test(answer) ||
+            /\b(fresh|new)\b[^.?!]*\bshortlist\b|\b(put together|build|draw up|make)\b[^.?!]*\bshortlist\b/i.test(answer)),
         answer,
       ),
       ...judgeSaysNo(run, 'J3'),

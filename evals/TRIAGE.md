@@ -108,3 +108,14 @@ Replay of `evals/results/latest.json` (19 × 3 on `a423aec`, scored 17 of 19, li
 | 13 | **No-record answers: code states the dates.** `noRecord.ts` prints "I found no saved answer for 10 Nov 2026 or 3 Nov 2026." and the nearest matches with their dates; the writer explains in words and repeats no date. Code does date work (DESIGN.md, "Why"). | product | Cases 4, 5, 6: the writer wrote the tried dates, rejected by the literal reading. | Dates are app-injected (outside the literal check by provenance); the case assertions still see them in the shown answer. `recall.test.ts` › "no record: code states the dates tried …". The Lane 4 test that pinned "Name dates exactly as they are written in the input" in the writer prompt now pins "Do not repeat any date", because code names them. |
 | 14 | **A numeric date is stated in words:** "I read "3/11" as 3 November 2026." The design review (2.7) requires that the answer states the date used for an ambiguous numeric date. The app's date format is unchanged. | product | Case 8 failed every run: "answer says 3 November 2026". | `recall.test.ts` › "a numeric date is stated in words". |
 | 15 | The fresh writer never turns a relative day ("on Monday") into a calendar date. | product | Case 12 run 1 wrote "Monday 9 Nov 2026". | Measured live only. |
+
+### Round eval-fix-r3 (19 Nov 2026)
+
+The 19 × 3 run on `0ad1520` (eval-fix-r2): scored 18 of 19 and literal 18 of 19 at 3 of 3, $0.34. The one failure: case 5 run 3, judge J3 answered "yes", quoting the code-built line "I found no saved answer for 9 Nov 2026." as implying the conversation never happened.
+
+Codex review of eval-fix-r2 (`docs/review/eval-fix-r2-codex.md`) and that failure, fixed offline:
+- Change 12 tightened: a timestamp field contributes only its date (year, month, day, in UTC and in the case's zone), never its clock digits; an evidence number counts only inside a `[n]` marker that names one of this turn's evidence items, never as a free figure. `numbers.test.ts` › "a timestamp gives only its date …", "an evidence number counts only inside a marker …".
+- The no-record line is worded about what is saved, not whether the conversation happened: "I have nothing saved about Postgres hosting from 10 Nov 2026 or 3 Nov 2026, so I can't look that conversation up." It names the topic, as case 6 asks ("nothing about Postgres hosting").
+- With no previous answer in the session, no date is claimed as tried; the writer is told whether dates were shown. Nearest matches are shown as literal text (inline code, one line) and the writer, the user and the recall event get the same three.
+- The "I read "3/11" as …" line only appears when the date came from the numeric lookup.
+- Stronger assertions (spec wording): case 5 must ask for the names or offer a fresh shortlist; case 6 checks the emitted `recall.nearest` topic hit and an actual offer to confirm.

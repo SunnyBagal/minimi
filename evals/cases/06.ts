@@ -24,21 +24,24 @@ export const evalCase: EvalCase = {
     const events = run.parts[0]?.traces[0]?.events ?? [];
     const answer = run.parts[0]?.traces[0]?.answerText ?? '';
     const recall = recallOf(events);
-    const nearest = run.store.nearestTurns({
-      around: ['2026-11-10', '2026-11-03'],
-      topic: 'Postgres hosting',
-      entities: ['Northwind PG', 'Basalt DB'],
-      excludeTurnIds: [],
-      limit: 10,
-    });
-    const topicHit = nearest.find((hit) => hit.matched === 'topic' && hit.userTurn.localDate === '2026-11-05');
+    // The nearest matches the pipeline actually emitted (and showed), not a fresh store query.
+    const topicHit = (recall?.nearest ?? []).find(
+      (hit) => hit.matched === 'topic' && hit.userTurn.localDate === '2026-11-05',
+    );
     return [
       chosenIs(events, null),
       ok('recall.hits is empty', recall !== undefined && recall.hits.length === 0, recall?.hits.length ?? null),
       ok('nearest 5 Nov hit is matched topic', topicHit !== undefined, topicHit?.matched ?? null),
       ok('answer names Tue 10 Nov or 10 Nov', /10 Nov/.test(answer), answer),
       ok('answer names Tue 3 Nov or 3 Nov', /3 Nov/.test(answer), answer),
-      ok('answer offers Thu 5 Nov by date', /5 Nov/.test(answer), answer),
+      ok(
+        'answer offers Thu 5 Nov by date and asks the user to confirm it',
+        /5 Nov/.test(answer) &&
+          /did you mean|do you mean|is (that|this|it) the one|was (that|this|it) (the one|it)|if (that|this|it)('s| is| was)|that one|confirm|is that what/i.test(
+            answer,
+          ),
+        answer,
+      ),
       noVerdicts(events),
       numbersAllowed(run, events, []),
     ];

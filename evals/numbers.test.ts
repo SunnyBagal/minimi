@@ -251,6 +251,28 @@ describe('numbers', () => {
     expect(literalAssertions(bad)[0]?.observed).toEqual(['31']);
   });
 
+  it('a timestamp gives only its date: a price matching a clock minute fails both readings', () => {
+    // 08:35 is the claim's time of day; 35 is not a figure anywhere.
+    const events = [
+      { type: 'verdict', row: { claim: { value: '19 USD/month', quote: 'Starter 19 USD/month', asOfUtc: '2026-11-10T08:35:00.000Z' }, check: { checkedAtUtc: '2026-11-13T13:00:00.000Z', newValue: null, newQuote: null, reason: 'Same.' } } },
+      { type: 'text', delta: 'The price is 35 USD.' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('Has it changed?', events);
+    expect(numbersAllowed(run, events, []).observed).toEqual(['35']);
+    expect(literalAssertions(run)[0]?.observed).toEqual(['35']);
+  });
+
+  it('an evidence number counts only inside a marker that names a real item, never as a free figure', () => {
+    const cited = [
+      { type: 'citations', items: [{ n: 1, sourceId: 's', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'The price is 1 USD [1]. See also [7].' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('What does it cost?', cited);
+    numbersAllowed(run, cited, []);
+    // "1 USD" is a figure (fails); "[1]" names evidence item 1 (skipped); "[7]" names no item (checked).
+    expect(literalAssertions(run)[0]?.observed).toEqual(['1', '7']);
+  });
+
   it('fails both checks when the model writes a price that is in no evidence', () => {
     const run = runWith('What does it cost?', textEvents('The plan costs 19 USD.'));
     const scored = numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], []);

@@ -256,29 +256,58 @@ function extras(wanted: readonly string[], allowed: Iterable<string>): string[] 
   return out;
 }
 
-/** Every number a stored claim holds: its value, its quote and its date. */
-function claimNumbers(claims: readonly Claim[]): string[] {
-  return claims.flatMap((claim) => numbersIn(`${claim.value} ${claim.quote} ${claim.asOfUtc}`));
+/**
+ * The date a timestamp field holds, as year, month and day: in UTC and in the
+ * case's zone (a check at 23:00 UTC is the next day in Kolkata). Never its
+ * clock digits, so an hour or minute can never license a price.
+ */
+function dateParts(iso: string, zone: string): string[] {
+  const utc = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  const parts = utc === null ? [] : [utc[1] ?? '', utc[2] ?? '', utc[3] ?? ''];
+  const local = /^(\d{4})-(\d{2})-(\d{2})/.exec(formatLocalDate(iso, zone));
+  if (local !== null) parts.push(local[1] ?? '', local[2] ?? '', local[3] ?? '');
+  return parts.filter((part) => part !== '');
 }
 
-/** Every number a verdict row holds: the claim's value, quote and date, and the check's values, reason and time. */
-function rowNumbers(row: VerdictRow): string[] {
-  return numbersIn(
-    [
-      row.claim.value,
-      row.claim.quote,
-      row.claim.asOfUtc,
-      row.check.newValue ?? '',
-      row.check.newQuote ?? '',
-      row.check.reason,
-      row.check.checkedAtUtc,
-    ].join(' '),
-  );
+/** The local calendar date of an instant in a zone, as YYYY-MM-DD. */
+function formatLocalDate(iso: string, zone: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
+      new Date(iso),
+    );
+  } catch {
+    return '';
+  }
 }
 
-/** The numbers that identify this turn's evidence items: [1]…[n]. */
-function evidenceNumbers(events: AgentEvent[]): string[] {
-  return ofType(events, 'citations').flatMap((event) => event.items.map((item) => String(item.n)));
+/** Every number a stored claim holds: its value and quote, and its date (not its clock time). */
+function claimNumbers(claims: readonly Claim[], zone: string): string[] {
+  return claims.flatMap((claim) => [...numbersIn(`${claim.value} ${claim.quote}`), ...dateParts(claim.asOfUtc, zone)]);
+}
+
+/** Every number a verdict row holds: values, quotes and reason, and the claim's and check's dates (not clock times). */
+function rowNumbers(row: VerdictRow, zone: string): string[] {
+  return [
+    ...numbersIn(
+      [row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason].join(' '),
+    ),
+    ...dateParts(row.claim.asOfUtc, zone),
+    ...dateParts(row.check.checkedAtUtc, zone),
+  ];
+}
+
+/** This turn's evidence numbers: the n of each cited item. */
+function evidenceNumberSet(events: AgentEvent[]): Set<number> {
+  return new Set(ofType(events, 'citations').flatMap((event) => event.items.map((item) => item.n)));
+}
+
+/**
+ * Removes citation markers ("[2]", "[1][3]") whose every number names one of
+ * this turn's evidence items: they reference evidence, they are not figures.
+ * A marker naming no real item stays and is checked.
+ */
+function withoutEvidenceMarkers(text: string, evidence: Set<number>): string {
+  return text.replace(/\[(\d+)\]/g, (marker, n: string) => (evidence.has(Number(n)) ? '' : marker));
 }
 
 /** The spec's literal number check. It is recorded, and it does not score the run. */
@@ -289,12 +318,11 @@ export const SCORED_NUMBERS_PREFIX = 'numbers are in the message, claims, rows o
 
 const literalByRun = new WeakMap<CaseRun, Assertion[]>();
 
-function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[]): Set<string> {
+function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], zone: string): Set<string> {
   return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
-    ...claimNumbers(allClaims(run.store)),
-    ...verdictsOf(events).flatMap(rowNumbers),
-    ...evidenceNumbers(events),
+    ...claimNumbers(allClaims(run.store), zone),
+    ...verdictsOf(events).flatMap((row) => rowNumbers(row, zone)),
     ...sources.flatMap((text) => numbersIn(text)),
   ]);
 }
@@ -369,8 +397,8 @@ function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
   const zone = caseZone(run, events);
-  const modelBody = modelTextOf(run, events);
-  const allowed = baseAllowed(run, events, sources);
+  const modelBody = withoutEvidenceMarkers(modelTextOf(run, events), evidenceNumberSet(events));
+  const allowed = baseAllowed(run, events, sources, zone);
   const literalExtra = extras(numbersIn(modelBody), allowed);
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
   const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);

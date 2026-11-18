@@ -11,22 +11,38 @@ import type { TurnContext } from './context';
 /** How many nearest matches the code-built line names. */
 const NEAREST_SHOWN = 3;
 
-/** The code-built lines: what was tried, and the nearest saved conversations. Empty when nothing was tried. */
-export function noRecordLines(candidates: DateCandidates, nearest: readonly MemoryHit[]): string {
+/**
+ * A stored question shown as literal text: one line, inside inline code, so
+ * Markdown in it (headings, lists, links, emphasis) is never interpreted.
+ */
+export function literalExcerpt(text: string): string {
+  return `\`${text.replace(/\s+/g, ' ').trim().replaceAll('`', "'")}\``;
+}
+
+/**
+ * The code-built lines: what was tried (and about what), and the nearest saved
+ * conversations. Empty when no date was tried and nothing is near.
+ */
+export function noRecordLines(candidates: DateCandidates, nearest: readonly MemoryHit[], topic: string | null): string {
   const lines: string[] = [];
+  const about = topic === null || topic.trim() === '' ? '' : ` about ${topic.trim()}`;
+  // Worded about what is saved, never about whether the conversation happened (judge check J3).
   if (candidates.dates.length > 0) {
-    lines.push(`I found no saved answer for ${orList(candidates.dates.map((date) => dateWords(date)))}.`);
+    lines.push(
+      `I have nothing saved${about} from ${orList(candidates.dates.map((date) => dateWords(date)))}, so I can't look that conversation up.`,
+    );
   } else if (candidates.range !== null) {
     lines.push(
-      `I found no saved answer between ${dateWords(candidates.range.from)} and ${dateWords(candidates.range.to)}.`,
+      `I have nothing saved${about} from ${dateWords(candidates.range.from)} to ${dateWords(candidates.range.to)}, so I can't look that conversation up.`,
     );
   }
-  const shown = nearest.slice(0, NEAREST_SHOWN);
-  if (shown.length === 1 && shown[0] !== undefined) {
-    lines.push(`The nearest saved conversation is from ${dateWords(shown[0].userTurn.localDate)}: "${shown[0].userTurn.content}".`);
-  } else if (shown.length > 1) {
+  if (nearest.length === 1 && nearest[0] !== undefined) {
+    lines.push(
+      `The nearest saved conversation is from ${dateWords(nearest[0].userTurn.localDate)}: ${literalExcerpt(nearest[0].userTurn.content)}.`,
+    );
+  } else if (nearest.length > 1) {
     lines.push('The nearest saved conversations:');
-    for (const hit of shown) lines.push(`- ${dateWords(hit.userTurn.localDate)}: "${hit.userTurn.content}"`);
+    for (const hit of nearest) lines.push(`- ${dateWords(hit.userTurn.localDate)}: ${literalExcerpt(hit.userTurn.content)}`);
   }
   return lines.length === 0 ? '' : `${lines.join('\n')}\n\n`;
 }
@@ -39,15 +55,18 @@ export async function* noRecord(ctx: TurnContext, candidates: DateCandidates): A
       : candidates.range !== null
         ? [candidates.range.from, candidates.range.to]
         : [];
-  const nearest = ctx.store.nearestTurns({
+  // The user, the writer and the recall event all get the same few nearest matches.
+  const nearest = ctx.store
+    .nearestTurns({
     around,
     ...(ctx.plan.topic !== null ? { topic: ctx.plan.topic } : {}),
     ...(ctx.plan.entities.length > 0 ? { entities: ctx.plan.entities } : {}),
     excludeTurnIds: [ctx.currentId],
     limit: ctx.config.limits.recentTurns,
-  });
+  })
+    .slice(0, NEAREST_SHOWN);
   yield { type: 'recall', candidates, hits: [], chosen: null, asked: null, nearest };
-  const lines = noRecordLines(candidates, nearest);
+  const lines = noRecordLines(candidates, nearest, ctx.plan.topic);
   if (lines !== '') yield ctx.textEvent(lines);
   for await (const delta of ctx.deps.llm.write(
     { mode: 'no_record', message: ctx.input.message, tried: candidates, nearest },

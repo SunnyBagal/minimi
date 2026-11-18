@@ -162,8 +162,32 @@ describe('recall', () => {
       timeTable: [{ ref: { kind: 'weekday', weekday: 2, modifier: 'last' }, result: { dates: ['2026-11-10', '2026-11-03'], range: null, ambiguous: true, rule: 'last Tuesday' } }],
     });
     const text = textOf(await run({ message: 'last Tuesday I asked about Postgres hosting' }));
-    expect(text.startsWith('I found no saved answer for 10 Nov 2026 or 3 Nov 2026.\nThe nearest saved conversation is from 5 Nov 2026: "Postgres hosting prices?".')).toBe(true);
+    expect(
+      text.startsWith(
+        "I have nothing saved about Postgres hosting from 10 Nov 2026 or 3 Nov 2026, so I can't look that conversation up.\nThe nearest saved conversation is from 5 Nov 2026: `Postgres hosting prices?`.",
+      ),
+    ).toBe(true);
     expect(text).toContain('Nothing is saved for those dates.');
+  });
+
+  it('no previous answer at all: no date is claimed as tried', async () => {
+    const { run } = rig({
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true }), write: ['I could not tell which earlier answer you meant.'] },
+    });
+    const events = await run({ message: 'Is that still right?' });
+    expect(recallEvent(events).candidates.dates).toEqual([]);
+    expect(textOf(events)).not.toContain('I have nothing saved');
+  });
+
+  it('the "I read" line is not added on the previous-answer path, even if the plan also carries a numeric date', async () => {
+    const store = new InMemoryStore();
+    userTurn(store, { content: 'Pipeloom Team price?', localDate: '2026-11-09', createdAtUtc: '2026-11-09T05:50:00.000Z', session: SESSION } as never);
+    const { run } = rig({
+      store,
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true, timeRef: { kind: 'numeric', first: 3, second: 11 }, timeText: '3/11' }), write: ['Summary.'] },
+    });
+    const text = textOf(await run({ message: 'Is that still right for 3/11?' }));
+    expect(text).not.toContain('I read');
   });
 
   it('a numeric date is stated in words: I read "3/11" as 3 November 2026', async () => {

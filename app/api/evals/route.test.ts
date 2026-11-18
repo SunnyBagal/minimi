@@ -11,8 +11,38 @@ const RESULTS = {
   runs: 3,
   spend: { budgetUsd: 4.5, spentUsd: 0.357843, byModel: { haiku: 0.1 } },
   cases: [
-    { id: 1, runs: 3, requestedRuns: 3, passedRuns: 3, results: [{ run: 1, passed: true, assertions: [{ name: 'SECRET_ASSERTION' }], judge: 'SECRET_JUDGE', trace: ['SECRET_TRACE'], spendUsd: 0.01 }] },
-    { id: 2, runs: 3, requestedRuns: 3, passedRuns: 1, results: [{ run: 1, passed: false, assertions: [], judge: null, trace: ['SECRET_ANSWER'], spendUsd: 0.01 }] },
+    {
+      id: 1,
+      runs: 3,
+      requestedRuns: 3,
+      passedRuns: 3,
+      results: [
+        {
+          run: 1,
+          passed: true,
+          assertions: [{ name: 'SECRET_ASSERTION' }],
+          judge: 'SECRET_JUDGE',
+          trace: ['SECRET_TRACE'],
+          spendUsd: 0.01,
+        },
+      ],
+    },
+    {
+      id: 2,
+      runs: 3,
+      requestedRuns: 3,
+      passedRuns: 1,
+      results: [
+        {
+          run: 1,
+          passed: false,
+          assertions: [],
+          judge: null,
+          trace: ['SECRET_ANSWER'],
+          spendUsd: 0.01,
+        },
+      ],
+    },
     { id: 3, runs: 3, requestedRuns: 3, passedRuns: 0, results: [] },
   ],
   incomplete: [],
@@ -55,7 +85,17 @@ describe('GET /api/evals summary', () => {
 
   it('never sends traces, assertions, judge notes, answers or the per-model spend', async () => {
     const body = await (await evalsResponse(await fileWith('ok2.json', JSON.stringify(RESULTS)))).text();
-    for (const secret of ['SECRET_ASSERTION', 'SECRET_JUDGE', 'SECRET_TRACE', 'SECRET_ANSWER', 'trace', 'assertions', 'results', 'byModel', 'budgetUsd']) {
+    for (const secret of [
+      'SECRET_ASSERTION',
+      'SECRET_JUDGE',
+      'SECRET_TRACE',
+      'SECRET_ANSWER',
+      'trace',
+      'assertions',
+      'results',
+      'byModel',
+      'budgetUsd',
+    ]) {
       expect(body).not.toContain(secret);
     }
   });
@@ -81,7 +121,17 @@ describe('GET /api/evals summary', () => {
     expect([200, 404]).toContain(response.status);
     if (response.status === 200) {
       const body = (await response.json()) as Record<string, unknown>;
-      expect(Object.keys(body).sort()).toEqual(['cases', 'failing', 'flaky', 'incomplete', 'passAtAll', 'runs', 'sha', 'spentUsd', 'strict']);
+      expect(Object.keys(body).sort()).toEqual([
+        'cases',
+        'failing',
+        'flaky',
+        'incomplete',
+        'passAtAll',
+        'runs',
+        'sha',
+        'spentUsd',
+        'strict',
+      ]);
     }
   });
 });

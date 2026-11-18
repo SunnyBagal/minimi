@@ -26,11 +26,19 @@ export interface PopoverPlace {
 }
 
 /** Under the button, centred on it, clamped into the window; full width on a phone. */
-export function placePopover(anchor: { left: number; right: number; bottom: number }, viewportWidth: number): PopoverPlace {
+export function placePopover(
+  anchor: { left: number; right: number; bottom: number },
+  viewportWidth: number,
+): PopoverPlace {
   const top = anchor.bottom + GAP;
   const centre = (anchor.left + anchor.right) / 2;
   if (viewportWidth <= PHONE_MAX) {
-    return { top, left: GUTTER, width: viewportWidth - 2 * GUTTER, originX: centre - GUTTER };
+    return {
+      top,
+      left: GUTTER,
+      width: viewportWidth - 2 * GUTTER,
+      originX: centre - GUTTER,
+    };
   }
   const width = Math.min(WIDTH, viewportWidth - 2 * GUTTER);
   const left = Math.min(Math.max(centre - width / 2, GUTTER), viewportWidth - GUTTER - width);
@@ -71,7 +79,8 @@ export function MenuPopover({
     if (!open) return;
     const button = anchor.current;
     const node = ref.current;
-    node?.focus();
+    // After the layout effect has placed it (an unplaced popover is not focusable yet).
+    const frame = window.requestAnimationFrame(() => node?.focus());
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -87,6 +96,7 @@ export function MenuPopover({
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onPointer);
     return () => {
+      window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', onKey);
       document.removeEventListener('pointerdown', onPointer);
       // Back to the button, unless the user has already moved focus somewhere else.
@@ -123,8 +133,13 @@ export function MenuPopover({
       className={open ? 'mb-popover' : 'mb-popover mb-closing'}
       style={
         place === null
-          ? { visibility: 'hidden' }
-          : { top: place.top, left: place.left, width: place.width, transformOrigin: `${place.originX}px 0` }
+          ? { opacity: 0 }
+          : {
+              top: place.top,
+              left: place.left,
+              width: place.width,
+              transformOrigin: `${place.originX}px 0`,
+            }
       }
     >
       {children}

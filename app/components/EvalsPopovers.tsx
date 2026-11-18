@@ -34,7 +34,19 @@ import { STATUS_LABEL, suiteView, usd, type CaseCell } from './suiteEvals';
 
 export const SUITE_COMMAND = 'npm run evals -- --runs 3';
 
-function HeadTile({ id, icon, title, subtitle, children }: { id: string; icon: ReactNode; title: string; subtitle: string; children?: ReactNode }) {
+function HeadTile({
+  id,
+  icon,
+  title,
+  subtitle,
+  children,
+}: {
+  id: string;
+  icon: ReactNode;
+  title: string;
+  subtitle: string;
+  children?: ReactNode;
+}) {
   const body = (
     <>
       <span className="mb-head-icon">{icon}</span>
@@ -91,7 +103,12 @@ const VERDICT_COLOR: Record<Verdict, string> = {
   unverifiable: 'var(--viz-unverifiable)',
   source_unavailable: 'var(--viz-unavailable)',
 };
-const INTENT_LABEL = { fresh: 'Fresh (searched)', recheck: 'Re-checks', recall: 'Recalls', chat: 'Chat' } as const;
+const INTENT_LABEL = {
+  fresh: 'Fresh (searched)',
+  recheck: 'Re-checks',
+  recall: 'Recalls',
+  chat: 'Chat',
+} as const;
 
 export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessage[]; titleId: string }) {
   const evals = useMemo(() => chatEvals(messages), [messages]);
@@ -110,7 +127,10 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
             ['Answers', String(evals.answers)],
             ...(evals.intents === null
               ? []
-              : INTENTS.map((intent): [string, ReactNode] => [INTENT_LABEL[intent], String(evals.intents?.[intent] ?? 0)])),
+              : INTENTS.map((intent): [string, ReactNode] => [
+                  INTENT_LABEL[intent],
+                  String(evals.intents?.[intent] ?? 0),
+                ])),
             ...(evals.intents !== null && evals.answersWithoutIntent > 0
               ? [['Without an intent yet', String(evals.answersWithoutIntent)] as [string, ReactNode]]
               : []),
@@ -138,7 +158,13 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
           icon={<ShieldCheckIcon />}
           reason="no re-check yet"
         />
-        <RingTile label="Live sources" share={sources.liveShare} valueText={percent(sources.liveShare)} icon={<GlobeIcon />} reason="no sources yet" />
+        <RingTile
+          label="Live sources"
+          share={sources.liveShare}
+          valueText={percent(sources.liveShare)}
+          icon={<GlobeIcon />}
+          reason="no sources yet"
+        />
         <RingTile
           label="Avg. answer"
           share={null}
@@ -151,7 +177,11 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
       <hr className="mb-divider" />
       <h3 className="mb-section">Details</h3>
 
-      <MenuRow icon={<StackIcon />} title="Verdicts" summary={verdicts.rows === 0 ? '—' : `${verdicts.rows} ${verdicts.rows === 1 ? 'row' : 'rows'}`}>
+      <MenuRow
+        icon={<StackIcon />}
+        title="Verdicts"
+        summary={verdicts.rows === 0 ? '—' : `${verdicts.rows} ${verdicts.rows === 1 ? 'row' : 'rows'}`}
+      >
         {verdicts.rows === 0 ? (
           <p className="mb-empty">No re-check in this chat yet, so there are no verdict rows.</p>
         ) : (
@@ -168,18 +198,30 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
               }))}
             />
             <p className="mb-caption">
-              Verified now: {verdicts.verifiedNow} of {verdicts.rows} rows were checked against a page fetched for this re-check.
+              Verified now: {verdicts.verifiedNow} of {verdicts.rows} rows were checked against a page fetched for this
+              re-check.
             </p>
           </>
         )}
       </MenuRow>
 
-      <MenuRow icon={<BarsIcon />} title="Latency by stage" summary={latency.avgAnswerMs === null ? '—' : `avg ${duration(latency.avgAnswerMs)}`}>
+      <MenuRow
+        icon={<BarsIcon />}
+        title="Latency by stage"
+        summary={latency.avgAnswerMs === null ? '—' : `avg ${duration(latency.avgAnswerMs)}`}
+      >
         {latency.stages.length === 0 ? (
           <p className="mb-empty">No stage timings have arrived yet.</p>
         ) : (
           <>
-            <HBars title="Average per stage" rows={latency.stages.map((s) => ({ label: s.stage, value: s.avgMs }))} format={duration} />
+            <HBars
+              title="Average per stage"
+              rows={latency.stages.map((s) => ({
+                label: s.stage,
+                value: s.avgMs,
+              }))}
+              format={duration}
+            />
             <Sparkline title="Total time per answer" values={latency.perAnswer} format={duration} />
           </>
         )}
@@ -194,16 +236,40 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
               title="How each source was read"
               unit="citations"
               segments={[
-                { key: 'live', name: 'Fetched live', label: 'Fetched live', value: sources.live, color: 'var(--viz-1)' },
-                { key: 'index', name: 'Search-index copy', label: 'Search-index copy', value: sources.total - sources.live, color: 'var(--viz-rest)' },
+                {
+                  key: 'live',
+                  name: 'Fetched live',
+                  label: 'Fetched live',
+                  value: sources.live,
+                  color: 'var(--viz-1)',
+                },
+                {
+                  key: 'index',
+                  name: 'Search-index copy',
+                  label: 'Search-index copy',
+                  value: sources.total - sources.live,
+                  color: 'var(--viz-rest)',
+                },
               ]}
             />
             <SegmentedBar
               title="Who published it"
               unit="citations"
               segments={[
-                { key: 'first', name: 'First-party', label: 'First-party', value: sources.firstParty, color: 'var(--viz-1)' },
-                { key: 'other', name: 'Other sites', label: 'Other sites', value: sources.total - sources.firstParty, color: 'var(--viz-rest)' },
+                {
+                  key: 'first',
+                  name: 'First-party',
+                  label: 'First-party',
+                  value: sources.firstParty,
+                  color: 'var(--viz-1)',
+                },
+                {
+                  key: 'other',
+                  name: 'Other sites',
+                  label: 'Other sites',
+                  value: sources.total - sources.firstParty,
+                  color: 'var(--viz-rest)',
+                },
               ]}
             />
             <p className="mb-caption">Counts every citation in every answer, so a page cited twice counts twice.</p>
@@ -214,7 +280,8 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
       {evals.errors > 0 ? (
         <MenuRow icon={<AlertIcon />} title="Errors" summary={String(evals.errors)}>
           <p className="mb-empty">
-            {evals.errors} {evals.errors === 1 ? 'turn stage' : 'turn stages'} reported an error; the answer cards show which.
+            {evals.errors} {evals.errors === 1 ? 'turn stage' : 'turn stages'} reported an error; the answer cards show
+            which.
           </p>
         </MenuRow>
       ) : null}
@@ -222,7 +289,11 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
   );
 }
 
-type SuiteState = { kind: 'loading' } | { kind: 'missing'; message: string } | { kind: 'error'; message: string } | { kind: 'ready'; summary: EvalSummary };
+type SuiteState =
+  | { kind: 'loading' }
+  | { kind: 'missing'; message: string }
+  | { kind: 'error'; message: string }
+  | { kind: 'ready'; summary: EvalSummary };
 
 function Squares({ title, cells }: { title: string; cells: CaseCell[] }) {
   return (
@@ -233,7 +304,14 @@ function Squares({ title, cells }: { title: string; cells: CaseCell[] }) {
           const text = `Case ${cell.id}: ${STATUS_LABEL[cell.status]}`;
           return (
             <li key={cell.id}>
-              <span className={`mb-square mb-square-${cell.status}`} tabIndex={0} role="img" aria-label={text} data-tip={text} title={text} />
+              <span
+                className={`mb-square mb-square-${cell.status}`}
+                tabIndex={0}
+                role="img"
+                aria-label={text}
+                data-tip={text}
+                title={text}
+              />
             </li>
           );
         })}
@@ -252,13 +330,28 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
     fetch('/api/evals', { signal: controller.signal, cache: 'no-store' })
       .then(async (response) => {
         const body: unknown = await response.json().catch(() => null);
-        const message = typeof body === 'object' && body !== null && 'error' in body ? String((body as { error: unknown }).error) : '';
-        if (response.status === 404) setState({ kind: 'missing', message: message || 'No eval results yet.' });
-        else if (!response.ok) setState({ kind: 'error', message: message || `The summary could not be loaded (${response.status}).` });
+        const message =
+          typeof body === 'object' && body !== null && 'error' in body
+            ? String((body as { error: unknown }).error)
+            : '';
+        if (response.status === 404)
+          setState({
+            kind: 'missing',
+            message: message || 'No eval results yet.',
+          });
+        else if (!response.ok)
+          setState({
+            kind: 'error',
+            message: message || `The summary could not be loaded (${response.status}).`,
+          });
         else setState({ kind: 'ready', summary: body as EvalSummary });
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setState({ kind: 'error', message: error instanceof Error ? error.message : 'The summary could not be loaded.' });
+        if (!controller.signal.aborted)
+          setState({
+            kind: 'error',
+            message: error instanceof Error ? error.message : 'The summary could not be loaded.',
+          });
       });
     return () => controller.abort();
   }, [active]);
@@ -281,7 +374,13 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
       <span className="mb-plain-text">
         Run the full suite: <code>{SUITE_COMMAND}</code>
       </span>
-      <button type="button" className="mb-copy" onClick={copy} aria-label={copied ? 'Copied' : 'Copy the command'} title={copied ? 'Copied' : 'Copy'}>
+      <button
+        type="button"
+        className="mb-copy"
+        onClick={copy}
+        aria-label={copied ? 'Copied' : 'Copy the command'}
+        title={copied ? 'Copied' : 'Copy'}
+      >
         {copied ? 'Copied' : <CopyIcon />}
       </button>
     </div>
@@ -294,7 +393,13 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
           id={titleId}
           icon={<FlaskIcon size={18} />}
           title="Test suite"
-          subtitle={state.kind === 'loading' ? 'Loading the last run…' : state.kind === 'missing' ? 'No results yet' : 'Could not load the results'}
+          subtitle={
+            state.kind === 'loading'
+              ? 'Loading the last run…'
+              : state.kind === 'missing'
+                ? 'No results yet'
+                : 'Could not load the results'
+          }
         />
         {state.kind !== 'loading' ? <p className="mb-empty mb-pad">{state.message}</p> : null}
         <hr className="mb-divider" />
@@ -305,7 +410,11 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
 
   const { summary } = state;
   const view = suiteView(summary);
-  const counts = { pass: summary.passAtAll.length, flaky: summary.flaky.length, fail: summary.failing.length };
+  const counts = {
+    pass: summary.passAtAll.length,
+    flaky: summary.flaky.length,
+    fail: summary.failing.length,
+  };
   return (
     <>
       <HeadTile id={titleId} icon={<FlaskIcon size={18} />} title="Test suite" subtitle={view.subtitle}>
@@ -314,7 +423,10 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
             ['Commit', <code key="sha">{summary.sha}</code>],
             ['Cases', String(summary.cases)],
             ['Runs per case', String(summary.runs)],
-            ['Incomplete', summary.incomplete.length === 0 ? 'none' : summary.incomplete.map((id) => `#${id}`).join(', ')],
+            [
+              'Incomplete',
+              summary.incomplete.length === 0 ? 'none' : summary.incomplete.map((id) => `#${id}`).join(', '),
+            ],
             ['Metered cost', usd(summary.spentUsd)],
           ]}
         />
@@ -331,15 +443,35 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
       />
 
       <div className="mb-tiles">
-        <RingTile label="Scored" share={view.scoredShare} valueText={`${view.scored}/${view.cases}`} icon={<CheckCircleIcon size={16} />} />
-        <RingTile label="Literal" share={view.literalShare} valueText={`${view.literal}/${view.cases}`} icon={<QuoteIcon size={16} />} />
-        <RingTile label="Cost" share={null} valueText={usd(summary.spentUsd)} icon={<CoinIcon />} reason="not recorded" />
+        <RingTile
+          label="Scored"
+          share={view.scoredShare}
+          valueText={`${view.scored}/${view.cases}`}
+          icon={<CheckCircleIcon size={16} />}
+        />
+        <RingTile
+          label="Literal"
+          share={view.literalShare}
+          valueText={`${view.literal}/${view.cases}`}
+          icon={<QuoteIcon size={16} />}
+        />
+        <RingTile
+          label="Cost"
+          share={null}
+          valueText={usd(summary.spentUsd)}
+          icon={<CoinIcon />}
+          reason="not recorded"
+        />
       </div>
 
       <hr className="mb-divider" />
       <h3 className="mb-section">Details</h3>
 
-      <MenuRow icon={<GridIcon />} title="Cases" summary={`${counts.pass} pass · ${counts.flaky} flaky · ${counts.fail} fail`}>
+      <MenuRow
+        icon={<GridIcon />}
+        title="Cases"
+        summary={`${counts.pass} pass · ${counts.flaky} flaky · ${counts.fail} fail`}
+      >
         <Squares title="Scored, one square per case" cells={view.cells} />
         <Squares title="The spec's literal check" cells={view.literalCells} />
         <ul className="mb-legend mb-legend-row">
@@ -359,9 +491,18 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
         <Facts
           items={[
             ['Flaky (scored)', summary.flaky.length === 0 ? 'none' : summary.flaky.map((id) => `#${id}`).join(', ')],
-            ['Failing (scored)', summary.failing.length === 0 ? 'none' : summary.failing.map((id) => `#${id}`).join(', ')],
-            ['Flaky (literal)', summary.strict.flaky.length === 0 ? 'none' : summary.strict.flaky.map((id) => `#${id}`).join(', ')],
-            ['Failing (literal)', summary.strict.failing.length === 0 ? 'none' : summary.strict.failing.map((id) => `#${id}`).join(', ')],
+            [
+              'Failing (scored)',
+              summary.failing.length === 0 ? 'none' : summary.failing.map((id) => `#${id}`).join(', '),
+            ],
+            [
+              'Flaky (literal)',
+              summary.strict.flaky.length === 0 ? 'none' : summary.strict.flaky.map((id) => `#${id}`).join(', '),
+            ],
+            [
+              'Failing (literal)',
+              summary.strict.failing.length === 0 ? 'none' : summary.strict.failing.map((id) => `#${id}`).join(', '),
+            ],
           ]}
         />
         <p className="mb-caption">Case ids only: the summary does not carry assertion names.</p>

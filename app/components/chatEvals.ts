@@ -10,7 +10,18 @@ import type { ChatUIMessage } from '../api/chat/route';
 export const INTENTS: readonly Intent[] = ['fresh', 'recheck', 'recall', 'chat'];
 export const VERDICTS: readonly Verdict[] = ['unchanged', 'changed', 'unverifiable', 'source_unavailable'];
 /** The pipeline's stage names in pipeline order; any other stage is listed after these. */
-export const STAGE_ORDER = ['persist', 'route', 'search', 'write', 'validate', 'extract', 'resolve', 'fetch', 'judge', 'summary'];
+export const STAGE_ORDER = [
+  'persist',
+  'route',
+  'search',
+  'write',
+  'validate',
+  'extract',
+  'resolve',
+  'fetch',
+  'judge',
+  'summary',
+];
 
 export interface StageLatency {
   stage: string;
@@ -67,7 +78,9 @@ export interface ChatEvals {
 const share = (part: number, whole: number): number | null => (whole === 0 ? null : part / whole);
 
 function isAnswer(message: ChatUIMessage): boolean {
-  return message.role === 'assistant' && message.parts.some((part) => part.type === 'text' || part.type.startsWith('data-'));
+  return (
+    message.role === 'assistant' && message.parts.some((part) => part.type === 'text' || part.type.startsWith('data-'))
+  );
 }
 
 function stageRank(stage: string): number {
@@ -77,7 +90,12 @@ function stageRank(stage: string): number {
 
 export function chatEvals(messages: readonly ChatUIMessage[]): ChatEvals {
   const answers = messages.filter(isAnswer);
-  const intents: Record<Intent, number> = { fresh: 0, recheck: 0, recall: 0, chat: 0 };
+  const intents: Record<Intent, number> = {
+    fresh: 0,
+    recheck: 0,
+    recall: 0,
+    chat: 0,
+  };
   let withIntent = 0;
   let citedAnswers = 0;
   let fullyCited = 0;
@@ -85,7 +103,12 @@ export function chatEvals(messages: readonly ChatUIMessage[]): ChatEvals {
   let total = 0;
   let live = 0;
   let firstParty = 0;
-  const counts: Record<Verdict, number> = { unchanged: 0, changed: 0, unverifiable: 0, source_unavailable: 0 };
+  const counts: Record<Verdict, number> = {
+    unchanged: 0,
+    changed: 0,
+    unverifiable: 0,
+    source_unavailable: 0,
+  };
   let rows = 0;
   let verifiedNow = 0;
   const stageSums = new Map<string, { sum: number; count: number; first: number }>();
@@ -121,7 +144,11 @@ export function chatEvals(messages: readonly ChatUIMessage[]): ChatEvals {
       } else if (part.type === 'data-timing') {
         timed = true;
         answerMs += part.data.ms;
-        const entry = stageSums.get(part.data.stage) ?? { sum: 0, count: 0, first: order++ };
+        const entry = stageSums.get(part.data.stage) ?? {
+          sum: 0,
+          count: 0,
+          first: order++,
+        };
         entry.sum += part.data.ms;
         entry.count += 1;
         stageSums.set(part.data.stage, entry);
@@ -145,9 +172,25 @@ export function chatEvals(messages: readonly ChatUIMessage[]): ChatEvals {
     answers: answers.length,
     intents: withIntent === 0 ? null : intents,
     answersWithoutIntent: answers.length - withIntent,
-    coverage: { citedAnswers, fullyCited, share: share(fullyCited, citedAnswers), uncitedNumbers },
-    sources: { total, live, firstParty, liveShare: share(live, total), firstPartyShare: share(firstParty, total) },
-    verdicts: { rows, counts, verifiedNow, verifiedShare: share(verifiedNow, rows) },
+    coverage: {
+      citedAnswers,
+      fullyCited,
+      share: share(fullyCited, citedAnswers),
+      uncitedNumbers,
+    },
+    sources: {
+      total,
+      live,
+      firstParty,
+      liveShare: share(live, total),
+      firstPartyShare: share(firstParty, total),
+    },
+    verdicts: {
+      rows,
+      counts,
+      verifiedNow,
+      verifiedShare: share(verifiedNow, rows),
+    },
     latency: {
       stages,
       perAnswer,

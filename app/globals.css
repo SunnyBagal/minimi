@@ -1639,7 +1639,8 @@ details[open] > summary > .mb-row-chevron {
   right: 6px;
 }
 
-.mb-slider:has(.mb-slider-fill) .mb-slider-left {
+.mb-slider:has(.mb-slider-fill) .mb-slider-left,
+.mb-slider-full .mb-slider-right {
   color: var(--on-accent);
 }
 
@@ -1671,7 +1672,8 @@ details[open] > summary > .mb-row-chevron {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
-.mb-round svg {
+/* The ring only; the icon's own svg inside .mb-round-icon stays centred. */
+.mb-round > svg {
   position: absolute;
   inset: 0;
 }

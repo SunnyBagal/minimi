@@ -31,11 +31,20 @@ describe('suiteView', () => {
       { id: 4, status: 'flaky' },
       { id: 5, status: 'pass' },
     ]);
-    expect(suiteView(SUMMARY).literalCells.map((cell) => cell.status)).toEqual(['flaky', 'fail', 'fail', 'fail', 'pass']);
+    expect(suiteView(SUMMARY).literalCells.map((cell) => cell.status)).toEqual([
+      'flaky',
+      'fail',
+      'fail',
+      'fail',
+      'pass',
+    ]);
   });
 
   it('marks incomplete cases as incomplete', () => {
-    expect(suiteView({ ...SUMMARY, incomplete: [4] }).cells[3]).toEqual({ id: 4, status: 'incomplete' });
+    expect(suiteView({ ...SUMMARY, incomplete: [4] }).cells[3]).toEqual({
+      id: 4,
+      status: 'incomplete',
+    });
   });
 
   it('reads "3 / 5 pass · 3 runs · a423aec"', () => {
@@ -44,7 +53,14 @@ describe('suiteView', () => {
   });
 
   it('an empty suite has null shares, not 0', () => {
-    const empty = suiteView({ ...SUMMARY, cases: 0, passAtAll: [], flaky: [], failing: [], strict: { passAtAll: [], flaky: [], failing: [] } });
+    const empty = suiteView({
+      ...SUMMARY,
+      cases: 0,
+      passAtAll: [],
+      flaky: [],
+      failing: [],
+      strict: { passAtAll: [], flaky: [], failing: [] },
+    });
     expect(empty.scoredShare).toBeNull();
     expect(empty.literalShare).toBeNull();
     expect(empty.cells).toEqual([]);

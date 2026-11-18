@@ -35,12 +35,23 @@ const citations = (items: { live: boolean; firstParty: boolean }[]): Part => ({
     })),
   },
 });
-const flags = (uncitedNumbers: string[]): Part => ({ type: 'data-flags', data: { strippedCitations: [], uncitedNumbers } });
-const timing = (stage: string, ms: number): Part => ({ type: 'data-timing', data: { stage, ms } });
-const error = (): Part => ({ type: 'data-error', data: { stage: 'write', message: 'Timed out.' } });
+const flags = (uncitedNumbers: string[]): Part => ({
+  type: 'data-flags',
+  data: { strippedCitations: [], uncitedNumbers },
+});
+const timing = (stage: string, ms: number): Part => ({
+  type: 'data-timing',
+  data: { stage, ms },
+});
+const error = (): Part => ({
+  type: 'data-error',
+  data: { stage: 'write', message: 'Timed out.' },
+});
 const verdict = (value: Verdict, provenance: Provenance): Part => ({
   type: 'data-verdict',
-  data: { row: { check: { verdict: value }, provenance } as unknown as VerdictRow },
+  data: {
+    row: { check: { verdict: value }, provenance } as unknown as VerdictRow,
+  },
 });
 
 describe('chatEvals', () => {
@@ -48,11 +59,26 @@ describe('chatEvals', () => {
     const evals = chatEvals([]);
     expect(evals.answers).toBe(0);
     expect(evals.intents).toBeNull();
-    expect(evals.coverage).toEqual({ citedAnswers: 0, fullyCited: 0, share: null, uncitedNumbers: 0 });
-    expect(evals.sources).toEqual({ total: 0, live: 0, firstParty: 0, liveShare: null, firstPartyShare: null });
+    expect(evals.coverage).toEqual({
+      citedAnswers: 0,
+      fullyCited: 0,
+      share: null,
+      uncitedNumbers: 0,
+    });
+    expect(evals.sources).toEqual({
+      total: 0,
+      live: 0,
+      firstParty: 0,
+      liveShare: null,
+      firstPartyShare: null,
+    });
     expect(evals.verdicts.rows).toBe(0);
     expect(evals.verdicts.verifiedShare).toBeNull();
-    expect(evals.latency).toEqual({ stages: [], perAnswer: [], avgAnswerMs: null });
+    expect(evals.latency).toEqual({
+      stages: [],
+      perAnswer: [],
+      avgAnswerMs: null,
+    });
     expect(evals.errors).toBe(0);
   });
 
@@ -83,24 +109,57 @@ describe('chatEvals', () => {
       answer([text('c'), citations([{ live: false, firstParty: true }]), flags([])]),
       answer([text('d'), flags(['3'])]), // no citations: not in the share, but its flag counts
     ]);
-    expect(evals.coverage).toEqual({ citedAnswers: 3, fullyCited: 2, share: 2 / 3, uncitedNumbers: 3 });
+    expect(evals.coverage).toEqual({
+      citedAnswers: 3,
+      fullyCited: 2,
+      share: 2 / 3,
+      uncitedNumbers: 3,
+    });
   });
 
   it('sources: totals, live share and first-party share over every citation entry', () => {
     const evals = chatEvals([
-      answer([citations([{ live: true, firstParty: true }, { live: false, firstParty: true }])]),
-      answer([citations([{ live: false, firstParty: false }, { live: false, firstParty: true }])]),
+      answer([
+        citations([
+          { live: true, firstParty: true },
+          { live: false, firstParty: true },
+        ]),
+      ]),
+      answer([
+        citations([
+          { live: false, firstParty: false },
+          { live: false, firstParty: true },
+        ]),
+      ]),
     ]);
-    expect(evals.sources).toEqual({ total: 4, live: 1, firstParty: 3, liveShare: 0.25, firstPartyShare: 0.75 });
+    expect(evals.sources).toEqual({
+      total: 4,
+      live: 1,
+      firstParty: 3,
+      liveShare: 0.25,
+      firstPartyShare: 0.75,
+    });
   });
 
   it('verdicts: counts per verdict across all rows and the verified-now share', () => {
     const evals = chatEvals([
-      answer([verdict('unchanged', 'verified_now'), verdict('unchanged', 'verified_now'), verdict('changed', 'verified_now')], 'recheck'),
+      answer(
+        [
+          verdict('unchanged', 'verified_now'),
+          verdict('unchanged', 'verified_now'),
+          verdict('changed', 'verified_now'),
+        ],
+        'recheck',
+      ),
       answer([verdict('unverifiable', 'could_not_verify'), verdict('source_unavailable', 'from_memory')], 'recheck'),
     ]);
     expect(evals.verdicts.rows).toBe(5);
-    expect(evals.verdicts.counts).toEqual({ unchanged: 2, changed: 1, unverifiable: 1, source_unavailable: 1 });
+    expect(evals.verdicts.counts).toEqual({
+      unchanged: 2,
+      changed: 1,
+      unverifiable: 1,
+      source_unavailable: 1,
+    });
     expect(evals.verdicts.verifiedNow).toBe(3);
     expect(evals.verdicts.verifiedShare).toBe(0.6);
   });
@@ -127,14 +186,22 @@ describe('chatEvals', () => {
   });
 
   it('ignores user messages entirely', () => {
-    const fake = { ...user('x'), parts: [citations([{ live: true, firstParty: true }])] } as ChatUIMessage;
+    const fake = {
+      ...user('x'),
+      parts: [citations([{ live: true, firstParty: true }])],
+    } as ChatUIMessage;
     expect(chatEvals([fake]).sources.total).toBe(0);
   });
 });
 
 describe('chatSubtitle and formatting', () => {
   it('reads "4 answers · 1 re-check"', () => {
-    const messages = [answer([text('a')], 'fresh'), answer([text('b')], 'fresh'), answer([text('c')], 'fresh'), answer([text('d')], 'recheck')];
+    const messages = [
+      answer([text('a')], 'fresh'),
+      answer([text('b')], 'fresh'),
+      answer([text('c')], 'fresh'),
+      answer([text('d')], 'recheck'),
+    ];
     expect(chatSubtitle(chatEvals(messages))).toBe('4 answers · 1 re-check');
     expect(chatSubtitle(chatEvals([answer([text('a')], 'recall')]))).toBe('1 answer · 1 recall');
     expect(chatSubtitle(chatEvals([]))).toBe('No answers yet');

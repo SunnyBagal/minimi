@@ -7,7 +7,8 @@ import { readFixture } from './pages';
 
 export type FixtureFailure = 'timeout' | 'not_found';
 
-export type FixturePageSpec = { file: string } | { failure: FixtureFailure };
+/** `file` is read from `evals/fixtures/`. `text` is the page body, for held-out pages that stay out of that directory. */
+export type FixturePageSpec = { file: string } | { text: string } | { failure: FixtureFailure };
 
 export interface FixtureSearchHit {
   match: string;
@@ -96,7 +97,7 @@ export class FixtureSearch implements SearchProvider {
       httpStatus: 200,
       live: true,
       title: new URL(request.url).hostname,
-      text: readFixture(spec.file),
+      text: 'text' in spec ? spec.text : readFixture(spec.file),
     };
   }
 }

@@ -12,6 +12,10 @@
  *   npm run evals -- --case 17 --runs 3
  *   npm run evals -- --cases 1,2,3
  *   npm run evals:quick
+ *   npm run evals:heldout
+ *
+ * `--set heldout` runs cases 101–119. It writes `heldout.json` and a dated
+ * stamp. It never writes `latest.json`, `full.json` or `quick.json`.
  */
 import { execFileSync } from 'node:child_process';
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
@@ -19,6 +23,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { systemClock } from '../src/core/systemClock';
 import { CASES, caseById } from './cases/index';
+import { HELDOUT_CASES, heldoutById } from './heldout/index';
 import { PRICE_SOURCE, redactDeep, SpendMeter, wouldExceed } from './budget';
 import { runHarness, type RunTrace } from './harness';
 import type { JudgeAnswer } from './judge';
@@ -77,9 +82,13 @@ export interface ExecuteResult {
 /** Cases 1–3 are the brief's prompts. 17 is the chat case. 4 is the empty-store no-record case. */
 export const QUICK_IDS: readonly number[] = [1, 2, 3, 17, 4];
 
+export type EvalSet = 'main' | 'heldout';
+
 export interface EvalSelection {
   selftest: boolean;
   quick: boolean;
+  /** `heldout` is cases 101–119. Anything else is the main set. */
+  set: EvalSet;
   runs: number;
   ids: number[];
   /** Stop before a case-run that would take the API spend over this, in USD. */
@@ -130,7 +139,11 @@ function parseIdList(text: string): number[] {
 }
 
 function emptySelection(selftest: boolean, quick: boolean, error: string): EvalSelection {
-  return { selftest, quick, runs: 0, ids: [], budgetUsd: 0, error };
+  return { selftest, quick, set: 'main', runs: 0, ids: [], budgetUsd: 0, error };
+}
+
+function heldoutIds(): number[] {
+  return HELDOUT_CASES.map((item) => item.id);
 }
 
 function isFullSet(ids: number[]): boolean {
@@ -139,7 +152,7 @@ function isFullSet(ids: number[]): boolean {
   return ids.length === all.length && all.every((id) => got.has(id));
 }
 
-/** Reads `--runs`, `--case`, `--cases`, `--budget-usd`, `--quick` and `--selftest`. Default runs is 1. */
+/** Reads `--runs`, `--case`, `--cases`, `--budget-usd`, `--set`, `--quick` and `--selftest`. Default runs is 1. */
 export function parseEvalArgs(argv: string[]): EvalSelection {
   const selftest = argv.includes('--selftest');
   const quick = argv.includes('--quick');
@@ -147,8 +160,16 @@ export function parseEvalArgs(argv: string[]): EvalSelection {
   const casesFlag = readFlag(argv, '--cases');
   const runsFlag = readFlag(argv, '--runs');
   const budgetFlag = readFlag(argv, '--budget-usd');
-  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error ?? budgetFlag.error;
+  const setFlag = readFlag(argv, '--set');
+  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error ?? budgetFlag.error ?? setFlag.error;
   if (missing !== null) return emptySelection(selftest, quick, missing);
+  const set = setFlag.value === undefined ? 'main' : setFlag.value;
+  if (set !== 'main' && set !== 'heldout') {
+    return emptySelection(selftest, quick, 'evals: --set must be main or heldout');
+  }
+  if (set === 'heldout' && (quick || selftest || caseFlag.value !== undefined || casesFlag.value !== undefined)) {
+    return emptySelection(selftest, quick, 'evals: --set heldout does not take --quick, --case, --cases or --selftest');
+  }
   const budgetUsd = budgetFlag.value === undefined ? DEFAULT_BUDGET_USD : Number(budgetFlag.value);
   if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
     return emptySelection(selftest, quick, 'evals: --budget-usd must be a positive number');
@@ -165,30 +186,35 @@ export function parseEvalArgs(argv: string[]): EvalSelection {
   }
 
   let ids: number[];
-  if (caseFlag.value !== undefined) ids = [Number(caseFlag.value)];
+  if (set === 'heldout') ids = heldoutIds();
+  else if (caseFlag.value !== undefined) ids = [Number(caseFlag.value)];
   else if (casesFlag.value !== undefined) ids = parseIdList(casesFlag.value);
   else if (selftest) ids = [1, 4, 17];
   else if (quick) ids = [...QUICK_IDS];
   else ids = allIds();
 
-  if (ids.length === 0 || ids.some((id) => !Number.isInteger(id) || caseById(id) === undefined)) {
+  if (set === 'main' && (ids.length === 0 || ids.some((id) => !Number.isInteger(id) || caseById(id) === undefined))) {
     return emptySelection(selftest, quick, 'evals: --case must be an integer from 1 to 19');
   }
   if (new Set(ids).size !== ids.length) {
     return emptySelection(selftest, quick, 'evals: --cases lists a case more than once');
   }
-  return { selftest, quick, runs, ids, budgetUsd, error: null };
+  return { selftest, quick, set, runs, ids, budgetUsd, error: null };
 }
 
-/** `latest.json` is the 3-of-3 reading: a live run of every case, at least 3 runs. */
-export function writesLatest(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
-  if (selection.selftest || selection.quick || selection.runs < 3) return false;
+/** `latest.json` is the 3-of-3 reading: a live run of every main-set case, at least 3 runs. */
+export function writesLatest(
+  selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'> & { set?: EvalSet },
+): boolean {
+  if (selection.set === 'heldout' || selection.selftest || selection.quick || selection.runs < 3) return false;
   return isFullSet(selection.ids);
 }
 
-/** A live run of every case with fewer than 3 runs. It never replaces `latest.json`. */
-export function writesFull(selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'>): boolean {
-  if (selection.selftest || selection.quick || selection.runs >= 3) return false;
+/** A live run of every main-set case with fewer than 3 runs. It never replaces `latest.json`. */
+export function writesFull(
+  selection: Pick<EvalSelection, 'selftest' | 'quick' | 'runs' | 'ids'> & { set?: EvalSet },
+): boolean {
+  if (selection.set === 'heldout' || selection.selftest || selection.quick || selection.runs >= 3) return false;
   return isFullSet(selection.ids);
 }
 
@@ -236,7 +262,7 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   let stoppedBefore: { id: number; run: number; reason: string } | null = null;
   try {
     for (const id of ids) {
-      const evalCase = caseById(id);
+      const evalCase = selection.set === 'heldout' ? heldoutById(id) : caseById(id);
       if (evalCase === undefined) continue;
       const results: RunRecord[] = [];
       let cutRun: RunRecord | undefined;
@@ -345,6 +371,8 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   // A selftest, a quick run, or any run that is not all 19 cases leaves both alone.
   // A run the budget stopped did not cover every case: it writes only its stamp.
   const complete = stoppedBefore === null && body.incomplete.length === 0;
+  // A held-out run keeps its own file. It never replaces the main set's three.
+  if (complete && selection.set === 'heldout') copyFileSync(file, join(dir, 'heldout.json'));
   if (complete && writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
   if (complete && writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
 

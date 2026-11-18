@@ -18,6 +18,7 @@
     "seed": "tsx scripts/seed.ts",
     "evals": "tsx evals/run.ts",
     "evals:quick": "tsx evals/run.ts --quick",
+    "evals:heldout": "tsx evals/run.ts --set heldout --runs 3",
     "golden": "tsx src/core/llm/golden/run.ts",
     "smoke:fresh": "tsx scripts/smoke-fresh.ts",
     "measure": "tsx scripts/measure.ts"

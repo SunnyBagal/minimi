@@ -27,6 +27,11 @@ export interface TurnTrace {
 export interface CasePart {
   seeds: readonly SeedId[];
   seedOptions?: SeedOptions;
+  /**
+   * Held-out cases seed their own rows here and leave `seeds` empty.
+   * Existing cases leave this unset.
+   */
+  prepare?: (store: MemoryStore) => void;
   /** ISO instant the fake clock starts at. */
   clock: string;
   tz: string;

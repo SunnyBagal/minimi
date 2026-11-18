@@ -90,6 +90,7 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
     if (part === undefined) continue;
     clock.set(part.clock);
     loadSeeds(store, part.seeds, part.seedOptions);
+    part.prepare?.(store);
     const search = new FixtureSearch(clock, part.scenario);
     const deps: AgentDeps = {
       clock,

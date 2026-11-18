@@ -173,6 +173,18 @@ async function judgeClaim(ctx: TurnContext, work: ClaimWork): Promise<VerdictRow
     }
   }
 
+  // A page the search engine only served from its stored copy cannot confirm a claim (the guard
+  // makes it source_unavailable). Say so plainly, and whether that stored copy still has the quote,
+  // so the user knows the difference between "probably the same" and "nothing found".
+  if (decision.verdict === 'source_unavailable' && page !== null && page.status === 'ok' && !page.live) {
+    decision = {
+      ...decision,
+      reason: containsQuote(page.text, claim.quote)
+        ? "The search engine served a stored copy instead of fetching the page live. That copy still shows this value, but it could not be confirmed live today."
+        : "The search engine served a stored copy instead of fetching the page live, and that copy no longer shows this value.",
+    };
+  }
+
   const check = ctx.store.saveCheck({
     claimId: claim.id,
     checkedAtUtc,

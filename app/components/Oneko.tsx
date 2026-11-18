@@ -18,7 +18,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { columnBand, insideRect, keepOut, nekoTarget, placeOutside, type Point, type Rect } from './nekoColumn';
-import { initialNeko, NEKO_FRAME_MS, NEKO_SIZE, nekoFrame, type NekoState } from './onekoCore';
+import { initialNeko, NEKO_EDGE_ARRIVE_PX, NEKO_FRAME_MS, NEKO_SIZE, nekoFrame, type NekoState } from './onekoCore';
 
 /** The elements that make up the conversation column. */
 const COLUMN_SELECTORS = ['.thread', '.composer-form'];
@@ -64,7 +64,14 @@ export function Oneko() {
         target = nekoTarget(pointer, { x: state.x, y: state.y }, NEKO_SIZE, column, view);
         if (target === null) return false;
       }
-      state = nekoFrame(state, { targetX: target.x, targetY: target.y, innerWidth: view.width, innerHeight: view.height });
+      const atEdge = target.x !== pointer.x || target.y !== pointer.y;
+      state = nekoFrame(state, {
+        targetX: target.x,
+        targetY: target.y,
+        innerWidth: view.width,
+        innerHeight: view.height,
+        arriveWithin: atEdge ? NEKO_EDGE_ARRIVE_PX : undefined,
+      });
       return true;
     };
 

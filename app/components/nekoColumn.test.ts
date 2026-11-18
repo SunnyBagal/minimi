@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { columnBand, insideRect, keepOut, nekoTarget, placeOutside, segmentCrosses, targetOutsideColumn, type Rect } from './nekoColumn';
-import { initialNeko, nekoFrame, NEKO_SIZE } from './onekoCore';
+import { initialNeko, NEKO_EDGE_ARRIVE_PX, nekoFrame, NEKO_SIZE } from './onekoCore';
 
 const VIEW = { width: 1280, height: 800 };
 // A 760 px column centred in a 1280 px window, full height: gutters of 260 px.
@@ -89,11 +89,21 @@ describe('nekoTarget', () => {
       const target = nekoTarget(pointer, state, NEKO_SIZE, COLUMN, VIEW);
       expect(target).not.toBeNull();
       if (target === null) break;
-      state = nekoFrame(state, { targetX: target.x, targetY: target.y, innerWidth: VIEW.width, innerHeight: VIEW.height });
+      const atEdge = target.x !== pointer.x || target.y !== pointer.y;
+      state = nekoFrame(state, {
+        targetX: target.x,
+        targetY: target.y,
+        innerWidth: VIEW.width,
+        innerHeight: VIEW.height,
+        arriveWithin: atEdge ? NEKO_EDGE_ARRIVE_PX : undefined,
+      });
       expect(overlaps(state, COLUMN)).toBe(false);
     }
     expect(state.phase).not.toBe('running');
-    expect(Math.hypot(state.x - 244, state.y - 300)).toBeLessThan(48);
+    // Waiting at the edge: the sprite's right side touches the column's left side.
+    // (It stops once it is within NEKO_EDGE_ARRIVE_PX of the edge point.)
+    expect(Math.hypot(state.x + NEKO_SIZE / 2 - COLUMN.left, state.y - 300)).toBeLessThan(NEKO_EDGE_ARRIVE_PX);
+    expect(state.x + NEKO_SIZE / 2).toBeLessThanOrEqual(COLUMN.left);
   });
 });
 

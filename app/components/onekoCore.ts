@@ -27,6 +27,8 @@ export const NEKO_NEAR_PX = 48;
 export const NEKO_IDLE_TICKS = 10;
 /** Tired ticks before it falls asleep. */
 export const NEKO_TIRED_TICKS = 15;
+/** arriveWithin for a target on the column's edge: the cat steps exactly onto it. */
+export const NEKO_EDGE_ARRIVE_PX = 1;
 /** Ticks an alerted cat that is already at its target waits before idling again. */
 export const NEKO_ALERT_TICKS = 3;
 
@@ -93,6 +95,13 @@ export interface NekoInput {
   targetY: number;
   innerWidth: number;
   innerHeight: number;
+  /**
+   * How close a running cat gets before it stops. Defaults to NEKO_NEAR_PX, as in the
+   * portfolio. Oneko.tsx passes a smaller value when the target is the column's edge, so
+   * the cat waits at the edge rather than 48 px short of it. A resting cat still only
+   * wakes when the target is NEKO_NEAR_PX or more away.
+   */
+  arriveWithin?: number;
 }
 
 /** The portfolio's starting state: in the middle of the viewport, idle. */
@@ -132,8 +141,9 @@ export function nekoFrame(state: NekoState, input: NekoInput): NekoState {
   const dx = input.targetX - s.x;
   const dy = input.targetY - s.y;
   const dist = Math.hypot(dx, dy);
+  const near = s.phase === 'running' ? (input.arriveWithin ?? NEKO_NEAR_PX) : NEKO_NEAR_PX;
 
-  if (dist < NEKO_NEAR_PX) {
+  if (dist < near) {
     if (s.phase === 'running') {
       s.phase = 'idle';
       s.tickCount = 0;

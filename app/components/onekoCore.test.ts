@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   angleToDir,
   initialNeko,
+  NEKO_EDGE_ARRIVE_PX,
   NEKO_IDLE_TICKS,
   NEKO_NEAR_PX,
   NEKO_SPEED,
@@ -95,6 +96,18 @@ describe('oneko, ported from the portfolio useNeko hook (follow mode)', () => {
     const running = nekoFrame(alerted, at(1000, 300));
     expect(running.phase).toBe('running');
     expect(running.x).toBeCloseTo(600 + NEKO_SPEED);
+  });
+
+  it('with arriveWithin, runs right onto the target, and once resting only wakes 48 px away', () => {
+    let state = { ...initialNeko(1280, 800), x: 100, y: 100 };
+    const edge = { ...at(300, 100), arriveWithin: NEKO_EDGE_ARRIVE_PX };
+    for (let tick = 0; tick < 40 && (tick === 0 || state.phase === 'running'); tick += 1) state = nekoFrame(state, edge);
+    expect(state.x).toBeCloseTo(300);
+    expect(state.phase).toBe('idle');
+    const nudged = nekoFrame(state, { ...at(300, 130), arriveWithin: NEKO_EDGE_ARRIVE_PX });
+    expect(nudged.phase).toBe('idle');
+    expect(nudged.y).toBe(100);
+    expect(nekoFrame(nudged, { ...at(300, 160), arriveWithin: NEKO_EDGE_ARRIVE_PX }).phase).toBe('running');
   });
 
   it('never steps past the target', () => {

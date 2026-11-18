@@ -222,6 +222,35 @@ describe('numbers', () => {
     expect(numbersAllowed(timed, hidden, []).observed).toEqual(['14']);
   });
 
+  it('the literal reading counts every number in a verdict row, its dates included, and the evidence numbers', () => {
+    const row = {
+      claim: {
+        id: 'c1', turnId: 't1', entity: 'Northwind PG', attribute: 'price', value: '19 USD/month', scope: {},
+        sourceId: 's1', quote: 'Starter 19 USD/month', asOfUtc: '2026-11-10T08:35:00.000Z', volatility: 'high' as const,
+        lastVerifiedAtUtc: '2026-11-10T08:35:00.000Z', supersedesId: null,
+      },
+      check: {
+        id: 'k1', claimId: 'c1', turnId: 't2', checkedAtUtc: '2026-11-13T13:00:00.000Z', verdict: 'changed' as const,
+        newValue: '24 USD/month', newQuote: 'Starter 24 USD/month', sourceId: 's2', reason: 'The page now says 24.', decidedBy: 'judge' as const,
+      },
+      provenance: 'verified_now' as const,
+    };
+    const events = [
+      { type: 'verdict', row },
+      { type: 'citations', items: [{ n: 1, sourceId: 's2', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'Northwind PG went from 19 to 24 USD/month [1], as of 13 Nov 2026 (it was 19 on 10 Nov 2026).' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('Has it changed?', events);
+    const scored = numbersAllowed(run, events, []);
+    expect(scored.observed).toEqual([]);
+    expect(literalAssertions(run)[0]?.observed).toEqual([]);
+    // A number in none of those fields still fails.
+    const invented = [...events.slice(0, 2), { type: 'text', delta: 'It is now 31 USD.' }] as unknown as AgentEvent[];
+    const bad = runWith('Has it changed?', invented);
+    numbersAllowed(bad, invented, []);
+    expect(literalAssertions(bad)[0]?.observed).toEqual(['31']);
+  });
+
   it('fails both checks when the model writes a price that is in no evidence', () => {
     const run = runWith('What does it cost?', textEvents('The plan costs 19 USD.'));
     const scored = numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], []);

@@ -17,3 +17,4 @@ One line per Lane 0 VERIFY item (V1–V8): `V<n>: <what was found> → <what the
 - Dates stay as `formatLocal` prints them ("Tue 3 Nov 2026"). Eval case 8's "3 November 2026" is our eval's wording, not the challenge brief's, so the format is not changed for it.
 - Time zones stay as `formatLocal` prints them (for example "GMT+5:30").
 - Evals: the literal number reading skips spans the app itself injects (timestamps, dates and the recall line in code-built lines); see `evals/TRIAGE.md` change 8. Live eval runs are capped by `--budget-usd` (default 4.5).
+- No-record answers: code prints the dates tried and the nearest matches; the writer adds words only. A numeric date ("3/11") is stated in words in the recall answer ("I read "3/11" as 3 November 2026."), as design review 2.7 asks; the date format itself is unchanged.

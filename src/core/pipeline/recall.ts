@@ -24,6 +24,7 @@ import type {
   Turn,
 } from '../contracts';
 import { claimLabel } from '../claimLabel';
+import { dateWords } from '../dateWords';
 import { noRecord } from './noRecord';
 import { recheck } from './recheck';
 import { evidenceFor, extractInto } from './evidence';
@@ -179,6 +180,11 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   const asked = chosen !== null && chosenHit !== null ? askedOf(chosenHit.userTurn) : null;
   yield { type: 'recall', candidates, hits, chosen, asked };
   yield doneResolve();
+
+  // A numeric date ("3/11") reads two ways; say in words which one was used (design review 2.7).
+  if (chosen !== null && plan.timeRef.kind === 'numeric' && plan.timeText !== null) {
+    yield ctx.textEvent(`I read "${plan.timeText}" as ${dateWords(chosen, 'long')}.\n`);
+  }
 
   if (chosen === null) {
     // Ambiguous: name each candidate with the user's own question as its summary.

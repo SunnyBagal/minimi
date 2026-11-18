@@ -256,8 +256,29 @@ function extras(wanted: readonly string[], allowed: Iterable<string>): string[] 
   return out;
 }
 
+/** Every number a stored claim holds: its value, its quote and its date. */
 function claimNumbers(claims: readonly Claim[]): string[] {
-  return claims.flatMap((claim) => numbersIn(`${claim.value} ${claim.quote}`));
+  return claims.flatMap((claim) => numbersIn(`${claim.value} ${claim.quote} ${claim.asOfUtc}`));
+}
+
+/** Every number a verdict row holds: the claim's value, quote and date, and the check's values, reason and time. */
+function rowNumbers(row: VerdictRow): string[] {
+  return numbersIn(
+    [
+      row.claim.value,
+      row.claim.quote,
+      row.claim.asOfUtc,
+      row.check.newValue ?? '',
+      row.check.newQuote ?? '',
+      row.check.reason,
+      row.check.checkedAtUtc,
+    ].join(' '),
+  );
+}
+
+/** The numbers that identify this turn's evidence items: [1]…[n]. */
+function evidenceNumbers(events: AgentEvent[]): string[] {
+  return ofType(events, 'citations').flatMap((event) => event.items.map((item) => String(item.n)));
 }
 
 /** The spec's literal number check. It is recorded, and it does not score the run. */
@@ -272,13 +293,8 @@ function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[]): Set
   return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
     ...claimNumbers(allClaims(run.store)),
-    ...verdictsOf(events).flatMap((row) =>
-      numbersIn(
-        [row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason].join(
-          ' ',
-        ),
-      ),
-    ),
+    ...verdictsOf(events).flatMap(rowNumbers),
+    ...evidenceNumbers(events),
     ...sources.flatMap((text) => numbersIn(text)),
   ]);
 }

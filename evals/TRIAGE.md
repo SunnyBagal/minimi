@@ -97,3 +97,14 @@ Codex review of this round (`docs/review/fix-prompts-r1-codex.md`), all fixed of
 - With the plan in `scope.plan`, fallback searches, the summary rows, the verdict table and recall rows name the plan through one helper (`src/core/claimLabel.ts`), so a Basic and a Pro price never read the same.
 - The chat rule keeps numbers already present in text it is asked to quote, rewrite or check (the eval judge quotes through the chat writer).
 These changes came after the 19 × 3 run on `a423aec` and were not re-measured live.
+
+## Round eval-fix-r2 (19 Nov 2026): toward 19 of 19 on both readings
+
+Replay of `evals/results/latest.json` (19 × 3 on `a423aec`, scored 17 of 19, literal 4 of 19) against its traces, offline:
+
+| # | Change | Kind | Before | After |
+| --- | --- | --- | --- | --- |
+| 12 | The literal (and scored) allowed set reads every number the spec's sources hold: a verdict row's claim value, quote **and date** (`asOfUtc`) and its check's values, reason **and time** (`checkedAtUtc`); a stored claim's value, quote **and date**; and the evidence numbers [1]…[n] of this turn's citations. Before, only the rows' and claims' value/quote/reason text was read. This is the spec's own wording ("numbers in evidence, verdict rows, stored claims and the user message"), not a looser check. Note: ISO time digits (for example 08, 35) are now in the set too. | harness | Literal rejected `["13","2026"]` (an "as of 13 Nov 2026" from the row's check time) and `["1","2","3","4"]` (citation numbers) in 12 cases. | Replay: cases 1, 2, 3, 9, 10, 11, 14, 15, 16, 19 and runs 2–3 of 12 clear. `numbers.test.ts` › "the literal reading counts every number in a verdict row, its dates included, and the evidence numbers" (an invented 31 still fails). |
+| 13 | **No-record answers: code states the dates.** `noRecord.ts` prints "I found no saved answer for 10 Nov 2026 or 3 Nov 2026." and the nearest matches with their dates; the writer explains in words and repeats no date. Code does date work (DESIGN.md, "Why"). | product | Cases 4, 5, 6: the writer wrote the tried dates, rejected by the literal reading. | Dates are app-injected (outside the literal check by provenance); the case assertions still see them in the shown answer. `recall.test.ts` › "no record: code states the dates tried …". The Lane 4 test that pinned "Name dates exactly as they are written in the input" in the writer prompt now pins "Do not repeat any date", because code names them. |
+| 14 | **A numeric date is stated in words:** "I read "3/11" as 3 November 2026." The design review (2.7) requires that the answer states the date used for an ambiguous numeric date. The app's date format is unchanged. | product | Case 8 failed every run: "answer says 3 November 2026". | `recall.test.ts` › "a numeric date is stated in words". |
+| 15 | The fresh writer never turns a relative day ("on Monday") into a calendar date. | product | Case 12 run 1 wrote "Monday 9 Nov 2026". | Measured live only. |

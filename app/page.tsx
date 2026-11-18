@@ -25,6 +25,7 @@ import { CatField } from './components/CatField';
 import { DevFooter } from './components/DevFooter';
 import { CheckIcon, CopyIcon, EditIcon, MoonIcon, NewChatIcon, SendIcon, SunIcon } from './components/icons';
 import { Markdown } from './components/Markdown';
+import { Oneko } from './components/Oneko';
 import { RecallCard } from './components/RecallCard';
 import { HISTORY_KEY, resetSession, sessionId } from './components/session';
 import { Sources } from './components/Sources';
@@ -305,6 +306,7 @@ export default function Page() {
     <>
       <CatField />
       <div className="app">
+        <Oneko />
         <header className="topbar">
           <div className="topbar-inner">
             <div className="brand">

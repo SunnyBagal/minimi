@@ -4,13 +4,12 @@
  * and gets text back. The art is drawn for this project.
  *
  *   createField(seed)                       -> FieldState (the drifting cats)
- *   stepNeko(neko, pointer, tMs, cols, rows) -> Neko       (the pointer cat, one step)
  *   renderLayers(cols, rows, tMs, state)    -> string[][] (far, middle, near)
  *   renderFrame(cols, rows, tMs, state)     -> string[]   (the three, composited)
  *
  * Drifting cats are a closed-form function of time, so a frame never depends
- * on the frames before it and nothing accumulates. Only the pointer cat has
- * state, and stepNeko returns a new object each step.
+ * on the frames before it and nothing accumulates. The pointer cat is oneko
+ * (Oneko.tsx), not part of this field.
  */
 
 export type CatKind = 'walker' | 'sitter' | 'sleeper' | 'player';
@@ -30,24 +29,8 @@ export interface Cat {
   phase: number;
 }
 
-export type NekoMode = 'run' | 'sit' | 'sleep';
-
-export interface Neko {
-  /** Top-left cell, fractional. */
-  x: number;
-  y: number;
-  mode: NekoMode;
-  facing: 1 | -1;
-  /** The last pointer cell seen. */
-  target: { col: number; row: number } | null;
-  /** When the pointer last moved (or the neko last ran), in ms. */
-  stillSinceMs: number;
-  lastStepMs: number | null;
-}
-
 export interface FieldState {
   cats: Cat[];
-  neko: Neko | null;
 }
 
 // ------------------------------------------------------------- tunables
@@ -72,17 +55,6 @@ const ZZZ_FRAME_MS = 750;
 const PLAY_CYCLE_MS = 2600;
 /** Columns the yarn rolls (and the cat then chases) per play cycle. */
 const PLAY_ROLL = 6;
-
-export const NEKO_SPEED_COLS = 26;
-export const NEKO_SPEED_ROWS = 11;
-/** The neko stops this far from the pointer, in columns and rows. */
-export const NEKO_GAP_COLS = 4;
-export const NEKO_GAP_ROWS = 2;
-/** With the pointer still this long, the neko falls asleep. */
-export const NEKO_SLEEP_AFTER_MS = 6000;
-/** Longest step a single frame may take (after a hidden tab, say). */
-export const NEKO_MAX_STEP_MS = 200;
-const NEKO_RUN_FRAME_MS = 110;
 
 // -------------------------------------------------------------- sprites
 // Original art. Every frame of one sprite has the same height. Spaces are
@@ -116,19 +88,6 @@ const SLEEP: string[][] = [
 const PLAY_BACK = [' /\\_/\\   ', '( o.o )  ', ' )   ( \\ ', '(_|_|_)~ '];
 const PLAY_BAT = [' /\\_/\\   ', '( o.o )  ', ' )   (--\'', '(_|_|_)~ '];
 const PLAY_WIDTH = 9;
-
-const NEKO_RUN: string[][] = [
-  ['   /\\_/\\ ', '~=/ o.o )', '  /_/ \\_\\'],
-  ['   /\\_/\\ ', '~=/ o.o )', '   |_ |_ '],
-];
-const NEKO_SIT = ['  /\\_/\\  ', ' ( o.o ) ', ' (")_(")~'];
-const NEKO_BLINK = ['  /\\_/\\  ', ' ( -.- ) ', ' (")_(")~'];
-const NEKO_SLEEP: string[][] = [
-  ['       z ', '  /\\_/\\  ', ' ( -.- )~'],
-  ['        Z', '  /\\_/\\ z', ' ( -.- )~'],
-];
-export const NEKO_WIDTH = 9;
-export const NEKO_HEIGHT = 3;
 
 const MIRROR: Record<string, string> = { '/': '\\', '\\': '/', '(': ')', ')': '(', '<': '>', '>': '<', '[': ']', ']': '[', '{': '}', '}': '{', "'": '`', '`': "'" };
 
@@ -164,7 +123,7 @@ function random(seed: number): () => number {
 const KIND_ORDER: CatKind[] = ['walker', 'sleeper', 'player', 'sitter'];
 
 /** MAX_CATS cats, every kind present among the first four, spread over rows and layers. */
-export function createField(seed: number, withNeko = true): FieldState {
+export function createField(seed: number): FieldState {
   const next = random(seed);
   const cats: Cat[] = [];
   for (let index = 0; index < MAX_CATS; index += 1) {
@@ -182,11 +141,7 @@ export function createField(seed: number, withNeko = true): FieldState {
       phase: Math.floor(next() * 10000),
     });
   }
-  return { cats, neko: withNeko ? createNeko() : null };
-}
-
-export function createNeko(): Neko {
-  return { x: 2, y: 2, mode: 'sit', facing: 1, target: null, stillSinceMs: 0, lastStepMs: null };
+  return { cats };
 }
 
 /** How many of the field's cats a grid this size shows. */
@@ -300,19 +255,8 @@ function catHeight(cat: Cat): number {
   return sitSprite(0, false).length;
 }
 
-/** The neko's sprite at time t. */
-export function nekoSprite(neko: Neko, tMs: number): string[] {
-  if (neko.mode === 'run') {
-    const sprite = NEKO_RUN[frameAt(tMs, NEKO_RUN_FRAME_MS, NEKO_RUN.length)] as string[];
-    return neko.facing < 0 ? mirror(sprite) : sprite;
-  }
-  if (neko.mode === 'sleep') return NEKO_SLEEP[frameAt(tMs, ZZZ_FRAME_MS, NEKO_SLEEP.length)] as string[];
-  return mod(tMs, BLINK_EVERY_MS) < BLINK_MS ? NEKO_BLINK : NEKO_SIT;
-}
-
 /**
  * Three grids, far to near, each `rows` strings of exactly `cols` characters.
- * The neko is drawn on the near layer.
  */
 export function renderLayers(cols: number, rows: number, tMs: number, state: FieldState): string[][] {
   const width = Math.max(0, Math.floor(cols));
@@ -326,7 +270,6 @@ export function renderLayers(cols: number, rows: number, tMs: number, state: Fie
     const grid = grids[cat.layer] as string[][];
     for (const part of pose.parts) blit(grid, part.sprite, left + part.dx, top);
   }
-  if (state.neko !== null) blit(grids[2] as string[][], nekoSprite(state.neko, tMs), state.neko.x, state.neko.y);
   return grids.map((grid) => grid.map((row) => row.join('')));
 }
 
@@ -341,50 +284,4 @@ export function renderFrame(cols: number, rows: number, tMs: number, state: Fiel
     });
   }
   return out.map((row) => row.join(''));
-}
-
-// ---------------------------------------------------------------- neko
-
-/**
- * One step of the pointer cat. It runs toward the pointer and stops a short
- * gap away, sits, and falls asleep when the pointer has been still for
- * NEKO_SLEEP_AFTER_MS. Moving the pointer wakes it. `pointer` is a grid cell,
- * or null when there has been none.
- */
-export function stepNeko(
-  neko: Neko,
-  pointer: { col: number; row: number } | null,
-  tMs: number,
-  cols: number,
-  rows: number,
-): Neko {
-  const dt = neko.lastStepMs === null ? 0 : Math.min(NEKO_MAX_STEP_MS, Math.max(0, tMs - neko.lastStepMs));
-  const moved =
-    pointer !== null && (neko.target === null || neko.target.col !== pointer.col || neko.target.row !== pointer.row);
-  const target = pointer ?? neko.target;
-  let { x, y, facing } = neko;
-  let stillSinceMs = moved ? tMs : neko.stillSinceMs;
-  let mode: NekoMode;
-
-  const dx = target === null ? 0 : target.col - (x + NEKO_WIDTH / 2);
-  const dy = target === null ? 0 : target.row - (y + NEKO_HEIGHT / 2);
-  const far = Math.abs(dx) > NEKO_GAP_COLS || Math.abs(dy) > NEKO_GAP_ROWS;
-  if (target !== null && far) {
-    mode = 'run';
-    stillSinceMs = tMs;
-    const seconds = dt / 1000;
-    // Move along both axes at once; cells are about twice as tall as wide.
-    const wantX = Math.abs(dx) > NEKO_GAP_COLS ? dx - Math.sign(dx) * NEKO_GAP_COLS : 0;
-    const wantY = Math.abs(dy) > NEKO_GAP_ROWS ? dy - Math.sign(dy) * NEKO_GAP_ROWS : 0;
-    const length = Math.hypot(wantX / NEKO_SPEED_COLS, wantY / NEKO_SPEED_ROWS);
-    const share = length === 0 ? 0 : Math.min(1, seconds / length);
-    x += wantX * share;
-    y += wantY * share;
-    if (Math.abs(dx) >= 1) facing = dx < 0 ? -1 : 1;
-  } else {
-    mode = tMs - stillSinceMs >= NEKO_SLEEP_AFTER_MS ? 'sleep' : 'sit';
-  }
-  x = Math.min(Math.max(0, x), Math.max(0, cols - NEKO_WIDTH));
-  y = Math.min(Math.max(0, y), Math.max(0, rows - NEKO_HEIGHT));
-  return { x, y, mode, facing, target: target === null ? null : { ...target }, stillSinceMs, lastStepMs: tMs };
 }

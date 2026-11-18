@@ -3,28 +3,18 @@ import {
   catPose,
   catsFor,
   createField,
-  createNeko,
   mirror,
-  NEKO_GAP_COLS,
-  NEKO_GAP_ROWS,
-  NEKO_HEIGHT,
-  NEKO_MAX_STEP_MS,
-  NEKO_SLEEP_AFTER_MS,
-  NEKO_WIDTH,
-  nekoSprite,
   renderFrame,
   renderLayers,
-  stepNeko,
   type Cat,
   type FieldState,
-  type Neko,
 } from './catFrames';
 
 const COLS = 120;
 const ROWS = 40;
 
 function only(cat: Partial<Cat> & Pick<Cat, 'kind'>): FieldState {
-  return { cats: [{ x0: 0.3, y: 0.5, speed: 4, layer: 2, phase: 0, ...cat }], neko: null };
+  return { cats: [{ x0: 0.3, y: 0.5, speed: 4, layer: 2, phase: 0, ...cat }] };
 }
 
 function nonBlank(lines: string[]): number {
@@ -34,13 +24,6 @@ function nonBlank(lines: string[]): number {
 /** Leftmost column with a non-space character, across all rows. */
 function leftmost(lines: string[]): number {
   return Math.min(...lines.map((line) => line.search(/\S/)).filter((index) => index >= 0));
-}
-
-/** Runs the neko for `ms` at 12 fps toward `pointer`. */
-function run(neko: Neko, pointer: { col: number; row: number } | null, fromMs: number, ms: number): Neko {
-  let current = neko;
-  for (let t = fromMs; t <= fromMs + ms; t += 1000 / 12) current = stepNeko(current, pointer, t, COLS, ROWS);
-  return current;
 }
 
 describe('renderFrame', () => {
@@ -180,79 +163,5 @@ describe('the drifting cats', () => {
     expect(ballAt(1500)).toBeGreaterThan(ballAt(100)); // rolled away
     expect(ballAt(2550)).toBeLessThan(ballAt(1500)); // the cat caught up
     expect(catPose(cat, 2550).travelled).toBeGreaterThan(catPose(cat, 1500).travelled);
-  });
-});
-
-describe('the pointer cat (neko)', () => {
-  it('runs toward the pointer and faces it', () => {
-    const start = { ...createNeko(), x: 10, y: 10 };
-    const after = run(start, { col: 90, row: 30 }, 0, 500);
-    expect(after.mode).toBe('run');
-    expect(after.x).toBeGreaterThan(start.x);
-    expect(after.y).toBeGreaterThan(start.y);
-    expect(after.facing).toBe(1);
-    const back = run(after, { col: 2, row: 30 }, 600, 300);
-    expect(back.facing).toBe(-1);
-  });
-
-  it('sits a short distance from the pointer when it arrives', () => {
-    const arrived = run({ ...createNeko(), x: 10, y: 10 }, { col: 60, row: 20 }, 0, 6000);
-    expect(arrived.mode).toBe('sit');
-    const centreX = arrived.x + NEKO_WIDTH / 2;
-    const centreY = arrived.y + NEKO_HEIGHT / 2;
-    expect(Math.abs(60 - centreX)).toBeLessThanOrEqual(NEKO_GAP_COLS + 0.01);
-    expect(Math.abs(20 - centreY)).toBeLessThanOrEqual(NEKO_GAP_ROWS + 0.01);
-    expect(Math.abs(60 - centreX)).toBeGreaterThan(NEKO_GAP_COLS - 1);
-  });
-
-  it('falls asleep when the pointer stays still, and wakes when it moves', () => {
-    const arrived = run({ ...createNeko(), x: 10, y: 10 }, { col: 30, row: 12 }, 0, 3000);
-    expect(arrived.mode).toBe('sit');
-    const asleep = run(arrived, { col: 30, row: 12 }, 3100, NEKO_SLEEP_AFTER_MS + 500);
-    expect(asleep.mode).toBe('sleep');
-    expect(nekoSprite(asleep, 0).join('')).toMatch(/[zZ]/);
-    // A small move that stays within the gap wakes it without making it run.
-    const near = { col: Math.round(asleep.x + NEKO_WIDTH / 2), row: Math.round(asleep.y + NEKO_HEIGHT / 2) };
-    const nudged = stepNeko(asleep, near, 3100 + NEKO_SLEEP_AFTER_MS + 600, COLS, ROWS);
-    expect(nudged.mode).toBe('sit');
-  });
-
-  it('sits, then sleeps, when there has been no pointer at all', () => {
-    const idle = run(createNeko(), null, 0, 1000);
-    expect(idle.mode).toBe('sit');
-    expect(run(idle, null, 1100, NEKO_SLEEP_AFTER_MS).mode).toBe('sleep');
-  });
-
-  it('never jumps more than one capped step after a long gap (a hidden tab)', () => {
-    const before = stepNeko({ ...createNeko(), x: 0, y: 0 }, { col: 110, row: 35 }, 0, COLS, ROWS);
-    const after = stepNeko(before, { col: 110, row: 35 }, 60_000, COLS, ROWS);
-    const moved = Math.hypot(after.x - before.x, (after.y - before.y) * 2);
-    const capped = run({ ...createNeko(), x: 0, y: 0 }, { col: 110, row: 35 }, 0, NEKO_MAX_STEP_MS);
-    expect(moved).toBeLessThanOrEqual(Math.hypot(capped.x, capped.y * 2) * 1.5 + 1);
-  });
-
-  it('stays on the grid', () => {
-    const far = run(createNeko(), { col: 5000, row: 5000 }, 0, 20_000);
-    expect(far.x).toBeLessThanOrEqual(COLS - NEKO_WIDTH);
-    expect(far.y).toBeLessThanOrEqual(ROWS - NEKO_HEIGHT);
-    const negative = run(createNeko(), { col: -50, row: -50 }, 0, 5000);
-    expect(negative.x).toBeGreaterThanOrEqual(0);
-    expect(negative.y).toBeGreaterThanOrEqual(0);
-  });
-
-  it('returns a new object and leaves the old one alone', () => {
-    const neko = createNeko();
-    const copy = structuredClone(neko);
-    const next = stepNeko(neko, { col: 50, row: 20 }, 100, COLS, ROWS);
-    expect(next).not.toBe(neko);
-    expect(neko).toEqual(copy);
-  });
-
-  it('is drawn on the near layer, running frames alternating', () => {
-    const neko: Neko = { ...createNeko(), mode: 'run', x: 20, y: 5 };
-    const layers = renderLayers(COLS, ROWS, 0, { cats: [], neko });
-    expect(nonBlank(layers[2]!)).toBeGreaterThan(0);
-    expect(nonBlank(layers[0]!) + nonBlank(layers[1]!)).toBe(0);
-    expect(nekoSprite(neko, 0)).not.toEqual(nekoSprite(neko, 110));
   });
 });

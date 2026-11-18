@@ -66,7 +66,7 @@ export function VerdictTable({ rows }: { rows: VerdictRow[] }) {
                         <a className="cite" href={row.nowSource.url} target="_blank" rel="noopener noreferrer">
                           [{row.nowSource.n}]
                         </a>{' '}
-                        <span className="cell-note">{row.nowSource.live ? 'live' : 'cached'}</span>
+                        <span className="cell-note">{row.nowSource.live ? 'live' : 'search-index copy'}</span>
                       </div>
                     ) : null}
                   </div>

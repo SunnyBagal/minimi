@@ -62,12 +62,35 @@ export function piecesOf(text: string, byN: Map<number, Citation>, uncited: stri
   return [...links, ...marks].sort((a, b) => a.start - b.start);
 }
 
-/** An inline [n] citation, as a small chip linking to the source. */
+/** How the source's text was obtained, in plain words, for the tooltip. */
+export function stateLabel(ref: Citation): string {
+  return ref.live ? 'fetched live' : 'cached copy from the search index';
+}
+
+/** "checked 20:26 GMT+5:30 · fetched live" */
+export function citationTip(ref: Citation): string {
+  return `${checkedLabel(ref)} · ${stateLabel(ref)}`;
+}
+
+/**
+ * An inline [n] citation: a small chip that shows only [n] and links to the
+ * source. When it was checked and whether it was live is in the tooltip (title,
+ * and a CSS tooltip on hover and focus) and in the accessible name.
+ */
 export function CitationLink({ citation }: { citation: Citation }) {
+  const tip = citationTip(citation);
+  const title = citation.title !== null && citation.title !== '' ? `: ${citation.title}` : '';
   return (
-    <a className="cite" href={citation.url} title={checkedLabel(citation)} target="_blank" rel="noopener noreferrer">
+    <a
+      className="cite"
+      href={citation.url}
+      title={tip}
+      data-tip={tip}
+      aria-label={`Source ${citation.n}${title}, ${tip}`}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
       [{citation.n}]
-      <sup className="cite-state"> {citation.live ? 'live' : 'cached'}</sup>
     </a>
   );
 }

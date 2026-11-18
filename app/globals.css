@@ -3,7 +3,7 @@
 :root {
   --paper: #f5f4f0;
   --surface: #ffffff;
-  --surface-glass: rgba(250, 249, 246, 0.74);
+  --surface-glass: rgba(250, 249, 246, 0.88);
   --ink: #141414;
   --ink-muted: #63625d;
   --ink-faint: #8d8c86;
@@ -13,7 +13,8 @@
   --accent-ring: rgba(168, 93, 20, 0.45);
   --code-bg: #f1efe9;
   --mark-bg: rgba(214, 160, 40, 0.24);
-  --field: rgba(20, 20, 20, 0.16);
+  --field: rgba(20, 20, 20, 0.34);
+  --piece: rgba(20, 20, 20, 0.3);
   --shadow: 0 1px 2px rgba(20, 20, 20, 0.04), 0 6px 24px rgba(20, 20, 20, 0.05);
 
   --pill-changed-bg: #fbecd9;
@@ -40,7 +41,7 @@
 :root[data-theme='dark'] {
   --paper: #0d0d0e;
   --surface: #171719;
-  --surface-glass: rgba(18, 18, 20, 0.72);
+  --surface-glass: rgba(18, 18, 20, 0.88);
   --ink: #ecebe6;
   --ink-muted: #a3a29c;
   --ink-faint: #75746f;
@@ -50,7 +51,8 @@
   --accent-ring: rgba(230, 168, 92, 0.5);
   --code-bg: #202023;
   --mark-bg: rgba(230, 168, 92, 0.22);
-  --field: rgba(236, 235, 230, 0.11);
+  --field: rgba(236, 235, 230, 0.24);
+  --piece: rgba(236, 235, 230, 0.22);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.25);
 
   --pill-changed-bg: #3a2a16;
@@ -72,7 +74,7 @@
   :root:not([data-theme='light']) {
     --paper: #0d0d0e;
     --surface: #171719;
-    --surface-glass: rgba(18, 18, 20, 0.72);
+    --surface-glass: rgba(18, 18, 20, 0.88);
     --ink: #ecebe6;
     --ink-muted: #a3a29c;
     --ink-faint: #75746f;
@@ -82,7 +84,8 @@
     --accent-ring: rgba(230, 168, 92, 0.5);
     --code-bg: #202023;
     --mark-bg: rgba(230, 168, 92, 0.22);
-    --field: rgba(236, 235, 230, 0.11);
+    --field: rgba(236, 235, 230, 0.24);
+    --piece: rgba(236, 235, 230, 0.22);
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.25);
 
     --pill-changed-bg: #3a2a16;
@@ -181,15 +184,59 @@ button {
 }
 
 .catfield-far {
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .catfield-mid {
-  opacity: 0.7;
+  opacity: 0.75;
 }
 
 .catfield-near {
   opacity: 1;
+}
+
+/* The two ascii-magic.com pieces, one per bottom gutter, sized to fit it. */
+.gutter-piece {
+  display: none;
+  position: absolute;
+  bottom: calc(var(--composer-h) + 14px);
+  margin: 0;
+  font-family: Menlo, 'DejaVu Sans Mono', Consolas, ui-monospace, monospace;
+  /* Menlo's advance is 0.602 em: the piece's width is cols * 0.602 * font-size. */
+  font-size: min(11px, calc((50vw - var(--column) / 2 - 40px) / (var(--cols, 80) * 0.61)));
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: pre;
+  color: var(--piece);
+}
+
+.gutter-piece-left {
+  left: 16px;
+}
+
+.gutter-piece-right {
+  right: 16px;
+}
+
+@media (min-width: 1240px) and (min-height: 640px) {
+  .gutter-piece {
+    display: block;
+  }
+}
+
+/* oneko (Oneko.tsx): above the cat field and the thread, below the header and composer. */
+.oneko {
+  position: fixed;
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  image-rendering: pixelated;
+  background-image: url('/oneko/oneko.gif');
+}
+
+.oneko[hidden] {
+  display: none;
 }
 
 /* ------------------------------------------------------------------ app */
@@ -549,11 +596,30 @@ button {
   color: var(--surface);
 }
 
-.cite-state {
-  font-size: 0.85em;
+.cite {
+  position: relative;
+}
+
+/* The tooltip: when the source was checked and whether it was fetched live. */
+.cite[data-tip]:hover::after,
+.cite[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  bottom: calc(100% + 6px);
+  width: max-content;
+  max-width: min(300px, 70vw);
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
   font-weight: 500;
-  opacity: 0.75;
-  vertical-align: baseline;
+  line-height: 1.4;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: var(--shadow);
 }
 
 mark.uncited {
@@ -641,6 +707,23 @@ mark.uncited small {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.source-state {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.source-live {
+  color: var(--pill-unchanged-fg);
+}
+
+.sources-note {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.45;
   color: var(--ink-faint);
 }
 

@@ -68,6 +68,7 @@ export const evalCase: EvalCase = {
       ok('turn B Northwind verdict is changed', repeatNorth?.check.verdict === 'changed', repeatNorth?.check.verdict ?? null),
       ok('turn B newValue contains 24', (repeatNorth?.check.newValue ?? '').includes('24'), repeatNorth?.check.newValue ?? null),
       ok('exactly one claim supersedes the original Northwind claim', oneSupersede, currentNorth?.supersedesId ?? null),
+      numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], [], 'first turn'),
       numbersAllowed(run, againEvents, [], 'turn A'),
       numbersAllowed(run, repeatEvents, [], 'turn B'),
     ];

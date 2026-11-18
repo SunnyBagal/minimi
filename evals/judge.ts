@@ -43,7 +43,8 @@ function redact(text: string, secret: string | null): string {
  */
 export function parseJudgeReply(raw: string): Pick<JudgeAnswer, 'answer' | 'quote'> {
   const trimmed = raw.trim();
-  const first = (/^[\s*_"'`]*([A-Za-z]+)/.exec(trimmed)?.[1] ?? '').toLowerCase();
+  // The verdict is a whole first word: "No." and "**Yes**" count; "No123", "no_idea", "Nope" do not.
+  const first = (/^[\s*_"'`]*(yes|no)(?![A-Za-z0-9_])/i.exec(trimmed)?.[1] ?? '').toLowerCase();
   const answer = first === 'yes' ? 'yes' : first === 'no' ? 'no' : 'unparsed';
   const quoted = trimmed.match(/"([^"]+)"/);
   return { answer, quote: answer === 'yes' ? (quoted?.[1] ?? null) : null };

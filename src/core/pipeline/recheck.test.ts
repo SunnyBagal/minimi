@@ -17,7 +17,7 @@ function verdicts(events: AgentEvent[]) {
 }
 
 /** Seeds a stored question/answer pair on 9 Nov with the given claims. */
-function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attribute?: string; value?: string; quote?: string; url?: string; firstParty?: boolean; pageText?: string; scope?: ClaimScope }[]) {
+function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attribute?: string; value?: string; quote?: string; url?: string; firstParty?: boolean; pageText?: string; scope?: ClaimScope; live?: boolean }[]) {
   const user = userTurn(r.store, { content: 'What does Neon Launch cost?', localDate: '2026-11-09' });
   const answer = assistantTurn(r.store, { localDate: '2026-11-09' });
   const refs: SourceRef[] = [];
@@ -25,6 +25,7 @@ function storedAnswer(r: ReturnType<typeof rig>, claims: { entity?: string; attr
     const src = source(r.store, {
       url: spec.url ?? NEON_PAGE,
       firstParty: spec.firstParty ?? true,
+      ...(spec.live !== undefined ? { live: spec.live } : {}),
       text: spec.pageText ?? spec.quote ?? 'The Launch plan costs 19 USD per month.',
     });
     claim(r.store, answer.id, src.id, {
@@ -127,7 +128,20 @@ describe('recheck', () => {
     const events = await r.run({ message: 'Is that still right?' });
     const row = verdicts(events)[0];
     expect(row?.provenance).toBe('could_not_verify');
-    expect(textOf(events)).toMatch(/Couldn't verify Neon price this time \([^)]*\); last verified 19 USD\/month on \d{1,2} [A-Z][a-z]{2} \d{4}\./);
+    // The stored source was not a live fetch and the claim was never re-verified: it was only seen in an index copy.
+    expect(textOf(events)).toMatch(
+      /Couldn't verify Neon price this time \([^)]*\); last seen in a search-index copy as 19 USD\/month on \d{1,2} [A-Z][a-z]{2} \d{4}\./,
+    );
+  });
+
+  it('says "last verified" only for a claim whose source was live or that a later re-check verified', async () => {
+    const r = recheckRig({
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true }), write: ['Summary.'] },
+      search: { pages: { [NEON_PAGE]: { status: 'timeout', live: false, text: '' } }, results: {} },
+    });
+    storedAnswer(r, [{ live: true }]);
+    const events = await r.run({ message: 'Is that still right?' });
+    expect(textOf(events)).toMatch(/last verified 19 USD\/month on/);
   });
 
   it('extraction on demand: a re-check of a turn whose extraction is pending still returns verdicts', async () => {

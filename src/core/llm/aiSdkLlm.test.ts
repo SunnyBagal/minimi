@@ -443,9 +443,10 @@ describe('createAiSdkLlm', () => {
     expect(withNearest).not.toContain('2026-11-');
 
     const asked = body(calls[2]);
-    expect(asked).toContain('Asked on: Tue 10 Nov 2026');
+    expect(asked).toContain('Earlier question asked on: Tue 10 Nov 2026');
     expect(asked).not.toContain('2026-11-');
-    expect(calls[2]?.instructions).toContain('Name dates exactly as they are written in the input.');
+    // Code prints when the user asked (recall card) and when the check ran (Checked line); the summary writes no dates.
+    expect(calls[2]?.instructions).toContain('Do not write any date or time');
   });
 
   it('puts page text and fresh result text through data blocks', async () => {

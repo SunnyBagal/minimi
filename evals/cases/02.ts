@@ -1,3 +1,4 @@
+import { formatLocal } from '../../src/core/time/format';
 import { chosenIs, numbersAllowed, ofType, ok, verdictIs, verdictsOf } from '../assert';
 import { MSG_CASE_2 } from '../messages';
 import { scenarioPipeloomSame } from '../scenarios';
@@ -21,7 +22,11 @@ export const evalCase: EvalCase = {
       verdictIs(events, 'Pipeloom', 'price', 'unchanged'),
       ok('decidedBy is fast_path', row?.check.decidedBy === 'fast_path', row?.check.decidedBy ?? null),
       ok('exactly 1 page fetch', fetches.length === 1, fetches.length),
-      ok('answer shows a check time', /\b\d{1,2}:\d{2}\b/.test(answer), answer),
+      ok(
+        "answer shows this check's time",
+        verdictsOf(events).some((row) => answer.includes(`Checked ${formatLocal(row.check.checkedAtUtc, TZ)}`)),
+        answer,
+      ),
       ok(
         'flags.uncitedNumbers is empty',
         flags.length > 0 && flags.every((flag) => flag.uncitedNumbers.length === 0),

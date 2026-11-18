@@ -154,7 +154,8 @@ describe('numbers', () => {
     expect(strict?.observed).toEqual(['1']);
   });
 
-  it('passes the scored check and fails the literal one when the only extra numbers are citation markers', () => {
+  it('fails both readings on citation markers that name no evidence item of the turn', () => {
+    // No citations event: [1]..[4] point at nothing, so both readings report them.
     const run = runWith(
       'Name the tools.',
       textEvents('Pipeloom [1]. Dealbase [2]. Closewise [3]. Leadharbor [4].'),
@@ -162,19 +163,19 @@ describe('numbers', () => {
     const events = run.parts[0]?.traces[0]?.events ?? [];
     const scored = numbersAllowed(run, events, []);
     const strict = literalAssertions(run)[0];
-    expect(scored.pass).toBe(true);
-    expect(scored.observed).toEqual([]);
+    expect(scored.pass).toBe(false);
+    expect(scored.observed).toEqual(['[1]', '[2]', '[3]', '[4]']);
     expect(strict?.pass).toBe(false);
-    expect(strict?.observed).toEqual(['1', '2', '3', '4']);
+    expect(strict?.observed).toEqual(['[1]', '[2]', '[3]', '[4]']);
 
     const priced = runWith('What does it cost?', textEvents('The plan costs 19 [1].'));
     const pricedEvents = priced.parts[0]?.traces[0]?.events ?? [];
     const pricedScored = numbersAllowed(priced, pricedEvents, []);
     const pricedStrict = literalAssertions(priced)[0];
     expect(pricedScored.pass).toBe(false);
-    expect(pricedScored.observed).toEqual(['19']);
+    expect(pricedScored.observed).toEqual(['[1]', '19']);
     expect(pricedStrict?.pass).toBe(false);
-    expect(pricedStrict?.observed).toEqual(['19', '1']);
+    expect(pricedStrict?.observed).toEqual(['[1]', '19']);
   });
 
   it('case 6: the scored reading allows the date of a nearest turn the no-record writer was given', () => {
@@ -269,8 +270,17 @@ describe('numbers', () => {
     ] as unknown as AgentEvent[];
     const run = runWith('What does it cost?', cited);
     numbersAllowed(run, cited, []);
-    // "1 USD" is a figure (fails); "[1]" names evidence item 1 (skipped); "[7]" names no item (checked).
-    expect(literalAssertions(run)[0]?.observed).toEqual(['1', '7']);
+    // "1 USD" is a figure (fails); "[1]" names evidence item 1 (skipped); "[7]" names no item (reported as a bad marker).
+    expect(literalAssertions(run)[0]?.observed).toEqual(['[7]', '1']);
+  });
+
+  it('removing a valid marker keeps token boundaries: "1[1]9 USD" is two numbers, not 19', () => {
+    const events = [
+      { type: 'citations', items: [{ n: 1, sourceId: 's', url: 'https://x.test', title: null, fetchedAtUtc: '2026-11-13T13:00:00.000Z', live: true, firstParty: true }] },
+      { type: 'text', delta: 'It costs 1[1]9 USD.' },
+    ] as unknown as AgentEvent[];
+    const run = runWith('What does it cost?', events);
+    expect(numbersAllowed(run, events, ['19 USD']).observed).toEqual(['1', '9']);
   });
 
   it('fails both checks when the model writes a price that is in no evidence', () => {

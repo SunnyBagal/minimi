@@ -131,3 +131,22 @@ The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19
 - Case 2 needs an actual flags event (empty); case 19 needs exactly one stored claim superseding the original.
 - Case 16 and product: for every row that could not be verified, code prints "Couldn't verify Northwind PG price this time (its page could not be fetched live); last verified 19 USD/month on 10 Nov 2026." (Grok, rec. 1: render figures and dates from quote-backed fields). Case 16 now needs one Northwind line pairing 19 with 10 Nov, not the old question's header.
 - The no-record writer never mentions "the app" (one run echoed "The app has shown the dates it checked").
+
+### Round eval-fix-r5 (19 Nov 2026): wrong prose that passed, and the checks that let it
+
+The 19 × 3 run on `07453de` (r4) scored 19 of 19 on both readings, $0.35. Codex's read of its traces (`docs/review/eval-fix-r34-codex.md`) found wrong prose that passed and check gaps. Fixed:
+
+Product
+- Case 11 (all 3 runs): the re-check writer wrote "As of Tue 10 Nov 2026" about a check run on 13 Nov, because its prompt said "Name dates exactly as they are written in the input" and its only date was the earlier question's. The writer now writes no dates or times (code prints when the user asked, on the recall card, and when the check ran, on the Checked line), except the date a news item states; its input labels the date "Earlier question asked on". The Lane 4 pin on the old sentence now pins the new rule.
+- Case 2 (runs 1 and 3): the writer said it did not have the user's earlier wording while the card showed it. The prompt now says the user sees the question word for word and the writer must never say it lacks it.
+- "last verified" only for a claim whose source was live or that a later re-check verified; otherwise "last seen in a search-index copy as …". Tests for both.
+- No-record prompt: dates **or** a range count as a lookup.
+
+Checks
+- Every case: **the writer does not date the check to the earlier question's date** (no writer sentence pairs that date with "as of", "checked", "verified").
+- Case 6: the confirming question must be in the writer's own text (the code-built prefix alone satisfied it); the 5 Nov candidate must be visible.
+- Cases 4 and 5: an offer must be a sentence that is not a refusal ("I cannot look this up" no longer counts), in the writer's text.
+- Number checks: dates the system emitted add only their date, never the clock (a displayed "14:05" no longer licenses "14 USD"); a citation marker that names no evidence item of the turn is reported as a failure in both readings; removing a valid marker keeps token boundaries ("1[1]9" is not 19).
+- First turns are now number-checked in cases 10, 11, 12 and 19.
+- Case 2: the Checked line must be this check's own time. Case 12: per vendor, a stored claim plus a sentence naming it with a cited USD price, or a sentence saying it could not be verified; the live-origin check needs at least one claim. Case 16: the Northwind line must carry that row's own value and last-verified date and say it could not be verified.
+- Judge: the verdict is a whole first word ("No123", "no_idea" are unparsed); a yes must quote a sentence of at least three words that is in the shown answer.

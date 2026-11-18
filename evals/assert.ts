@@ -184,6 +184,18 @@ export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: Reg
   return false;
 }
 
+/** The writer's own text for a turn (what the model wrote, without code-built lines); all text when unrecorded. */
+export function writerTextOf(run: CaseRun, events: AgentEvent[]): string {
+  return modelTextOf(run, events);
+}
+
+const REFUSAL = /\b(can't|cannot|can not|unable|won't|will not|not able)\b/i;
+
+/** Some sentence matches `pattern` and does not refuse ("I cannot look this up" is not an offer). */
+export function offersIn(text: string, pattern: RegExp): boolean {
+  return sentencesOf(text).some((sentence) => pattern.test(sentence) && !REFUSAL.test(sentence));
+}
+
 /** A sentence that asks the user to confirm which conversation they meant. */
 export function asksToConfirm(answer: string): boolean {
   return answer
@@ -194,6 +206,28 @@ export function asksToConfirm(answer: string): boolean {
         question,
       ),
     );
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * On every re-check turn, the writer does not date the check to the earlier
+ * question ("As of Tue 10 Nov 2026" about a check run on 13 Nov): no sentence of
+ * the writer's own text pairs that date with "as of", "checked" or "verified".
+ */
+export function checkNotDatedToQuestion(run: CaseRun): Assertion {
+  const misdated = run.parts.flatMap((part) =>
+    part.traces.flatMap((trace) => {
+      const chosen = recallOf(trace.events)?.chosen ?? null;
+      if (chosen === null || verdictsOf(trace.events).length === 0) return [];
+      const [, month, day] = chosen.split('-');
+      const words = `${Number(day)} ${MONTHS[Number(month) - 1] ?? ''}`;
+      return sentencesOf(trace.modelText ?? '').filter(
+        (sentence) => sentence.includes(words) && /\b(as of|checked|check(ed)? on|verified|confirmed)\b/i.test(sentence),
+      );
+    }),
+  );
+  return ok("the writer does not date the check to the earlier question's date", misdated.length === 0, misdated);
 }
 
 /** Each turn finished: exactly one `done`, no `error` event, and a non-empty shown answer. */
@@ -309,7 +343,7 @@ function dateParts(iso: string, zone: string): string[] {
 }
 
 /** The local calendar date of an instant in a zone, as YYYY-MM-DD. */
-function formatLocalDate(iso: string, zone: string): string {
+export function formatLocalDate(iso: string, zone: string): string {
   try {
     return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(
       new Date(iso),
@@ -346,7 +380,13 @@ function evidenceNumberSet(events: AgentEvent[]): Set<number> {
  * A marker naming no real item stays and is checked.
  */
 function withoutEvidenceMarkers(text: string, evidence: Set<number>): string {
-  return text.replace(/\[(\d+)\]/g, (marker, n: string) => (evidence.has(Number(n)) ? '' : marker));
+  // A space keeps "1[1]9" from becoming "19".
+  return text.replace(/\[(\d+)\]/g, (marker, n: string) => (evidence.has(Number(n)) ? ' ' : marker));
+}
+
+/** Citation markers that name no evidence item of this turn, as "[n]". */
+function invalidMarkers(text: string, evidence: Set<number>): string[] {
+  return [...text.matchAll(/\[(\d+)\]/g)].map((match) => match[1] ?? '').filter((n) => !evidence.has(Number(n))).map((n) => `[${n}]`);
 }
 
 /** The spec's literal number check. It is recorded, and it does not score the run. */
@@ -382,16 +422,14 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
     if (recall.candidates.range !== null) {
       texts.push(recall.candidates.range.from, recall.candidates.range.to);
     }
-    for (const hit of recall.hits) {
-      texts.push(hit.userTurn.localDate);
-      texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
-    }
+    for (const hit of recall.hits) texts.push(hit.userTurn.localDate);
     // The no-record writer is given each nearest turn's local date and question, not its time.
     for (const hit of recall.nearest ?? []) texts.push(hit.userTurn.localDate);
   }
+  // Dates only, never the clock: a displayed "14:05" must not license a "14 USD".
   for (const row of verdictsOf(events)) {
-    texts.push(formatLocal(row.claim.asOfUtc, zone));
-    texts.push(formatLocal(row.check.checkedAtUtc, zone));
+    texts.push(formatLocalDate(row.claim.asOfUtc, zone));
+    texts.push(formatLocalDate(row.check.checkedAtUtc, zone));
   }
   return texts.flatMap((text) => numbersIn(text));
 }
@@ -436,11 +474,14 @@ function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
   const zone = caseZone(run, events);
-  const modelBody = withoutEvidenceMarkers(modelTextOf(run, events), evidenceNumberSet(events));
+  const evidence = evidenceNumberSet(events);
+  const writerText = modelTextOf(run, events);
+  const badMarkers = invalidMarkers(writerText, evidence);
+  const modelBody = withoutEvidenceMarkers(writerText, evidence).replace(/\[\d+\]/g, ' ');
   const allowed = baseAllowed(run, events, sources, zone);
-  const literalExtra = extras(numbersIn(modelBody), allowed);
+  const literalExtra = [...badMarkers, ...extras(numbersIn(modelBody), allowed)];
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
-  const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);
+  const scoredExtra = [...badMarkers, ...extras(numbersIn(modelBody, true), scoredAllowed)];
   const suffix = label === '' ? '' : ` (${label})`;
   recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
   return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);
@@ -492,8 +533,8 @@ export function judgeSaysNo(run: CaseRun, id: JudgeId): Assertion[] {
   // A yes must quote a sentence that is really in the answer the user saw.
   const shown = run.parts.flatMap((part) => part.traces.map((trace) => trace.answerText)).join('\n');
   const squash = (text: string): string => text.replace(/\s+/g, ' ').trim();
-  const quoted =
-    found.answer !== 'yes' || (found.quote !== null && found.quote.length > 0 && squash(shown).includes(squash(found.quote)));
+  const quote = squash(found.quote ?? '');
+  const quoted = found.answer !== 'yes' || (quote.split(' ').length >= 3 && squash(shown).includes(quote));
   return [
     ok(`${id} answers no`, found.answer === 'no', found.answer),
     ok(`${id} quotes the offending sentence when it answers yes`, quoted, found.quote),

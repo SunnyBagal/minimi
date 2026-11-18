@@ -1,7 +1,10 @@
 import { intentIs, numbersAllowed, ok, verdictIs, verdictsOf } from '../assert';
+import { servedPageTexts } from '../fixtureSearch';
 import { MSG_CASE_10A, MSG_STILL } from '../messages';
 import { scenarioBasaltV1Search } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
+
+const scenario = scenarioBasaltV1Search();
 
 export const evalCase: EvalCase = {
   id: 10,
@@ -10,7 +13,7 @@ export const evalCase: EvalCase = {
       seeds: [],
       clock: CLOCK,
       tz: TZ,
-      scenario: scenarioBasaltV1Search(),
+      scenario,
       messages: [MSG_CASE_10A, MSG_STILL],
     },
   ],
@@ -26,6 +29,12 @@ export const evalCase: EvalCase = {
       ok('one verdict', rows.length === 1, rows.length),
       verdictIs(events, 'Basalt DB', 'price', 'unchanged'),
       numbersAllowed(run, events, []),
+      numbersAllowed(
+        run,
+        run.parts[0]?.traces[0]?.events ?? [],
+        servedPageTexts(scenario, run.parts[0]?.traces[0]?.log ?? []),
+        'first turn',
+      ),
     ];
   },
 };

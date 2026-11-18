@@ -350,7 +350,11 @@ export async function* recheck(ctx: TurnContext, resolved: Resolved): AsyncItera
     const lines = unverified.map((row) => {
       const why = row.check.verdict === 'source_unavailable' ? 'its page could not be fetched live' : 'nothing fetched now confirms it';
       const since = dateWords(ctx.time.toLocalDate(new Date(row.claim.lastVerifiedAtUtc), ctx.tz));
-      return `Couldn't verify ${claimLabel(row.claim)} this time (${why}); last verified ${row.claim.value} on ${since}.`;
+      // "Verified" only if it was: a live source when stated, or a later successful re-check.
+      const source = ctx.store.getSources([row.claim.sourceId])[0];
+      const reverified = row.claim.lastVerifiedAtUtc > row.claim.asOfUtc;
+      const known = reverified || source?.live === true ? 'last verified' : 'last seen in a search-index copy as';
+      return `Couldn't verify ${claimLabel(row.claim)} this time (${why}); ${known} ${row.claim.value} on ${since}.`;
     });
     yield ctx.textEvent(`${lines.join('\n')}\n`);
   }

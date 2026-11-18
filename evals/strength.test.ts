@@ -6,7 +6,7 @@ import { defaultConfig } from '../src/core/config';
 import type { AgentEvent } from '../src/core/contracts';
 import { createStore } from '../src/core/store/index';
 import { FakeClock } from '../src/core/testing/fakes';
-import { asksToConfirm, judgeSaysNo, turnsFinished } from './assert';
+import { asksToConfirm, checkNotDatedToQuestion, judgeSaysNo, turnsFinished } from './assert';
 import { parseJudgeReply } from './judge';
 import type { CaseRun } from './types';
 
@@ -74,5 +74,20 @@ describe('judgeSaysNo', () => {
       { id: 'J3', question: 'q', answer: 'yes', quote: 'I have nothing saved from 9 Nov 2026,', raw: '' },
     ]);
     expect(judgeSaysNo(real, 'J3')[1]?.pass).toBe(true);
+  });
+});
+
+describe('checkNotDatedToQuestion', () => {
+  const recall = { type: 'recall', candidates: { dates: ['2026-11-10'], range: null, ambiguous: false, rule: 'x' }, hits: [], chosen: '2026-11-10' } as unknown as AgentEvent;
+  const verdict = { type: 'verdict', row: {} } as unknown as AgentEvent;
+  it('fails "As of Tue 10 Nov 2026" written by the writer about a later check (case 11, sha 07453de)', () => {
+    const r = run([{ message: 'The 10th.', events: [recall, verdict, DONE], answerText: '' }]);
+    r.parts[0]!.traces[0]!.modelText = 'As of Tue 10 Nov 2026, Basalt DB is unchanged.';
+    expect(checkNotDatedToQuestion(r).pass).toBe(false);
+  });
+  it('passes when the writer names no date, or names the question date without tying the check to it', () => {
+    const r = run([{ message: 'The 10th.', events: [recall, verdict, DONE], answerText: '' }]);
+    r.parts[0]!.traces[0]!.modelText = 'Basalt DB is unchanged. On 10 Nov you asked about Postgres hosting.';
+    expect(checkNotDatedToQuestion(r).pass).toBe(true);
   });
 });

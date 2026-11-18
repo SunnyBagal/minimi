@@ -7,10 +7,10 @@ import { pathToFileURL } from 'node:url';
 export const REQUIRED_ENV_KEYS = /** @type {const} */ (['ANTHROPIC_API_KEY', 'EXA_API_KEY']);
 
 /** Lowest supported Node version, as [major, minor]. Matches "engines" in package.json. */
-export const MIN_NODE = /** @type {const} */ ([22, 13]);
+export const MIN_NODE = /** @type {const} */ ([26, 13]);
 
 /**
- * @param {string} nodeVersion for example "22.13.0"
+ * @param {string} nodeVersion for example "26.13.1"
  * @returns {boolean}
  */
 export function isNodeSupported(nodeVersion) {

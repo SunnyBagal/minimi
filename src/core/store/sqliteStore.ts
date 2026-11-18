@@ -6,7 +6,8 @@
  * 'fts' keeps an FTS5 virtual table over user turns (findTurns hits are user
  * turns and the router sets topic/entities on the user turn, so the index
  * holds USER turns only); 'like' falls back to bound-parameter LIKE scans —
- * DECISIONS V5 recorded fts5: false on the Node 22.13 engines floor.
+ * DECISIONS V5 found no FTS5 on Node 22.13 (the old engines floor) and FTS5 on
+ * 26.13.1; the floor is now 26.13, and the LIKE path stays as a fallback.
  *
  * Every ordering in this file means turns.seq / row seq, never timestamps:
  * test clocks do not advance.
@@ -40,8 +41,8 @@ export const DATE_RANK_MAX_ROWS = 20;
 const MIN_TERM_CHARS = 3;
 
 /**
- * DECISIONS V5 recorded fts5: false on the Node 22.13 floor, so a missing
- * FTS5 takes the recorded LIKE path rather than throwing.
+ * A missing FTS5 (V5 found none on Node 22.13; the floor is now 26.13, which
+ * has it) still takes the LIKE path rather than throwing.
  */
 const FTS5_EXPECTED = false;
 

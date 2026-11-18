@@ -211,7 +211,7 @@ describe('SqliteStore', () => {
 
   it('an undated query uses FTS with OR terms', () => {
     if (!ftsAvailable()) {
-      // Node 22.13 has no FTS5: forcing it must throw, the default is 'like'.
+      // A Node without FTS5 (22.13 had none): forcing it must throw, the default is 'like'.
       expect(() => new SqliteStore(tmpDb(), clock, config, { textSearch: 'fts' })).toThrow(Fts5MissingError);
       const likeStore = makeStore();
       expect(likeStore.textSearch).toBe('like');

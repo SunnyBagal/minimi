@@ -9,25 +9,25 @@ const KEYS = { ANTHROPIC_API_KEY: 'test-anthropic', EXA_API_KEY: 'test-exa' };
 
 describe('startupProblem', () => {
   it('reports MissingEnvError when ANTHROPIC_API_KEY is missing', () => {
-    const problem = startupProblem({ EXA_API_KEY: 'test-exa' }, '22.13.0');
+    const problem = startupProblem({ EXA_API_KEY: 'test-exa' }, '26.13.0');
     expect(problem?.name).toBe('MissingEnvError');
   });
 
   it('names both missing keys in one problem', () => {
-    const problem = startupProblem({}, '22.13.0');
+    const problem = startupProblem({}, '26.13.0');
     expect(problem?.name).toBe('MissingEnvError');
     expect(problem?.message).toContain('ANTHROPIC_API_KEY');
     expect(problem?.message).toContain('EXA_API_KEY');
   });
 
   it('counts a blank string as missing', () => {
-    const problem = startupProblem({ ANTHROPIC_API_KEY: '   ', EXA_API_KEY: 'test-exa' }, '22.13.0');
+    const problem = startupProblem({ ANTHROPIC_API_KEY: '   ', EXA_API_KEY: 'test-exa' }, '26.13.0');
     expect(problem?.name).toBe('MissingEnvError');
     expect(problem?.message).toContain('ANTHROPIC_API_KEY');
   });
 
   it('reports UnsupportedNodeError for Node 22.12.0 even with keys set', () => {
-    const problem = startupProblem(KEYS, '22.12.0');
+    const problem = startupProblem(KEYS, '26.12.0');
     expect(problem?.name).toBe('UnsupportedNodeError');
   });
 
@@ -36,8 +36,8 @@ describe('startupProblem', () => {
     expect(problem?.name).toBe('UnsupportedNodeError');
   });
 
-  it('accepts Node 22.13.0 and 26.13.1 with keys set', () => {
-    expect(startupProblem(KEYS, '22.13.0')).toBeNull();
+  it('accepts Node 26.13.0 and 26.13.1 with keys set', () => {
+    expect(startupProblem(KEYS, '26.13.0')).toBeNull();
     expect(startupProblem(KEYS, '26.13.1')).toBeNull();
   });
 });

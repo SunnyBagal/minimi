@@ -11,7 +11,7 @@ Ask about anything that changes (a price, a plan, a release) and minimi searches
 
 ## Try it
 
-Needs Node 22.13 or later, an Anthropic key and an Exa key.
+Needs Node 26.13 or later (the current LTS; `.nvmrc` pins 26.13.1), an Anthropic key and an Exa key.
 
 ```bash
 cp .env.example .env      # fill in ANTHROPIC_API_KEY and EXA_API_KEY

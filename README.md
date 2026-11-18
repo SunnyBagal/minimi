@@ -34,7 +34,9 @@ Writes three demo conversations labelled as seeded history so the recall and re-
 ```
 npm test                # the unit tests, no network
 npm run gate            # typecheck, tests, import rules, contracts hash
-npm run evals           # the eval cases in docs/02-evals.md
+npm run evals           # all 19 cases, one run each
+npm run evals:quick     # 5 cases, one run: the cheap check (writes evals/results/quick.json)
+npm run evals -- --runs 3   # all 19 cases, three runs each, the 3-of-3 reading
 npm run golden          # the golden model outputs
 npm run smoke:fresh     # one real fresh question end to end; exits non-zero on failure
 npm run measure         # fixed turns through the pipeline; writes evals/results/latency.json

@@ -13,7 +13,8 @@
  * test clocks do not advance.
  */
 import { mkdirSync, readFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import type {
   AgentConfig,
@@ -38,6 +39,23 @@ import type {
 export const DATE_RANK_MAX_ROWS = 20;
 
 /** Mirrors InMemoryStore.terms(): words of 3+ letters or digits, lowercased. */
+/**
+ * The database path to open: `dbPath`, or, when its directory cannot be created or written
+ * (a read-only deployment such as Vercel, where only the temp directory is writable), the
+ * same file name in the system temp directory. On such hosts the temp directory is per
+ * instance and short-lived, so memory does not persist there.
+ */
+export function writablePath(dbPath: string, mkdir: (dir: string) => void = (dir) => mkdirSync(dir, { recursive: true })): string {
+  try {
+    mkdir(dirname(dbPath));
+    return dbPath;
+  } catch {
+    const fallback = join(tmpdir(), basename(dbPath));
+    mkdir(dirname(fallback));
+    return fallback;
+  }
+}
+
 const MIN_TERM_CHARS = 3;
 
 /**
@@ -206,6 +224,8 @@ export class SqliteStore implements MemoryStore {
   /** Counts every FTS MATCH or LIKE text query, so tests can prove none ran. */
   readonly stats = { textQueries: 0 };
   private readonly db: DatabaseSync;
+  /** The file actually opened (see writablePath). */
+  readonly dbPath: string;
   private readonly clock: Clock;
   private readonly shelfLifeDays: Record<Volatility, number>;
 
@@ -217,8 +237,8 @@ export class SqliteStore implements MemoryStore {
   ) {
     this.clock = clock;
     this.shelfLifeDays = { ...config.shelfLifeDays };
-    mkdirSync(dirname(dbPath), { recursive: true });
-    this.db = new DatabaseSync(dbPath);
+    this.dbPath = writablePath(dbPath);
+    this.db = new DatabaseSync(this.dbPath);
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec(readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));

@@ -562,3 +562,20 @@ describe('SqliteStore', () => {
     }
   });
 });
+
+describe('writablePath', () => {
+  it('keeps the requested path when its directory can be created', async () => {
+    const { writablePath } = await import('./sqliteStore');
+    expect(writablePath('/data/minimi.db', () => {})).toBe('/data/minimi.db');
+  });
+
+  it('falls back to the temp directory when the directory is read-only (as on Vercel)', async () => {
+    const { writablePath } = await import('./sqliteStore');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const readOnly = (dir: string): void => {
+      if (dir === '/var/task/data') throw Object.assign(new Error('read-only file system'), { code: 'EROFS' });
+    };
+    expect(writablePath('/var/task/data/minimi.db', readOnly)).toBe(join(tmpdir(), 'minimi.db'));
+  });
+});

@@ -19,5 +19,11 @@ export default function nextConfig(phase) {
   return {
     // Next would otherwise write an AGENTS.md into the repository on `next dev`.
     agentRules: false,
+    // Files read from disk at run time, so a deployment (Vercel) ships them with the functions.
+    outputFileTracingIncludes: {
+      '/api/chat': ['./src/core/store/schema.sql', './src/core/llm/prompts/**/*'],
+      '/api/warm': ['./src/core/store/schema.sql', './src/core/llm/prompts/**/*'],
+      '/api/evals': ['./evals/results/latest.json', './evals/results/heldout.json', './evals/results/heldout-first.json'],
+    },
   };
 }

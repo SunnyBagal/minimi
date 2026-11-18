@@ -25,3 +25,16 @@
 | 119 | A page that now shows only an annual price is not `changed` to that annual figure | Case 13 |
 
 The harness also checks that every turn finishes, that every stored claim's quote contains its value's numbers, and that a check is not dated to the earlier question.
+
+## After the first run
+
+The first run (`evals/results/heldout-first.json`, commit `20e0b11`, before any fix) scored **15 of 19 at 3 of 3**. That is the honest held-out number: nothing had been tuned against these cases. A Codex review of the four failures (independent of the author) found:
+
+| Case | Finding | Change |
+| --- | --- | --- |
+| 116 | Product bug: a third-party page produced "unchanged". | The re-check now refuses "unchanged" or "changed" from a page that is not the vendor's own (`src/core/pipeline/recheck.ts`, with a regression test). |
+| 118 | Product gap: with no earlier answer to re-check, minimi asked for a topic, which cannot identify the claim to re-check. | The no-record writer now asks which claim or earlier answer to check (paste or describe it). |
+| 104 | Check too strict: it measured the whole reply (two rewrites) and required a movement verb. | Each rewrite is measured on its own; "is now in the east studio" counts; "moved from the east studio" still fails (`predicates.test.ts`). |
+| 111 | Check too strict: "look up … pricing fresh" was not accepted as forward-looking. | "fresh" counts; a historical lookup or a refusal still fails (`predicates.test.ts`). |
+
+Runs after these changes are written to `evals/results/heldout.json` and are reported as "after fixes", never in place of the first run.

@@ -233,11 +233,12 @@ function claimOn(run: CaseRun, entity: string, value: string, localDate: string)
   return allClaims(run.store).find((claim) => claim.entity === entity && claim.value === value && turnIds.has(claim.turnId));
 }
 
-function offersRelayLookup(text: string): boolean {
+// After the first held-out run (Codex review): "look up … pricing fresh" is forward-looking too.
+export function offersRelayLookup(text: string): boolean {
   return sentencesOf(text).some((sentence) => {
     if (REFUSAL.test(sentence) || !OFFER.test(sentence)) return false;
     if (!/\b(?:look(?:\s+\w+){0,3}\s+up|check)\b/i.test(sentence)) return false;
-    return /\bRelay\b/.test(sentence) && /\b(?:pric\w*|cost)\b/i.test(sentence) && /\b(?:current|now|today|latest)\b/i.test(sentence);
+    return /\bRelay\b/.test(sentence) && /\b(?:pric\w*|cost)\b/i.test(sentence) && /\b(?:current|now|today|latest|fresh)\b/i.test(sentence);
   });
 }
 
@@ -287,9 +288,24 @@ function namesALookupDate(text: string): boolean {
   return sentencesOf(text).some((sentence) => datesNamedIn(sentence).length > 0);
 }
 
-function shorterMove(text: string): boolean {
-  const body = text.trim();
-  return body.length > 0 && body.length < EAST_STUDIO.length && /east studio/i.test(body) && /\b(?:moved|move|moving|relocated|relocate)\b/i.test(body);
+/** Each complete rewrite the reply offers: its quoted passages, or its lines when nothing is quoted. */
+function rewriteCandidates(text: string): string[] {
+  const quoted = [...text.matchAll(/["“]([^"”]+)["”]/g)].map((match) => (match[1] ?? '').trim());
+  const pool = quoted.length > 0 ? quoted : text.split('\n');
+  return pool.map((candidate) => candidate.trim()).filter((candidate) => candidate !== '');
+}
+
+// After the first held-out run (Codex review): measure each rewrite on its own, not the whole reply,
+// and accept "is now in/at the east studio" as keeping the move; "moved from the east studio" still fails.
+export function shorterMove(text: string): boolean {
+  return rewriteCandidates(text).some(
+    (candidate) =>
+      candidate.length < EAST_STUDIO.length &&
+      /east studio/i.test(candidate) &&
+      !/\bfrom\s+the\s+east studio\b/i.test(candidate) &&
+      (/\b(?:moved|move|moving|relocated|relocate)\b[^.]*\b(?:to|into)\b[^.]*east studio/i.test(candidate) ||
+        /\b(?:is|are)\s+now\s+(?:in|at)\s+the\s+east studio/i.test(candidate)),
+  );
 }
 
 function explainsCompass(text: string): boolean {

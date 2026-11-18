@@ -42,3 +42,7 @@ Runs after these changes are written to `evals/results/heldout.json` and are rep
 ### Second run after fixes
 
 `0ce1ea0`: 17 of 19 at 3 of 3; 114 and 117 flaky. 114 (product): the re-check writer computed "an increase of 9 USD per month"; it now has the fresh writer's rule against computed differences, totals and percentages. 117 (check): the news citation came right after the full stop ("…question. [3]"), which the app's validator counts as citing that sentence; the check now uses the same rule (`citedSentencesOf`, tested).
+
+### Third run after fixes
+
+`6cdd446`: 18 of 19 at 3 of 3; 115 flaky. Its run 2 said "I can't say whether it still holds", which the "does not say the price still holds" check read as a claim that it holds (no negation rule in its second branch). The check now applies the same uncertainty rule as `claimsNoChangeAbout`, and still catches "still costs 44 USD" (tested).

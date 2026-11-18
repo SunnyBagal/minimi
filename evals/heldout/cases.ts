@@ -265,12 +265,15 @@ function attributesHistoricalPrice(text: string): boolean {
   );
 }
 
-function stillHolds(answer: string): boolean {
+// After the third held-out run: a hedged sentence ("I can't say whether it still holds") is not a claim
+// that it holds, the same uncertainty rule claimsNoChangeAbout uses.
+export function stillHolds(answer: string): boolean {
   if (claimsNoChangeAbout(answer, /Cinderwell/)) return true;
   return sentencesOf(answer).some(
     (sentence) =>
       /\b(?:still costs|still priced|price still|still holds|continues to cost|remains \d)\b/i.test(sentence) &&
-      /(?:Cinderwell|Foundry|\b44\b)/.test(sentence),
+      /(?:Cinderwell|Foundry|\b44\b)/.test(sentence) &&
+      !/\b(?:can't|cannot|can not|couldn't|could not|unable|not sure|don't know|do not know|whether|unclear|unconfirmed)\b/i.test(sentence),
   );
 }
 

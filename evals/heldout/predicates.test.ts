@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { citedSentencesOf, offersRelayLookup, shorterMove } from './cases';
+import { citedSentencesOf, offersRelayLookup, shorterMove, stillHolds } from './cases';
 
 // Changed after the first held-out run, per the Codex review of its failures; the first run's score is kept in
 // evals/results/heldout-first.json. Each fix is tested on the saved answers and on the counterexamples it must reject.
@@ -34,5 +34,15 @@ describe('held-out case 117: citedSentencesOf', () => {
   });
   it('does not attach a marker to a sentence it does not follow', () => {
     expect(citedSentencesOf('Shared drafts shipped. Prices are unchanged [3].')).toEqual(['Shared drafts shipped.', 'Prices are unchanged [3].']);
+  });
+});
+
+describe('held-out case 115: stillHolds', () => {
+  it('does not read a hedge as a claim that the price holds (the saved run-2 answer)', () => {
+    expect(stillHolds("The last price I have is 44 USD per month, and I can't say whether it still holds.")).toBe(false);
+  });
+  it('still catches a plain claim that it holds', () => {
+    expect(stillHolds('Cinderwell Foundry still costs 44 USD per month.')).toBe(true);
+    expect(stillHolds('The Foundry price still holds at 44 USD.')).toBe(true);
   });
 });

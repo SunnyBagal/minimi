@@ -150,3 +150,12 @@ Checks
 - First turns are now number-checked in cases 10, 11, 12 and 19.
 - Case 2: the Checked line must be this check's own time. Case 12: per vendor, a stored claim plus a sentence naming it with a cited USD price, or a sentence saying it could not be verified; the live-origin check needs at least one claim. Case 16: the Northwind line must carry that row's own value and last-verified date and say it could not be verified.
 - Judge: the verdict is a whole first word ("No123", "no_idea" are unparsed); a yes must quote a sentence of at least three words that is in the shown answer.
+
+### Round eval-fix-r6 (19 Nov 2026)
+
+Codex's r5 review (`docs/review/eval-fix-r5-codex.md`) supports reporting 19 of 19 on both readings for `77fe8b4` and lists remaining edge cases, all fixed offline and replayed against the `77fe8b4` traces (cases 4–6 still pass; no saved sentence dates a verification wrongly):
+- Offers must be phrased to the user ("I can …", "Want me to …?", "If you send me …") and not negated; a confirming question must itself carry the confirm wording, not borrow it from an earlier "I can't tell which one you meant."
+- The check-date assertion compares any date a verification sentence names (any format) with the day the check actually ran.
+- A judge "yes" must quote most of one sentence of the answer, not a fragment.
+- Case 16 checks both the row binding and the fixture's own 19 USD/month on 10 Nov 2026. Case 12 binds each vendor's sentence to that vendor's own claim amount and a valid citation; an all-abstention reply is allowed.
+- Prose: the fresh writer says what the sources state rather than asserting the price right now; the re-check writer names each row for what it is (price, free tier), and does not describe the screen.

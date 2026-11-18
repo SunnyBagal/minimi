@@ -71,15 +71,21 @@ describe('judgeSaysNo', () => {
     expect(verdict?.pass).toBe(false);
     expect(quoted?.pass).toBe(false);
     const real = run([{ message: 'm', events: [DONE], answerText: answer }], [
-      { id: 'J3', question: 'q', answer: 'yes', quote: 'I have nothing saved from 9 Nov 2026,', raw: '' },
+      { id: 'J3', question: 'q', answer: 'yes', quote: "I have nothing saved from 9 Nov 2026, so I can't look that conversation up.", raw: '' },
     ]);
     expect(judgeSaysNo(real, 'J3')[1]?.pass).toBe(true);
+    // A fragment is not an offending sentence.
+    const fragment = run([{ message: 'm', events: [DONE], answerText: answer }], [
+      { id: 'J3', question: 'q', answer: 'yes', quote: 'that conversation up', raw: '' },
+    ]);
+    expect(judgeSaysNo(fragment, 'J3')[1]?.pass).toBe(false);
   });
 });
 
 describe('checkNotDatedToQuestion', () => {
   const recall = { type: 'recall', candidates: { dates: ['2026-11-10'], range: null, ambiguous: false, rule: 'x' }, hits: [], chosen: '2026-11-10' } as unknown as AgentEvent;
-  const verdict = { type: 'verdict', row: {} } as unknown as AgentEvent;
+  // The check ran on 13 Nov (18:30 in Kolkata); the earlier question was on 10 Nov.
+  const verdict = { type: 'verdict', row: { check: { checkedAtUtc: '2026-11-13T13:00:00.000Z' } } } as unknown as AgentEvent;
   it('fails "As of Tue 10 Nov 2026" written by the writer about a later check (case 11, sha 07453de)', () => {
     const r = run([{ message: 'The 10th.', events: [recall, verdict, DONE], answerText: '' }]);
     r.parts[0]!.traces[0]!.modelText = 'As of Tue 10 Nov 2026, Basalt DB is unchanged.';
@@ -89,5 +95,26 @@ describe('checkNotDatedToQuestion', () => {
     const r = run([{ message: 'The 10th.', events: [recall, verdict, DONE], answerText: '' }]);
     r.parts[0]!.traces[0]!.modelText = 'Basalt DB is unchanged. On 10 Nov you asked about Postgres hosting.';
     expect(checkNotDatedToQuestion(r).pass).toBe(true);
+  });
+  it('fails any other date given to the verification, in any format, and passes the check\'s own date', () => {
+    const r = run([{ message: 'm', events: [recall, verdict, DONE], answerText: '' }]);
+    r.parts[0]!.traces[0]!.modelText = 'I verified it on November 10, 2026.';
+    expect(checkNotDatedToQuestion(r).pass).toBe(false);
+    r.parts[0]!.traces[0]!.modelText = 'As of 13 Nov 2026 it still holds.';
+    expect(checkNotDatedToQuestion(r).pass).toBe(true);
+  });
+});
+
+describe('offersIn and asksToConfirm: not a refusal, not a negation, not a remark', () => {
+  it('rejects the counterexamples from the r5 review', async () => {
+    const { offersIn } = await import('./assert');
+    expect(offersIn('A fresh Postgres hosting pricing check would be useful.', /postgres/i)).toBe(false);
+    expect(offersIn("Don't send me the tool names.", /names?/i)).toBe(false);
+    expect(asksToConfirm("I can't tell which one you meant. Want a fresh lookup?")).toBe(false);
+  });
+  it('accepts real offers and requests', async () => {
+    const { offersIn } = await import('./assert');
+    expect(offersIn('I can look up current Postgres hosting pricing for you.', /postgres/i)).toBe(true);
+    expect(offersIn('If you send me the names of the tools, I will check each one.', /names?/i)).toBe(true);
   });
 });

@@ -20,7 +20,15 @@ export const evalCase: EvalCase = {
       lastDate !== null &&
       answer
         .split('\n')
-        .some((line) => /northwind/i.test(line) && line.includes(`${north.claim.value} on ${lastDate}`) && /couldn'?t verify/i.test(line));
+        .some(
+          (line) =>
+            /northwind/i.test(line) &&
+            line.includes(`${north.claim.value} on ${lastDate}`) &&
+            /couldn'?t verify/i.test(line) &&
+            // The S-PG fixture itself: Northwind was 19 USD/month, seeded on 10 Nov 2026.
+            /\b19 USD\/month\b/.test(line) &&
+            /\b10 Nov 2026\b/.test(line),
+        );
     // Scoped to sentences about Northwind: "Basalt DB is unchanged" is not a claim about Northwind.
     const saysNoChange = claimsNoChangeAbout(answer, /northwind/i, /basalt/i);
     return [

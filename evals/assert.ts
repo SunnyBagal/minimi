@@ -189,18 +189,19 @@ export function writerTextOf(run: CaseRun, events: AgentEvent[]): string {
   return modelTextOf(run, events);
 }
 
-const REFUSAL = /\b(can't|cannot|can not|unable|won't|will not|not able)\b/i;
+const REFUSAL = /\b(can't|cannot|can not|unable|won't|will not|not able|don't|do not|never)\b/i;
+/** An offer is made to the user: "I can …", "I'll …", "Want me to …?", "Would you like …?", "Let me …", or a request to them. */
+const OFFER_FORM = /\b(I can|I could|I'll|I will|I'd be happy|happy to|let me|want me to|shall I|should I|would you like|do you want|if you (tell|send|share|give|list)|tell me|send me|share|give me|list them)\b/i;
 
-/** Some sentence matches `pattern` and does not refuse ("I cannot look this up" is not an offer). */
+/** Some sentence matches `pattern`, is phrased as an offer or request to the user, and does not refuse or negate. */
 export function offersIn(text: string, pattern: RegExp): boolean {
-  return sentencesOf(text).some((sentence) => pattern.test(sentence) && !REFUSAL.test(sentence));
+  return sentencesOf(text).some((sentence) => pattern.test(sentence) && OFFER_FORM.test(sentence) && !REFUSAL.test(sentence));
 }
 
 /** A sentence that asks the user to confirm which conversation they meant. */
 export function asksToConfirm(answer: string): boolean {
-  return answer
-    .split(/(?<=[?])/)
-    .filter((part) => part.trim().endsWith('?'))
+  return sentencesOf(answer)
+    .filter((sentence) => sentence.endsWith('?') && !REFUSAL.test(sentence))
     .some((question) =>
       /\b(meant|mean|thinking of|had in mind|the one|that match|that conversation|this conversation|is it|was it|confirm)\b/i.test(
         question,
@@ -210,6 +211,19 @@ export function asksToConfirm(answer: string): boolean {
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** Calendar dates a sentence names, as "10 Nov": "10 Nov", "10 November", "Nov 10", "November 10, 2026". */
+export function datesNamedIn(sentence: string): string[] {
+  const out: string[] = [];
+  const month = '(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*';
+  for (const m of sentence.matchAll(new RegExp(`\\b(\\d{1,2})\\s+${month}\\b`, 'gi'))) out.push(`${Number(m[1])} ${cap(m[2] ?? '')}`);
+  for (const m of sentence.matchAll(new RegExp(`\\b${month}\\s+(\\d{1,2})\\b`, 'gi'))) out.push(`${Number(m[2])} ${cap(m[1] ?? '')}`);
+  return out;
+}
+
+function cap(month: string): string {
+  return month.slice(0, 1).toUpperCase() + month.slice(1, 3).toLowerCase();
+}
+
 /**
  * On every re-check turn, the writer does not date the check to the earlier
  * question ("As of Tue 10 Nov 2026" about a check run on 13 Nov): no sentence of
@@ -218,16 +232,21 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function checkNotDatedToQuestion(run: CaseRun): Assertion {
   const misdated = run.parts.flatMap((part) =>
     part.traces.flatMap((trace) => {
-      const chosen = recallOf(trace.events)?.chosen ?? null;
-      if (chosen === null || verdictsOf(trace.events).length === 0) return [];
-      const [, month, day] = chosen.split('-');
-      const words = `${Number(day)} ${MONTHS[Number(month) - 1] ?? ''}`;
-      return sentencesOf(trace.modelText ?? '').filter(
-        (sentence) => sentence.includes(words) && /\b(as of|checked|check(ed)? on|verified|confirmed)\b/i.test(sentence),
+      if (verdictsOf(trace.events).length === 0) return [];
+      // The dates this check ran on (local), as day + month; a verification sentence may name only those.
+      const checked = new Set(
+        verdictsOf(trace.events).map((row) => {
+          const [, month, day] = formatLocalDate(row.check.checkedAtUtc, part.tz).split('-');
+          return `${Number(day)} ${MONTHS[Number(month) - 1] ?? ''}`;
+        }),
       );
+      return sentencesOf(trace.modelText ?? '').filter((sentence) => {
+        if (!/\b(as of|checked|check(ed)? on|verified|confirmed)\b/i.test(sentence)) return false;
+        return datesNamedIn(sentence).some((named) => !checked.has(named));
+      });
     }),
   );
-  return ok("the writer does not date the check to the earlier question's date", misdated.length === 0, misdated);
+  return ok('the writer dates a check only to the day it ran', misdated.length === 0, misdated);
 }
 
 /** Each turn finished: exactly one `done`, no `error` event, and a non-empty shown answer. */
@@ -533,8 +552,15 @@ export function judgeSaysNo(run: CaseRun, id: JudgeId): Assertion[] {
   // A yes must quote a sentence that is really in the answer the user saw.
   const shown = run.parts.flatMap((part) => part.traces.map((trace) => trace.answerText)).join('\n');
   const squash = (text: string): string => text.replace(/\s+/g, ' ').trim();
-  const quote = squash(found.quote ?? '');
-  const quoted = found.answer !== 'yes' || (quote.split(' ').length >= 3 && squash(shown).includes(quote));
+  const quote = squash(found.quote ?? '').replace(/^["“]|["”]$/g, '');
+  // The quote must be (most of) one sentence of the shown answer, not a fragment like "the pricing page".
+  const quoted =
+    found.answer !== 'yes' ||
+    (quote.split(' ').length >= 3 &&
+      sentencesOf(shown).some((sentence) => {
+        const whole = squash(sentence);
+        return whole.includes(quote) && quote.length >= whole.length * 0.6;
+      }));
   return [
     ok(`${id} answers no`, found.answer === 'no', found.answer),
     ok(`${id} quotes the offending sentence when it answers yes`, quoted, found.quote),

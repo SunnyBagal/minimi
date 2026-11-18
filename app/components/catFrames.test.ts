@@ -18,7 +18,7 @@ import {
   type Cat,
   type FieldState,
   type Neko,
-} from './catField';
+} from './catFrames';
 
 const COLS = 120;
 const ROWS = 40;

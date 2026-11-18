@@ -4,9 +4,9 @@
 export function DevFooter({ timings }: { timings: { stage: string; ms: number }[] }) {
   if (timings.length === 0) return null;
   return (
-    <footer data-testid="dev-footer" style={{ marginTop: 16, fontSize: 11, color: '#999' }}>
+    <footer data-testid="dev-footer" className="timings" aria-label="Timings">
       {timings.map((entry, index) => (
-        <span key={index} style={{ marginRight: 10 }}>
+        <span key={index} className="timing">
           {entry.stage}: {entry.ms} ms
         </span>
       ))}

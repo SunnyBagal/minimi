@@ -14,13 +14,13 @@ export function RecallCard({ data }: { data: RecallData }) {
   const seeded = chosenHit?.userTurn.origin === 'seed';
   const others = data.candidates.dates.filter((date) => date !== data.chosen);
   return (
-    <div data-testid="recall" style={{ border: '1px solid #ddd', borderRadius: 6, padding: 8, margin: '6px 0', fontSize: 13 }}>
+    <div data-testid="recall" className="recall">
       {data.chosen !== null ? (
-        <>
+        <div>
           <strong>About {data.chosen}</strong>
-          {seeded ? <span style={{ marginLeft: 6, color: '#777' }}>(seeded)</span> : null}
-          {others.length > 0 ? <div>other dates considered: {others.join(', ')}</div> : null}
-        </>
+          {seeded ? <span className="recall-seeded">(seeded)</span> : null}
+          {others.length > 0 ? <div className="recall-others">other dates considered: {others.join(', ')}</div> : null}
+        </div>
       ) : data.hits.length === 0 ? (
         <span>No matching conversation.</span>
       ) : (

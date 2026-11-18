@@ -40,9 +40,9 @@ A missing key or an older Node stops startup with one named error (`MissingEnvEr
 | "Is that still right?" | Re-checks every saved claim: fetches its page live, keeps it only if the exact quote is still there, otherwise searches again and asks a judge model, then applies fixed guards. Each row ends as *verified now*, *from memory* or *couldn't verify*, with the reason. |
 | Something it has no record of | Says what dates it looked at and what it found nearby, and offers to look it up fresh. It never claims to remember what it does not. |
 
-<p align="center"><img src="docs/images/suite-dark.png" alt="The Test suite menu: 19 of 19" width="45%"></p>
+<p align="center"><img src="docs/images/suite-dark.png" alt="The Test suite menu: main suite 19 of 19; held-out first run 15 of 19, after fixes 19 of 19" width="45%"></p>
 
-The UI shows the recalled question in a card, a verdict table, a collapsible source list, per-stage timings, and two header menus: **This chat** (citation coverage, live sources, verdicts, latency) and **Test suite** (the latest eval run).
+The UI shows the recalled question in a card, a verdict table, a collapsible source list, per-stage timings, and two header menus: **This chat** (citation coverage, live sources, verdicts, latency) and **Test suite** (the main suite's latest run, and the held-out set's first run and run after fixes).
 
 ## How it works
 
@@ -64,7 +64,17 @@ Why each choice was made, and what was rejected: [`DESIGN.md`](DESIGN.md). What 
 
 ## Results
 
-**Evals: 19 of 19 scripted cases pass at 3 of 3 runs**, on both the scored reading and the spec's literal number check (every number the model writes must appear in the evidence, verdict rows, stored claims or your message). 663 assertions, none failed, on commit `44c4247`, for $0.33 of API spend metered by the runner ([`evals/results/latest.json`](evals/results/latest.json)). The cases are in [`docs/02-evals.md`](docs/02-evals.md); every change made to the checks along the way, with before and after, is in [`evals/TRIAGE.md`](evals/TRIAGE.md). These are fixture pages and three runs per case: they show the logic holds on these cases, not the model's long-run reliability.
+Three numbers, each read from a results file in this repo. A case passes when all 3 of its runs pass, on both readings: the scored one and the spec's literal number check (every number the model writes must appear in the evidence, the verdict rows, the stored claims or your message).
+
+| | Cases | Pass at 3 of 3 | What it is | File |
+| --- | --- | --- | --- | --- |
+| **Held-out set, first run** · *headline* | 101–119 | **15 of 19** | **Confirmatory.** Written after the tuning, never tuned against, run once before any fix. 687 assertions, 13 failed; $0.19. | [`evals/results/heldout-first.json`](evals/results/heldout-first.json), commit `20e0b11` |
+| Held-out set, after fixes | 101–119 | 19 of 19 | **Adaptive**, not a held-out result: the same cases after fixing what the first run found ([`evals/heldout/README.md`](evals/heldout/README.md)). 687 assertions, none failed; $0.19. | [`evals/results/heldout.json`](evals/results/heldout.json), commit `94f69ea` |
+| Main suite | 1–19 | 19 of 19 | **Tuned regression suite**: the cases the agent was built and tuned against. 663 assertions, none failed; $0.33. | [`evals/results/latest.json`](evals/results/latest.json), commit `9a599ef` |
+
+The product code (`app/`, `src/`) is the same in the two final runs; the commits between them changed only eval checks. Spend is API cost metered by the eval runner under a hard cap. A fresh blind set, written and run once, is the next step before claiming the agent improved.
+
+The main cases are in [`docs/02-evals.md`](docs/02-evals.md) and the held-out ones in [`evals/heldout/README.md`](evals/heldout/README.md); every change made to the checks, with before and after, is in [`evals/TRIAGE.md`](evals/TRIAGE.md). These are fixture pages and three runs per case: they show the logic holds on these cases, not the model's long-run reliability.
 
 **Latency** (`npm run measure`, 3 passes on one machine, 17 Nov 2026, before the latest changes; [`evals/results/latency.json`](evals/results/latency.json)): router median 1524 ms; claim extraction, which runs after the answer has streamed, median 17773 ms. Per-turn first-text and total times are in the same file.
 
@@ -75,6 +85,7 @@ npm test                    # unit tests, no network
 npm run gate                # typecheck, tests, import rules, frozen-contract hash
 npm run evals:quick         # 5 cases, one run each: the cheap live check
 npm run evals -- --runs 3   # all 19 cases, three runs each; hard spend cap, --budget-usd 4.5 by default
+npm run evals:heldout       # the 19 held-out cases, three runs each; writes evals/results/heldout.json
 npm run smoke:fresh         # one real question end to end
 npm run measure             # fixed turns through the pipeline, writes evals/results/latency.json
 ```
@@ -90,6 +101,7 @@ src/core/store/      SQLite memory: turns, claims with supersede chains, sources
 src/core/search/     Exa client, first-party and quote checks, citation validation
 src/core/llm/        AI SDK adapter and the prompts
 evals/               19 scripted cases, fixture pages, harness, results
+evals/heldout/       19 held-out cases (101–119), written after the tuning
 scripts/             seed, measure, smoke test, gate checks
 ```
 

@@ -61,14 +61,36 @@ const NO_CHANGE =
   /\b(?:no change|unchanged|not changed|hasn't changed|has not changed|nothing has changed|still holds|still the same|same price)\b/i;
 const UNSURE = /\b(?:can't|cannot|can not|couldn't|could not|unable|not able|whether|unclear|not sure|unknown)\b/i;
 
+/** Clauses of a sentence, split at , ; : and at "but", "while", "whereas", "although". */
+function clausesOf(sentence: string): string[] {
+  return sentence
+    .split(/[,;:]|\s(?:but|while|whereas|although)\s/i)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause !== '');
+}
+
+/** A clause that opens by referring back to the last-named subject. */
+const BACK_REFERENCE = /^(?:it|its|it's|this|that|the price|the page|the plan|their|they)\b/i;
+
 /**
- * True when some sentence that names the entity asserts that nothing changed
- * for it. A sentence that only says the change could not be confirmed
- * ("I can't say whether ... still holds") does not count, and a no-change
- * sentence about another entity does not count.
+ * True when some clause about the entity asserts that nothing changed for it.
+ * A clause is about the entity when it names it, or when it opens with a back
+ * reference ("Its price is unchanged") and the last-named subject was the
+ * entity. Naming one of `others` makes that the subject instead. Uncertainty
+ * ("can't say whether ... still holds") vetoes only its own clause, so doubt
+ * about another product does not hide a no-change claim about this one.
  */
-export function claimsNoChangeAbout(answer: string, entity: RegExp): boolean {
-  return sentencesOf(answer).some((sentence) => entity.test(sentence) && NO_CHANGE.test(sentence) && !UNSURE.test(sentence));
+export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: RegExp): boolean {
+  let subject: 'entity' | 'other' | null = null;
+  for (const sentence of sentencesOf(answer)) {
+    for (const clause of clausesOf(sentence)) {
+      if (entity.test(clause)) subject = 'entity';
+      else if (others !== undefined && others.test(clause)) subject = 'other';
+      else if (!BACK_REFERENCE.test(clause)) subject = null;
+      if (subject === 'entity' && NO_CHANGE.test(clause) && !UNSURE.test(clause)) return true;
+    }
+  }
+  return false;
 }
 
 export function recallOf(events: AgentEvent[]): Extract<AgentEvent, { type: 'recall' }> | undefined {
@@ -153,35 +175,9 @@ export const LITERAL_NUMBERS_PREFIX =
 
 export const SCORED_NUMBERS_PREFIX = 'numbers are in the message, claims, rows or evidence';
 
-const SEARCH_FAILED_LINE =
-  "Search failed: I could not get any web results for this, so I can't give you current facts on it. Try again, or rephrase the question.";
-
-/** Whole lines the pipeline builds in code. Anchored to the fixed wording. */
-const CODE_LINE: readonly RegExp[] = [
-  /^On .+ you asked: ".*"\.(?: \(seeded demo history\))?$/,
-  /^I found more than one conversation that could match:$/,
-  /^Which one do you mean\?$/,
-  /^- .+?, \d{2}:\d{2} .+: ".*"$/,
-  /^- .+ \(as of .+; from memory, not re-checked\)$/,
-  /^Skipped \d+ lower-priority claim\(s\) over the limit of \d+: .+\.$/,
-  /^\(\d+ undated search result\(s\) were set aside\.\)$/,
-];
-
 const literalByRun = new WeakMap<CaseRun, Assertion[]>();
 
-function withoutChecked(answer: string): string {
-  return answer.replace(/^Checked [^\n]*\n?/gm, '');
-}
-
-/** Drops the code-built lines. The Checked line is removed by the caller. */
-export function withoutCodeBuiltLines(text: string): string {
-  return text
-    .split('\n')
-    .filter((line) => line !== SEARCH_FAILED_LINE && !CODE_LINE.some((pattern) => pattern.test(line)))
-    .join('\n');
-}
-
-function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], answer: string): Set<string> {
+function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[]): Set<string> {
   return new Set<string>([
     ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
     ...claimNumbers(allClaims(run.store)),
@@ -193,7 +189,6 @@ function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], answ
       ),
     ),
     ...sources.flatMap((text) => numbersIn(text)),
-    ...numbersIn(answer.match(/^Checked [^\n]*/gm)?.join(' ') ?? ''),
   ]);
 }
 
@@ -213,10 +208,12 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
     if (recall.candidates.range !== null) {
       texts.push(recall.candidates.range.from, recall.candidates.range.to);
     }
-    for (const hit of [...recall.hits, ...(recall.nearest ?? [])]) {
+    for (const hit of recall.hits) {
       texts.push(hit.userTurn.localDate);
       texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
     }
+    // The no-record writer is given each nearest turn's local date and question, not its time.
+    for (const hit of recall.nearest ?? []) texts.push(hit.userTurn.localDate);
   }
   for (const row of verdictsOf(events)) {
     texts.push(formatLocal(row.claim.asOfUtc, zone));
@@ -236,27 +233,37 @@ export function literalAssertions(run: CaseRun): Assertion[] {
   return literalByRun.get(run) ?? [];
 }
 
+/** The writer's own text for the turn that produced `events`; all streamed text when no record exists. */
+function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
+  for (const part of run.parts) {
+    for (const trace of part.traces) {
+      if (trace.events === events && trace.modelText !== undefined) return trace.modelText;
+    }
+  }
+  return answerOf(events);
+}
+
 /**
- * Both readings first drop the spans the app itself injects: the "Checked"
- * line, the recall card's headline and the other code-built lines (memory
- * rows, ambiguity choices, the undated-results note). Those are the app's
- * timestamps and counts, not the model's numbers.
+ * Both readings check only what the model's writer produced on the turn
+ * (`TurnTrace.modelText`, recorded by the harness). Text the app's code
+ * injected (the recall card's headline, the "Checked" line, memory rows,
+ * ambiguity choices, the undated-results note) is outside it by provenance,
+ * not by its wording, so a model sentence styled like one of those lines is
+ * still checked.
  *
- * Literal reading (the spec's subset check on the rest): every remaining
- * digit, list markers and citation digits included, must appear in the
- * message, claims, verdict rows or evidence. Recorded; it does not decide
- * `passed`.
+ * Literal reading (the spec's subset check on the model's text): every digit,
+ * list markers and citation digits included, must appear in the message,
+ * claims, verdict rows or evidence. Recorded; it does not decide `passed`.
  *
  * Scored reading: as literal, plus line-start list markers and digits inside
  * `[n]` are skipped (the `validateAnswer` rules), and digits of dates the
- * system emitted on this turn (recall candidates, hits, nearest turns, verdict
- * dates) are allowed.
+ * system emitted on this turn (recall candidates and hits, the nearest turns'
+ * local dates, verdict dates) are allowed.
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
   const zone = caseZone(run, events);
-  const answer = shownAnswerOf(events, zone);
-  const modelBody = withoutCodeBuiltLines(withoutChecked(answer));
-  const allowed = baseAllowed(run, events, sources, answer);
+  const modelBody = modelTextOf(run, events);
+  const allowed = baseAllowed(run, events, sources);
   const literalExtra = extras(numbersIn(modelBody), allowed);
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
   const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);

@@ -15,6 +15,7 @@ import { createStore } from '../src/core/store/index';
 import { FakeClock, FakeLlm, fakeTime, passThroughGuard } from '../src/core/testing/fakes';
 import { time } from '../src/core/time/index';
 import { allClaims, literalAssertions, shownAnswerOf } from './assert';
+import { RecordingLlm } from './recordingLlm';
 import { scoredPass } from './score';
 import { FixtureSearch } from './fixtureSearch';
 import { askJudge, type JudgeAnswer } from './judge';
@@ -34,7 +35,7 @@ export interface HarnessOptions {
 export interface RunTrace {
   parts: {
     tz: string;
-    turns: { message: string; answerText: string; events: AgentEvent[] }[];
+    turns: { message: string; answerText: string; modelText: string; events: AgentEvent[] }[];
   }[];
   claims: {
     id: string;
@@ -75,9 +76,11 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
   const clock = new FakeClock(evalCase.parts[0]?.clock ?? '2026-11-13T13:00:00.000Z');
   const dir = mkdtempSync(join(tmpdir(), 'minimi-eval-'));
   const store = createStore(join(dir, 'store.db'), clock, defaultConfig);
-  const llm: Llm = options.selftest
+  const innerLlm: Llm = options.selftest
     ? new FakeLlm(selftestScript(evalCase.id))
     : createLlm(options.apiKey ?? '', defaultConfig, options.fetch !== undefined ? { fetch: options.fetch } : {});
+  // Records the writer's own output per turn: the provenance the number checks use.
+  const llm = new RecordingLlm(innerLlm);
   const depsTime = options.selftest ? fakeTime(selftestTime(evalCase.id)) : time;
   const depsGuard = options.selftest ? passThroughGuard : guardVerdict;
 
@@ -101,11 +104,14 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
     const traces: TurnTrace[] = [];
     for (const message of part.messages) {
       const mark = search.log.length;
+      llm.startTurn();
       const events = await collect(runTurn({ sessionId, message, tz: part.tz }, deps));
+      const modelText = llm.endTurn();
       traces.push({
         message,
         events,
         answerText: answerText(events, part.tz),
+        modelText,
         log: search.log.slice(mark),
       });
     }
@@ -129,6 +135,7 @@ export async function runHarness(evalCase: EvalCase, options: HarnessOptions): P
       turns: part.traces.map((turn) => ({
         message: turn.message,
         answerText: turn.answerText,
+        modelText: turn.modelText ?? '',
         events: keptEvents(turn.events),
       })),
     })),

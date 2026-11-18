@@ -19,7 +19,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { systemClock } from '../src/core/systemClock';
 import { CASES, caseById } from './cases/index';
-import { SpendMeter, wouldExceed } from './budget';
+import { PRICE_SOURCE, redactDeep, SpendMeter, wouldExceed } from './budget';
 import { runHarness, type RunTrace } from './harness';
 import type { JudgeAnswer } from './judge';
 import { classify, literalPass } from './score';
@@ -39,9 +39,16 @@ interface RunRecord {
 
 interface CaseRecord {
   id: number;
+  /** Completed, scored runs. */
   runs: number;
+  /** Runs asked for. Fewer completed means the case is incomplete and is not classified. */
+  requestedRuns: number;
   passedRuns: number;
   results: RunRecord[];
+  /** Set when the budget stopped this case before all requested runs completed. */
+  incomplete?: true;
+  /** A run cut off part-way by the spend cap; kept for diagnosis, never scored. */
+  cutRun?: RunRecord;
 }
 
 export interface ExecuteOptions {
@@ -223,42 +230,66 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   }
 
   const records: CaseRecord[] = [];
-  const meter = new SpendMeter();
+  const meter = new SpendMeter(selection.budgetUsd);
   const meteredFetch = meter.wrap(options.baseFetch ?? globalThis.fetch);
   let dearestRunUsd = 0;
-  let stoppedBefore: { id: number; run: number } | null = null;
+  let stoppedBefore: { id: number; run: number; reason: string } | null = null;
   try {
     for (const id of ids) {
       const evalCase = caseById(id);
       if (evalCase === undefined) continue;
       const results: RunRecord[] = [];
+      let cutRun: RunRecord | undefined;
       for (let run = 1; run <= runs; run += 1) {
-        if (wouldExceed(meter.spentUsd(), dearestRunUsd, selection.budgetUsd)) {
-          stoppedBefore = { id, run };
+        if (meter.exhausted() || wouldExceed(meter.spentUsd(), dearestRunUsd, selection.budgetUsd)) {
+          stoppedBefore = { id, run, reason: meter.incomplete ?? 'the next run could pass the budget' };
           break;
         }
         const before = meter.spentUsd();
+        const refusedBefore = meter.refused;
         const result = await harness(evalCase, { selftest, apiKey, fetch: meteredFetch });
         await meter.settle();
         const spendUsd = meter.spentUsd() - before;
         dearestRunUsd = Math.max(dearestRunUsd, spendUsd);
-        results.push({
+        const record: RunRecord = {
           run,
           passed: result.passed,
           assertions: result.assertions,
           judge: result.judge,
           ...(result.trace !== undefined ? { trace: result.trace } : {}),
           spendUsd,
-        });
+        };
+        if (meter.refused > refusedBefore || meter.incomplete !== null) {
+          // A request in this run was refused, or its spend is unknown: the run did not finish as written.
+          cutRun = record;
+          stoppedBefore = {
+            id,
+            run,
+            reason: meter.incomplete ?? 'a request in this run was refused by the spend cap',
+          };
+          break;
+        }
+        results.push(record);
       }
-      if (results.length > 0) {
+      if (results.length > 0 || cutRun !== undefined) {
         const passedRuns = results.filter((result) => result.passed).length;
-        records.push({ id, runs: results.length, passedRuns, results });
-        console.error(`evals: case ${id} ${passedRuns}/${results.length}  spent $${meter.spentUsd().toFixed(3)}`);
+        const incomplete = results.length < runs;
+        records.push({
+          id,
+          runs: results.length,
+          requestedRuns: runs,
+          passedRuns,
+          results,
+          ...(incomplete ? { incomplete: true as const } : {}),
+          ...(cutRun !== undefined ? { cutRun } : {}),
+        });
+        const note = incomplete ? ` of ${runs} requested (incomplete)` : '';
+        console.error(`evals: case ${id} ${passedRuns}/${results.length}${note}  spent $${meter.spentUsd().toFixed(3)}`);
       }
       if (stoppedBefore !== null) {
+        const where = `case ${stoppedBefore.id} run ${stoppedBefore.run}`;
         console.error(
-          `evals: stopped before case ${stoppedBefore.id} run ${stoppedBefore.run}: spent $${meter.spentUsd().toFixed(3)}, the next run could pass the $${selection.budgetUsd} budget`,
+          `evals: stopped at ${where} (${stoppedBefore.reason}); spent $${meter.spentUsd().toFixed(3)} of $${selection.budgetUsd}`,
         );
         break;
       }
@@ -271,30 +302,39 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     if (offline) globalThis.fetch = originalFetch;
   }
 
-  const totals = classify(records);
+  // Only cases whose every requested run completed are classified.
+  const scored = records.filter((record) => record.incomplete !== true);
+  const totals = classify(scored);
   const strict = classify(
-    records.map((record) => ({
+    scored.map((record) => ({
       id: record.id,
       runs: record.runs,
       passedRuns: record.results.filter((result) => literalPass(result.assertions)).length,
     })),
   );
-  const body = {
-    mode: selftest ? 'selftest' : 'live',
-    sha,
-    runs,
-    spend: {
-      budgetUsd: selection.budgetUsd,
-      spentUsd: meter.spentUsd(),
-      byModel: meter.report(),
-      stoppedBefore,
+  const body = redactDeep(
+    {
+      mode: selftest ? 'selftest' : 'live',
+      sha,
+      runs,
+      spend: {
+        budgetUsd: selection.budgetUsd,
+        spentUsd: meter.spentUsd(),
+        byModel: meter.report(),
+        refusedRequests: meter.refused,
+        incompleteAccounting: meter.incomplete,
+        stoppedBefore,
+        priceSource: PRICE_SOURCE,
+      },
+      cases: records,
+      incomplete: records.filter((record) => record.incomplete === true).map((record) => record.id),
+      passAtAll: totals.passAtAll,
+      flaky: totals.flaky,
+      failing: totals.failing,
+      strict,
     },
-    cases: records,
-    passAtAll: totals.passAtAll,
-    flaky: totals.flaky,
-    failing: totals.failing,
-    strict,
-  };
+    [apiKey],
+  );
   const dir = options.resultsDir ?? repoResultsDir;
   mkdirSync(dir, { recursive: true });
   const stamp = systemClock.now().toISOString().replaceAll(':', '-');
@@ -303,13 +343,13 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   // latest.json is the 3-of-3 reading. A one-run full pass goes to full.json.
   // A selftest, a quick run, or any run that is not all 19 cases leaves both alone.
   // A run the budget stopped did not cover every case: it writes only its stamp.
-  const complete = stoppedBefore === null;
+  const complete = stoppedBefore === null && body.incomplete.length === 0;
   if (complete && writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
   if (complete && writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
 
   const stdout = summaryLine(totals.passAtAll.length, totals.flaky.length, totals.failing.length);
   console.error(
-    `evals: spent $${meter.spentUsd().toFixed(3)} of the $${selection.budgetUsd} budget${stoppedBefore === null ? '' : ' (stopped by budget)'}`,
+    `evals: spent $${meter.spentUsd().toFixed(3)} of the $${selection.budgetUsd} budget${stoppedBefore === null ? '' : ' (stopped by the spend cap)'}`,
   );
   if (offline && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
   return { exitCode: 0, stdout, networkCalls, resultsFile: file };

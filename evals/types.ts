@@ -13,6 +13,12 @@ export interface TurnTrace {
   message: string;
   events: AgentEvent[];
   answerText: string;
+  /**
+   * Exactly what the model's writer produced on this turn. Answer text outside
+   * it was injected by the app's code. Absent in hand-built test traces, where
+   * the number checks treat all text as model-written.
+   */
+  modelText?: string;
   /** Provider calls made while this message was running. */
   log: FixtureCall[];
 }

@@ -27,3 +27,23 @@ describe('claimsNoChangeAbout', () => {
     expect(sentencesOf('A is fine. B is not!\nC? D')).toEqual(['A is fine.', 'B is not!', 'C?', 'D']);
   });
 });
+
+describe('claimsNoChangeAbout: subject and uncertainty scoped to the clause', () => {
+  it('counts a Northwind no-change claim next to doubt about another product', () => {
+    expect(claimsNoChangeAbout("I couldn't check Basalt DB, but Northwind PG is unchanged.", /northwind/i, /basalt/i)).toBe(true);
+    expect(claimsNoChangeAbout('Northwind PG is unchanged; whether Basalt DB changed is unclear.', /northwind/i, /basalt/i)).toBe(true);
+  });
+
+  it('follows "Its" back to the product named just before', () => {
+    expect(claimsNoChangeAbout('Northwind PG could not be reached. Its price is unchanged.', /northwind/i, /basalt/i)).toBe(true);
+    expect(claimsNoChangeAbout('Basalt DB was checked. Its price is unchanged.', /northwind/i, /basalt/i)).toBe(false);
+  });
+
+  it('still passes the saved case 16 run-1 answer with Basalt as the other product', () => {
+    expect(claimsNoChangeAbout(CASE_16_RUN_1, /northwind/i, /basalt/i)).toBe(false);
+  });
+
+  it('does not carry the subject into a clause that does not refer back', () => {
+    expect(claimsNoChangeAbout('Northwind PG timed out. Everything else is unchanged.', /northwind/i, /basalt/i)).toBe(false);
+  });
+});

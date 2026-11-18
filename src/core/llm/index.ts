@@ -2,6 +2,7 @@
 import type { AgentConfig, Llm } from '../contracts';
 import { createAiSdkLlm } from './aiSdkLlm';
 
-export function createLlm(apiKey: string, config: AgentConfig): Llm {
-  return createAiSdkLlm(apiKey, config);
+/** `fetch` is optional: the eval runner passes one that meters token spend. */
+export function createLlm(apiKey: string, config: AgentConfig, options: { fetch?: typeof fetch } = {}): Llm {
+  return createAiSdkLlm(apiKey, config, options.fetch !== undefined ? { fetch: options.fetch } : undefined);
 }

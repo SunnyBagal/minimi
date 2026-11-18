@@ -70,3 +70,17 @@ These passed every scored run. The literal number check failed. Case 17 is the o
 | 19 turn B | `["10","14"]` on runs 1, 2 and 3 |
 
 Case 12's literal tokens are the citation markers fix 6 drops from the scored check. The other rows are digits the literal check still counts, mostly from code-built lines (Bunny, Lane 5) and from dates fix 2 allows only on the scored reading.
+
+## Round eval-fix-r1 (18 Nov 2026): changes to the checks, before and after
+
+From `evals/results/2026-11-18T15-13-43.417Z.json` (19 × 3, sha `2436fe7`; scored 13 of 19, literal 0 of 19) and the root-cause review in the orchestrator's notes. Each change has an offline test; none was measured live in this round.
+
+| # | Change | Kind | Before (saved run) | After (offline test) |
+| --- | --- | --- | --- | --- |
+| 7 | The checks read the **shown answer**: the recall card's headline, built from the new `recall.asked` field with the UI's own `recallHeadline`, then the streamed text. | follows a product change | The recall line was streamed text. | Same words, now from the card. `numbers.test.ts` › "skips the recall card headline built from the recall event, and still rejects a number the model wrote". |
+| 8 | The **literal reading** drops the spans the app itself injects before its subset check: the "Checked" line, the recall headline and the other code-built lines (memory rows, ambiguity choices, the undated-results note). Model-written digits, list markers and citation digits still count. User's decision. | harness | Rejected the app's own timestamps, e.g. `["10","14"]` in cases 2, 11, 13–16, 19. | Recall-line clock passes; a model-written `7` beside the same note still fails. `numbers.test.ts` › "passes both readings when the only extra numbers are a recall-line clock the app injected", "skips the code-built undated note and memory rows, but not a model sentence with the same digits". The old test that expected the literal reading to fail on the recall-line clock was changed to this, by that decision. |
+| 9 | Case 16's "does not say no change about Northwind" is scoped to sentences that name Northwind and is not tripped by "can't say whether … still holds". | harness | Run 1 failed on "Basalt DB is unchanged" (`observed: true`). | That exact answer passes; real Northwind no-change sentences still fail it. `claims.test.ts`. |
+| 10 | The scored reading also allows the dates of the **nearest turns** the no-record writer was given (new `recall.nearest`). | follows a product change | Case 6 rejected `["5"]` (Thu 5 Nov) on all 3 runs. | `[]`. `numbers.test.ts` › "case 6: the scored reading allows the date of a nearest turn the no-record writer was given". |
+| 11 | Every run record now carries a **trace** (each turn's non-text events and every stored claim) and its **spend**; the runner stops before a case-run that could pass `--budget-usd` (default 4.5) and then writes neither `full.json` nor `latest.json`. | harness | Case 10 and 19 failures could not be diagnosed: no row or judge output was saved. | `run.test.ts` › "budget"; `budget.test.ts`. |
+
+Not changed: case 8 still expects "3 November 2026". That wording appears only in `docs/02-evals.md` case 8, not in the challenge brief, so by the user's decision the app's date format stays and the case stays failing. Case 10 and 19 wait for a traced run.

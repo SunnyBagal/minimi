@@ -20,7 +20,7 @@ export async function* noRecord(ctx: TurnContext, candidates: DateCandidates): A
     excludeTurnIds: [ctx.currentId],
     limit: ctx.config.limits.recentTurns,
   });
-  yield { type: 'recall', candidates, hits: [], chosen: null };
+  yield { type: 'recall', candidates, hits: [], chosen: null, asked: null, nearest };
   for await (const delta of ctx.deps.llm.write(
     { mode: 'no_record', message: ctx.input.message, tried: candidates, nearest },
     ctx.signal,

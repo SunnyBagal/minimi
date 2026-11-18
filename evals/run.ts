@@ -19,7 +19,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { systemClock } from '../src/core/systemClock';
 import { CASES, caseById } from './cases/index';
-import { runHarness } from './harness';
+import { SpendMeter, wouldExceed } from './budget';
+import { runHarness, type RunTrace } from './harness';
 import type { JudgeAnswer } from './judge';
 import { classify, literalPass } from './score';
 import type { Assertion } from './types';
@@ -31,6 +32,9 @@ interface RunRecord {
   passed: boolean;
   assertions: Assertion[];
   judge: JudgeAnswer[] | null;
+  trace?: RunTrace;
+  /** Spend for this case-run, in USD, from the metered API responses. */
+  spendUsd?: number;
 }
 
 interface CaseRecord {
@@ -51,6 +55,8 @@ export interface ExecuteOptions {
    * write results with no network and no API key.
    */
   runHarness?: typeof runHarness;
+  /** The fetch the spend meter wraps. Tests pass a fake that returns usage. */
+  baseFetch?: typeof fetch;
 }
 
 export interface ExecuteResult {
@@ -69,8 +75,13 @@ export interface EvalSelection {
   quick: boolean;
   runs: number;
   ids: number[];
+  /** Stop before a case-run that would take the API spend over this, in USD. */
+  budgetUsd: number;
   error: string | null;
 }
+
+/** The default spend cap for one `npm run evals` call, in USD. */
+export const DEFAULT_BUDGET_USD = 4.5;
 
 /** The value after a flag. `error` is set when the flag is present and has no value. */
 function readFlag(argv: string[], name: string): { value: string | undefined; error: string | null } {
@@ -112,7 +123,7 @@ function parseIdList(text: string): number[] {
 }
 
 function emptySelection(selftest: boolean, quick: boolean, error: string): EvalSelection {
-  return { selftest, quick, runs: 0, ids: [], error };
+  return { selftest, quick, runs: 0, ids: [], budgetUsd: 0, error };
 }
 
 function isFullSet(ids: number[]): boolean {
@@ -121,15 +132,20 @@ function isFullSet(ids: number[]): boolean {
   return ids.length === all.length && all.every((id) => got.has(id));
 }
 
-/** Reads `--runs`, `--case`, `--cases`, `--quick` and `--selftest`. Default runs is 1. */
+/** Reads `--runs`, `--case`, `--cases`, `--budget-usd`, `--quick` and `--selftest`. Default runs is 1. */
 export function parseEvalArgs(argv: string[]): EvalSelection {
   const selftest = argv.includes('--selftest');
   const quick = argv.includes('--quick');
   const caseFlag = readFlag(argv, '--case');
   const casesFlag = readFlag(argv, '--cases');
   const runsFlag = readFlag(argv, '--runs');
-  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error;
+  const budgetFlag = readFlag(argv, '--budget-usd');
+  const missing = caseFlag.error ?? casesFlag.error ?? runsFlag.error ?? budgetFlag.error;
   if (missing !== null) return emptySelection(selftest, quick, missing);
+  const budgetUsd = budgetFlag.value === undefined ? DEFAULT_BUDGET_USD : Number(budgetFlag.value);
+  if (!Number.isFinite(budgetUsd) || budgetUsd <= 0) {
+    return emptySelection(selftest, quick, 'evals: --budget-usd must be a positive number');
+  }
   if (quick && (caseFlag.value !== undefined || casesFlag.value !== undefined || runsFlag.value !== undefined)) {
     return emptySelection(selftest, quick, 'evals: --quick does not take --case, --cases or --runs');
   }
@@ -154,7 +170,7 @@ export function parseEvalArgs(argv: string[]): EvalSelection {
   if (new Set(ids).size !== ids.length) {
     return emptySelection(selftest, quick, 'evals: --cases lists a case more than once');
   }
-  return { selftest, quick, runs, ids, error: null };
+  return { selftest, quick, runs, ids, budgetUsd, error: null };
 }
 
 /** `latest.json` is the 3-of-3 reading: a live run of every case, at least 3 runs. */
@@ -207,18 +223,45 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   }
 
   const records: CaseRecord[] = [];
+  const meter = new SpendMeter();
+  const meteredFetch = meter.wrap(options.baseFetch ?? globalThis.fetch);
+  let dearestRunUsd = 0;
+  let stoppedBefore: { id: number; run: number } | null = null;
   try {
     for (const id of ids) {
       const evalCase = caseById(id);
       if (evalCase === undefined) continue;
       const results: RunRecord[] = [];
       for (let run = 1; run <= runs; run += 1) {
-        const result = await harness(evalCase, { selftest, apiKey });
-        results.push({ run, passed: result.passed, assertions: result.assertions, judge: result.judge });
+        if (wouldExceed(meter.spentUsd(), dearestRunUsd, selection.budgetUsd)) {
+          stoppedBefore = { id, run };
+          break;
+        }
+        const before = meter.spentUsd();
+        const result = await harness(evalCase, { selftest, apiKey, fetch: meteredFetch });
+        await meter.settle();
+        const spendUsd = meter.spentUsd() - before;
+        dearestRunUsd = Math.max(dearestRunUsd, spendUsd);
+        results.push({
+          run,
+          passed: result.passed,
+          assertions: result.assertions,
+          judge: result.judge,
+          ...(result.trace !== undefined ? { trace: result.trace } : {}),
+          spendUsd,
+        });
       }
-      const passedRuns = results.filter((result) => result.passed).length;
-      records.push({ id, runs, passedRuns, results });
-      console.error(`evals: case ${id} ${passedRuns}/${runs}`);
+      if (results.length > 0) {
+        const passedRuns = results.filter((result) => result.passed).length;
+        records.push({ id, runs: results.length, passedRuns, results });
+        console.error(`evals: case ${id} ${passedRuns}/${results.length}  spent $${meter.spentUsd().toFixed(3)}`);
+      }
+      if (stoppedBefore !== null) {
+        console.error(
+          `evals: stopped before case ${stoppedBefore.id} run ${stoppedBefore.run}: spent $${meter.spentUsd().toFixed(3)}, the next run could pass the $${selection.budgetUsd} budget`,
+        );
+        break;
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -240,6 +283,12 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
     mode: selftest ? 'selftest' : 'live',
     sha,
     runs,
+    spend: {
+      budgetUsd: selection.budgetUsd,
+      spentUsd: meter.spentUsd(),
+      byModel: meter.report(),
+      stoppedBefore,
+    },
     cases: records,
     passAtAll: totals.passAtAll,
     flaky: totals.flaky,
@@ -253,10 +302,15 @@ export async function execute(argv: string[], options: ExecuteOptions = {}): Pro
   writeFileSync(file, `${JSON.stringify(body, null, 2)}\n`);
   // latest.json is the 3-of-3 reading. A one-run full pass goes to full.json.
   // A selftest, a quick run, or any run that is not all 19 cases leaves both alone.
-  if (writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
-  if (writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
+  // A run the budget stopped did not cover every case: it writes only its stamp.
+  const complete = stoppedBefore === null;
+  if (complete && writesLatest(selection)) copyFileSync(file, join(dir, 'latest.json'));
+  if (complete && writesFull(selection)) copyFileSync(file, join(dir, 'full.json'));
 
   const stdout = summaryLine(totals.passAtAll.length, totals.flaky.length, totals.failing.length);
+  console.error(
+    `evals: spent $${meter.spentUsd().toFixed(3)} of the $${selection.budgetUsd} budget${stoppedBefore === null ? '' : ' (stopped by budget)'}`,
+  );
   if (offline && networkCalls > 0) return { exitCode: 1, stdout, networkCalls, resultsFile: file };
   return { exitCode: 0, stdout, networkCalls, resultsFile: file };
 }

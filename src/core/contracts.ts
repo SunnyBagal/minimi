@@ -205,6 +205,15 @@ export interface MemoryHit {
   score: number;
 }
 
+/** The earlier question a recall or re-check is about. The UI shows it above the answer. */
+export interface RecalledQuestion {
+  turnId: Id;
+  question: string;
+  createdAtUtc: IsoUtc;
+  tz: IanaTz;
+  origin: Origin;
+}
+
 /**
  * as_stated: the claims those turns wrote, exactly as written then, including
  *            any that were superseded later.
@@ -392,7 +401,16 @@ export type GuardVerdict = (
 export type AgentEvent =
   /** Transient: not stored in message history. */
   | { type: 'status'; text: string }
-  | { type: 'recall'; candidates: DateCandidates; hits: MemoryHit[]; chosen: LocalDate | null }
+  | {
+      type: 'recall';
+      candidates: DateCandidates;
+      hits: MemoryHit[];
+      chosen: LocalDate | null;
+      /** The question the answer is about, when one was chosen. Not repeated in the answer text. */
+      asked?: RecalledQuestion | null;
+      /** No-record only: the nearest stored turns handed to the writer. */
+      nearest?: MemoryHit[];
+    }
   | { type: 'verdict'; row: VerdictRow }
   | { type: 'text'; delta: string }
   | { type: 'citations'; items: Omit<SourceRef, 'text'>[] }

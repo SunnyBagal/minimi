@@ -30,7 +30,7 @@ function textEvents(answer: string): AgentEvent[] {
 }
 
 describe('numbers', () => {
-  it('passes the scored check and fails the strict one when the only extra numbers are a recall-line clock', () => {
+  it('passes both readings when the only extra numbers are a recall-line clock the app injected', () => {
     const answer = [
       'On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: "What does it cost?".',
       'The price is unchanged.',
@@ -40,8 +40,45 @@ describe('numbers', () => {
     const strict = literalAssertions(run)[0];
     expect(scored.pass).toBe(true);
     expect(scored.observed).toEqual([]);
-    expect(strict?.pass).toBe(false);
-    expect(strict?.observed).toEqual(['10', '2026', '14', '05', '5', '30']);
+    expect(strict?.pass).toBe(true);
+    expect(strict?.observed).toEqual([]);
+  });
+
+  it('skips the recall card headline built from the recall event, and still rejects a number the model wrote', () => {
+    const events: AgentEvent[] = [
+      {
+        type: 'recall',
+        candidates: { dates: ['2026-11-10'], range: null, ambiguous: false, rule: 'last Tuesday' },
+        hits: [],
+        chosen: '2026-11-10',
+        asked: {
+          turnId: 't1',
+          question: 'What does it cost?',
+          createdAtUtc: '2026-11-10T08:35:00.000Z',
+          tz: 'Asia/Kolkata',
+          origin: 'seed',
+        },
+      },
+      { type: 'text', delta: 'The price went up to 31 USD.' },
+    ];
+    const run = runWith('What does it cost?', events);
+    const scored = numbersAllowed(run, events, []);
+    const strict = literalAssertions(run)[0];
+    expect(scored.observed).toEqual(['31']);
+    expect(strict?.observed).toEqual(['31']);
+  });
+
+  it('skips the code-built undated note and memory rows, but not a model sentence with the same digits', () => {
+    const answer = [
+      '- Pipeloom price: 30 USD/seat/month (as of Tue 3 Nov 2026, 11:20 GMT+5:30; from memory, not re-checked)',
+      '(2 undated search result(s) were set aside.)',
+      'Two results were set aside, and 7 more were ignored.',
+    ].join('\n');
+    const run = runWith('What did I ask?', textEvents(answer));
+    const scored = numbersAllowed(run, run.parts[0]?.traces[0]?.events ?? [], []);
+    const strict = literalAssertions(run)[0];
+    expect(scored.observed).toEqual(['7']);
+    expect(strict?.observed).toEqual(['7']);
   });
 
   it('passes both readings when Tue 3 Nov is allowed by 2026-11-03, and fails both when 30 is checked against 03', () => {
@@ -108,6 +145,44 @@ describe('numbers', () => {
     expect(pricedScored.observed).toEqual(['19']);
     expect(pricedStrict?.pass).toBe(false);
     expect(pricedStrict?.observed).toEqual(['19', '1']);
+  });
+
+  it('case 6: the scored reading allows the date of a nearest turn the no-record writer was given', () => {
+    const nearestTurn = {
+      id: 'u5',
+      sessionId: 's',
+      role: 'user' as const,
+      content: 'Postgres hosting prices?',
+      createdAtUtc: '2026-11-05T09:00:00.000Z',
+      tz: 'Asia/Kolkata',
+      localDate: '2026-11-05',
+      origin: 'seed' as const,
+      intent: null,
+      topic: 'Postgres hosting',
+      entities: [],
+      summary: null,
+      extraction: 'skipped' as const,
+      targetTurnIds: [],
+    };
+    const events: AgentEvent[] = [
+      {
+        type: 'recall',
+        candidates: { dates: ['2026-11-10', '2026-11-03'], range: null, ambiguous: true, rule: 'last Tuesday' },
+        hits: [],
+        chosen: null,
+        asked: null,
+        nearest: [{ userTurn: nearestTurn, assistantTurn: null, matched: 'topic', score: 1 }],
+      },
+      { type: 'text', delta: 'Nothing on Tue 10 Nov or Tue 3 Nov. You asked about Postgres hosting on Thu 5 Nov.' },
+    ];
+    const run = runWith('Last Tuesday I asked you about Postgres hosting.', events);
+    const scored = numbersAllowed(run, events, []);
+    expect(scored.pass).toBe(true);
+    expect(scored.observed).toEqual([]);
+    // Without the nearest turn on the event, 5 is unsupported (the saved case-6 failure).
+    const withoutNearest = events.map((event) => (event.type === 'recall' ? { ...event, nearest: [] } : event));
+    const before = runWith('Last Tuesday I asked you about Postgres hosting.', withoutNearest);
+    expect(numbersAllowed(before, withoutNearest, []).observed).toEqual(['5']);
   });
 
   it('fails both checks when the model writes a price that is in no evidence', () => {

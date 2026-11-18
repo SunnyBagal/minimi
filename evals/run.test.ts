@@ -30,8 +30,16 @@ describe('parseEvalArgs', () => {
       quick: false,
       runs: 1,
       ids: allIds,
+      budgetUsd: 4.5,
       error: null,
     });
+  });
+
+  it('reads --budget-usd and rejects a missing, zero or negative budget', () => {
+    expect(parseEvalArgs(['--budget-usd', '2.5'])).toMatchObject({ budgetUsd: 2.5, error: null });
+    expect(parseEvalArgs(['--budget-usd']).error).toBe('evals: --budget-usd needs a value');
+    expect(parseEvalArgs(['--budget-usd', '0']).error).toBe('evals: --budget-usd must be a positive number');
+    expect(parseEvalArgs(['--budget-usd', 'abc']).error).toBe('evals: --budget-usd must be a positive number');
   });
 
   it('keeps --runs and --case', () => {
@@ -229,5 +237,66 @@ describe('partial run', () => {
     expect(written.cases.map((item) => item.id)).toEqual([17]);
     expect(existsSync(join(dir, 'quick.json'))).toBe(false);
     expect(repoSnapshot()).toEqual(before);
+  });
+});
+
+describe('budget', () => {
+  /** A harness that makes one metered Sonnet call of 100K input and 50K output tokens: $0.70. */
+  function spendingHarness(): { runHarness: typeof import('./harness').runHarness; calls: () => number } {
+    let calls = 0;
+    return {
+      calls: () => calls,
+      runHarness: async (_evalCase, options) => {
+        calls += 1;
+        const response = await (options.fetch ?? fetch)('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          body: JSON.stringify({ model: 'claude-sonnet-5-5' }),
+        });
+        await response.text();
+        return { assertions: [], judge: null, passed: true };
+      },
+    };
+  }
+
+  const fakeAnthropic = (async () =>
+    new Response(
+      JSON.stringify({ model: 'claude-sonnet-5-5', usage: { input_tokens: 100_000, output_tokens: 50_000 } }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    )) as typeof fetch;
+
+  it('stops before a case-run that could pass the budget, records the spend, and writes neither full.json nor latest.json', async () => {
+    const dir = tempResults();
+    const stub = spendingHarness();
+
+    const result = await execute(['--budget-usd', '2'], { resultsDir: dir, runHarness: stub.runHarness, baseFetch: fakeAnthropic });
+
+    // $0.70 per run: after two runs ($1.40) a third could reach $2.10.
+    expect(stub.calls()).toBe(2);
+    expect(existsSync(join(dir, 'full.json'))).toBe(false);
+    expect(existsSync(join(dir, 'latest.json'))).toBe(false);
+    const written = JSON.parse(readFileSync(result.resultsFile ?? '', 'utf8')) as {
+      spend: { budgetUsd: number; spentUsd: number; stoppedBefore: { id: number; run: number } | null };
+      cases: Array<{ id: number; results: Array<{ spendUsd: number }> }>;
+    };
+    expect(written.spend.budgetUsd).toBe(2);
+    expect(written.spend.spentUsd).toBeCloseTo(1.4, 6);
+    expect(written.spend.stoppedBefore).toEqual({ id: allIds[2], run: 1 });
+    expect(written.cases.map((item) => item.id)).toEqual(allIds.slice(0, 2));
+    expect(written.cases[0]?.results[0]?.spendUsd).toBeCloseTo(0.7, 6);
+  });
+
+  it('a run inside the budget completes every case', async () => {
+    const dir = tempResults();
+    const stub = spendingHarness();
+    const result = await execute(['--cases', '1,2', '--budget-usd', '5'], {
+      resultsDir: dir,
+      runHarness: stub.runHarness,
+      baseFetch: fakeAnthropic,
+    });
+    expect(stub.calls()).toBe(2);
+    const written = JSON.parse(readFileSync(result.resultsFile ?? '', 'utf8')) as {
+      spend: { stoppedBefore: unknown };
+    };
+    expect(written.spend.stoppedBefore).toBeNull();
   });
 });

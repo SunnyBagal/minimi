@@ -1,0 +1,29 @@
+import { describe, expect, it } from 'vitest';
+import { claimsNoChangeAbout, sentencesOf } from './assert';
+
+// The case 16 run-1 answer from evals/results/2026-11-18T15-13-43.417Z.json.
+const CASE_16_RUN_1 =
+  "Basalt DB is unchanged since your earlier question. Its price is still 25 USD/month and its free tier is still 1 project, and both are still quoted on the live first-party page. I couldn't check Northwind PG: the page took too long to load and the request timed out, so I can't say whether the earlier price of 19 USD/month still holds.";
+
+describe('claimsNoChangeAbout', () => {
+  it('does not count "unchanged" about another entity (the case 16 run-1 answer)', () => {
+    expect(claimsNoChangeAbout(CASE_16_RUN_1, /northwind/i)).toBe(false);
+    expect(claimsNoChangeAbout(CASE_16_RUN_1, /basalt/i)).toBe(true);
+  });
+
+  it('counts a sentence that says nothing changed for the entity', () => {
+    expect(claimsNoChangeAbout('Northwind PG is unchanged at 19 USD/month.', /northwind/i)).toBe(true);
+    expect(claimsNoChangeAbout('There is no change for Northwind PG.', /northwind/i)).toBe(true);
+    expect(claimsNoChangeAbout('Nothing has changed for Northwind PG.', /northwind/i)).toBe(true);
+    expect(claimsNoChangeAbout('Northwind PG still holds at 19 USD.', /northwind/i)).toBe(true);
+  });
+
+  it('does not count a sentence that says the change could not be confirmed', () => {
+    expect(claimsNoChangeAbout("I can't confirm Northwind PG is unchanged.", /northwind/i)).toBe(false);
+    expect(claimsNoChangeAbout('Northwind PG could not be checked, so whether it is unchanged is unknown.', /northwind/i)).toBe(false);
+  });
+
+  it('splits sentences at terminators and line breaks', () => {
+    expect(sentencesOf('A is fine. B is not!\nC? D')).toEqual(['A is fine.', 'B is not!', 'C?', 'D']);
+  });
+});

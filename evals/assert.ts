@@ -3,6 +3,7 @@
  */
 import type { AgentEvent, Claim, MemoryStore, Verdict, VerdictRow } from '../src/core/contracts';
 import { containsQuote } from '../src/core/search/index';
+import { recallHeadline } from '../src/core/recallHeadline';
 import { formatLocal } from '../src/core/time/format';
 import type { JudgeAnswer, JudgeId } from './judge';
 import { TZ, type Assertion, type CaseRun, type TurnTrace } from './types';
@@ -30,6 +31,44 @@ export function answerOf(events: AgentEvent[]): string {
   return ofType(events, 'text')
     .map((event) => event.delta)
     .join('');
+}
+
+/**
+ * The recall card's headline ("On <date> you asked: ..."), built from the
+ * recall event's `asked` field with the same function the UI uses.
+ */
+export function headlineOf(events: AgentEvent[], viewerTz: string): string | null {
+  const asked = recallOf(events)?.asked ?? null;
+  return asked === null ? null : recallHeadline(asked, formatLocal, viewerTz);
+}
+
+/** What the user sees for a turn: the recall card's headline, then the streamed text. */
+export function shownAnswerOf(events: AgentEvent[], viewerTz: string): string {
+  const headline = headlineOf(events, viewerTz);
+  const text = answerOf(events);
+  return headline === null ? text : `${headline}\n${text}`;
+}
+
+/** Sentences of an answer, split at . ! ? before whitespace, and at line breaks. */
+export function sentencesOf(text: string): string[] {
+  return text
+    .split(/(?<=[.!?])\s+|\n+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence !== '');
+}
+
+const NO_CHANGE =
+  /\b(?:no change|unchanged|not changed|hasn't changed|has not changed|nothing has changed|still holds|still the same|same price)\b/i;
+const UNSURE = /\b(?:can't|cannot|can not|couldn't|could not|unable|not able|whether|unclear|not sure|unknown)\b/i;
+
+/**
+ * True when some sentence that names the entity asserts that nothing changed
+ * for it. A sentence that only says the change could not be confirmed
+ * ("I can't say whether ... still holds") does not count, and a no-change
+ * sentence about another entity does not count.
+ */
+export function claimsNoChangeAbout(answer: string, entity: RegExp): boolean {
+  return sentencesOf(answer).some((sentence) => entity.test(sentence) && NO_CHANGE.test(sentence) && !UNSURE.test(sentence));
 }
 
 export function recallOf(events: AgentEvent[]): Extract<AgentEvent, { type: 'recall' }> | undefined {
@@ -174,7 +213,7 @@ function emittedDateNumbers(events: AgentEvent[], zone: string): string[] {
     if (recall.candidates.range !== null) {
       texts.push(recall.candidates.range.from, recall.candidates.range.to);
     }
-    for (const hit of recall.hits) {
+    for (const hit of [...recall.hits, ...(recall.nearest ?? [])]) {
       texts.push(hit.userTurn.localDate);
       texts.push(formatLocal(hit.userTurn.createdAtUtc, hit.userTurn.tz));
     }
@@ -198,24 +237,35 @@ export function literalAssertions(run: CaseRun): Assertion[] {
 }
 
 /**
- * Scored reading: code-built lines are not the model's numbers, and digits of
- * dates the system emitted are allowed. The spec's literal reading is recorded
- * beside it and does not decide `passed`.
+ * Both readings first drop the spans the app itself injects: the "Checked"
+ * line, the recall card's headline and the other code-built lines (memory
+ * rows, ambiguity choices, the undated-results note). Those are the app's
+ * timestamps and counts, not the model's numbers.
+ *
+ * Literal reading (the spec's subset check on the rest): every remaining
+ * digit, list markers and citation digits included, must appear in the
+ * message, claims, verdict rows or evidence. Recorded; it does not decide
+ * `passed`.
+ *
+ * Scored reading: as literal, plus line-start list markers and digits inside
+ * `[n]` are skipped (the `validateAnswer` rules), and digits of dates the
+ * system emitted on this turn (recall candidates, hits, nearest turns, verdict
+ * dates) are allowed.
  */
 export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: string[], label = ''): Assertion {
-  const answer = answerOf(events);
-  const literalBody = withoutChecked(answer);
-  const scoredBody = withoutCodeBuiltLines(literalBody);
+  const zone = caseZone(run, events);
+  const answer = shownAnswerOf(events, zone);
+  const modelBody = withoutCodeBuiltLines(withoutChecked(answer));
   const allowed = baseAllowed(run, events, sources, answer);
-  const literalExtra = extras(numbersIn(literalBody), allowed);
-  const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, caseZone(run, events))]);
-  const scoredExtra = extras(numbersIn(scoredBody, true), scoredAllowed);
+  const literalExtra = extras(numbersIn(modelBody), allowed);
+  const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);
+  const scoredExtra = extras(numbersIn(modelBody, true), scoredAllowed);
   const suffix = label === '' ? '' : ` (${label})`;
   recordLiteral(run, ok(`${LITERAL_NUMBERS_PREFIX}${suffix}`, literalExtra.length === 0, literalExtra));
   return ok(`${SCORED_NUMBERS_PREFIX}${suffix}`, scoredExtra.length === 0, scoredExtra);
 }
 
-function allClaims(store: MemoryStore): Claim[] {
+export function allClaims(store: MemoryStore): Claim[] {
   // InMemoryStore returns nothing when a query has no date and no topic overlap.
   // Every seed and eval clock in docs/02-evals.md is in November 2026.
   const hits = store.findTurns({

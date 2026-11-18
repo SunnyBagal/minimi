@@ -859,7 +859,8 @@ mark.uncited small {
     color: var(--ink-faint);
   }
 
-  .verdicts td.verdict-claim {
+  .verdicts td.verdict-claim,
+  .verdicts tbody tr:first-child td.verdict-claim {
     display: block;
     padding: 0 0 8px;
     margin-bottom: 4px;
@@ -867,7 +868,7 @@ mark.uncited small {
     font-size: 14px;
   }
 
-  .verdicts td.verdict-claim::before {
+  .verdicts tbody tr td.verdict-claim::before {
     content: none;
   }
 

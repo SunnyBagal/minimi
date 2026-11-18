@@ -4,10 +4,12 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CASES } from './cases/index';
+import { HELDOUT_CASES } from './heldout/index';
 import { execute, parseEvalArgs, QUICK_IDS, resultsFileName, writesFull, writesLatest } from './run';
 import type { HarnessResult } from './harness';
 
 const allIds = CASES.map((item) => item.id);
+const heldoutIds = HELDOUT_CASES.map((item) => item.id);
 const repoResults = join(dirname(fileURLToPath(import.meta.url)), 'results');
 const repoLatest = join(repoResults, 'latest.json');
 
@@ -28,6 +30,7 @@ describe('parseEvalArgs', () => {
     expect(selection).toEqual({
       selftest: false,
       quick: false,
+      set: 'main',
       runs: 1,
       ids: allIds,
       budgetUsd: 4.5,
@@ -91,6 +94,41 @@ describe('parseEvalArgs', () => {
     expect(parseEvalArgs(['--quick', '--cases', '1,2']).error).toBe(error);
     expect(parseEvalArgs(['--quick', '--runs', '3']).error).toBe(error);
   });
+
+  it('selects every held-out case and combines with --runs', () => {
+    expect(parseEvalArgs(['--set', 'heldout'])).toMatchObject({
+      set: 'heldout',
+      quick: false,
+      selftest: false,
+      runs: 1,
+      error: null,
+    });
+    expect(parseEvalArgs(['--set', 'heldout']).ids).toEqual(heldoutIds);
+    expect(parseEvalArgs(['--set', 'heldout', '--runs', '3'])).toMatchObject({
+      set: 'heldout',
+      runs: 3,
+      error: null,
+    });
+    expect(parseEvalArgs(['--set', 'heldout', '--runs', '3']).ids).toEqual(heldoutIds);
+    expect(heldoutIds).toEqual([101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]);
+  });
+
+  it('keeps --quick, --case and --cases on the main set', () => {
+    expect(parseEvalArgs(['--quick']).set).toBe('main');
+    expect(parseEvalArgs(['--quick']).ids).toEqual([...QUICK_IDS]);
+    expect(parseEvalArgs(['--case', '17'])).toMatchObject({ set: 'main', ids: [17] });
+    expect(parseEvalArgs(['--cases', '1,2,3'])).toMatchObject({ set: 'main', ids: [1, 2, 3] });
+  });
+
+  it('rejects an unknown --set and heldout combined with the main-set selectors', () => {
+    expect(parseEvalArgs(['--set']).error).toBe('evals: --set needs a value');
+    expect(parseEvalArgs(['--set', 'side']).error).toBe('evals: --set must be main or heldout');
+    const error = 'evals: --set heldout does not take --quick, --case, --cases or --selftest';
+    expect(parseEvalArgs(['--set', 'heldout', '--quick']).error).toBe(error);
+    expect(parseEvalArgs(['--set', 'heldout', '--case', '101']).error).toBe(error);
+    expect(parseEvalArgs(['--set', 'heldout', '--cases', '101,102']).error).toBe(error);
+    expect(parseEvalArgs(['--set', 'heldout', '--selftest']).error).toBe(error);
+  });
 });
 
 describe('writesLatest', () => {
@@ -107,6 +145,8 @@ describe('writesLatest', () => {
     expect(missingOne).toHaveLength(allIds.length);
     expect(writesLatest({ ...live, runs: 3, ids: missingOne })).toBe(false);
     expect(writesLatest({ ...live, runs: 3, ids: [...allIds, 1] })).toBe(false);
+    expect(writesLatest({ ...live, set: 'heldout', runs: 3, ids: heldoutIds })).toBe(false);
+    expect(writesLatest({ ...live, set: 'heldout', runs: 3, ids: allIds })).toBe(false);
   });
 });
 
@@ -116,6 +156,7 @@ describe('writesFull', () => {
     expect(writesFull({ selftest: false, quick: false, runs: 2, ids: allIds })).toBe(true);
     expect(writesFull({ selftest: false, quick: false, runs: 3, ids: allIds })).toBe(false);
     expect(writesFull({ selftest: false, quick: false, runs: 1, ids: [17] })).toBe(false);
+    expect(writesFull({ selftest: false, quick: false, set: 'heldout', runs: 1, ids: heldoutIds })).toBe(false);
   });
 });
 
@@ -237,6 +278,66 @@ describe('partial run', () => {
     expect(written.cases.map((item) => item.id)).toEqual([17]);
     expect(existsSync(join(dir, 'quick.json'))).toBe(false);
     expect(repoSnapshot()).toEqual(before);
+  });
+});
+
+describe('held-out run', () => {
+  it('writes heldout.json and a dated stamp, and not latest, full or quick', async () => {
+    const before = repoSnapshot();
+    const dir = tempResults();
+    const sentinel = '{"mode":"live","keep":true}\n';
+    writeFileSync(join(dir, 'latest.json'), sentinel);
+    writeFileSync(join(dir, 'full.json'), sentinel);
+    writeFileSync(join(dir, 'quick.json'), sentinel);
+    const stub = stubHarness();
+
+    const result = await execute(['--set', 'heldout', '--runs', '3'], { resultsDir: dir, runHarness: stub.runHarness });
+
+    expect(stub.calls()).toBe(heldoutIds.length * 3);
+    expect(result.networkCalls).toBe(0);
+    expect(result.exitCode).toBe(0);
+    expect(basename(result.resultsFile ?? '')).not.toBe('heldout.json');
+    expect(basename(result.resultsFile ?? '')).not.toBe('latest.json');
+    expect(basename(result.resultsFile ?? '')).not.toBe('full.json');
+    expect(basename(result.resultsFile ?? '')).not.toBe('quick.json');
+    const heldout = readFileSync(join(dir, 'heldout.json'), 'utf8');
+    expect(heldout).toBe(readFileSync(result.resultsFile ?? '', 'utf8'));
+    const written = JSON.parse(heldout) as { mode: string; runs: number; cases: Array<{ id: number }> };
+    expect(written.mode).toBe('live');
+    expect(written.runs).toBe(3);
+    expect(written.cases.map((item) => item.id)).toEqual(heldoutIds);
+    expect(readFileSync(join(dir, 'latest.json'), 'utf8')).toBe(sentinel);
+    expect(readFileSync(join(dir, 'full.json'), 'utf8')).toBe(sentinel);
+    expect(readFileSync(join(dir, 'quick.json'), 'utf8')).toBe(sentinel);
+    expect(repoSnapshot()).toEqual(before);
+  });
+
+  it('a one-run held-out pass also writes heldout.json', async () => {
+    const dir = tempResults();
+    const stub = stubHarness();
+    const result = await execute(['--set', 'heldout'], { resultsDir: dir, runHarness: stub.runHarness });
+    expect(stub.calls()).toBe(heldoutIds.length);
+    expect(result.exitCode).toBe(0);
+    expect(result.networkCalls).toBe(0);
+    expect(existsSync(join(dir, 'heldout.json'))).toBe(true);
+    expect(existsSync(join(dir, 'latest.json'))).toBe(false);
+    expect(existsSync(join(dir, 'full.json'))).toBe(false);
+    expect(existsSync(join(dir, 'quick.json'))).toBe(false);
+  });
+
+  it('a three-run main-set pass does not write heldout.json', async () => {
+    const dir = tempResults();
+    const stub = stubHarness();
+    await execute(['--runs', '3'], { resultsDir: dir, runHarness: stub.runHarness });
+    expect(existsSync(join(dir, 'latest.json'))).toBe(true);
+    expect(existsSync(join(dir, 'heldout.json'))).toBe(false);
+  });
+
+  it('npm run evals:heldout is --set heldout --runs 3', () => {
+    const pkg = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts['evals:heldout']).toBe('tsx evals/run.ts --set heldout --runs 3');
   });
 });
 

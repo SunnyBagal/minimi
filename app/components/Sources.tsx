@@ -11,13 +11,22 @@ export function hostOf(url: string): string {
   }
 }
 
-/** The numbered sources under an answer: number, host, title and when each was checked. */
+/**
+ * The numbered sources under an answer: number, host, title and when each was checked.
+ * Collapsed by default to one "Sources (n)" row; a native <details> so the keyboard and
+ * screen readers get a disclosure for free. Inline [n] chips link to the URLs directly.
+ */
 export function Sources({ citations }: { citations: Citation[] }) {
   if (citations.length === 0) return null;
   const sorted = [...citations].sort((a, b) => a.n - b.n);
   return (
-    <section className="sources" aria-label="Sources">
-      <h3 className="sources-head">Sources</h3>
+    <details className="sources">
+      <summary className="sources-head">
+        <span>Sources ({sorted.length})</span>
+        <svg className="sources-chevron" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+          <path d="M6 3.5l4.5 4.5L6 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </summary>
       <p className="sources-note">
         live: fetched when the answer was written. Search-index copy: the search engine&rsquo;s stored copy, which a
         re-check fetches live.
@@ -37,6 +46,6 @@ export function Sources({ citations }: { citations: Citation[] }) {
           </li>
         ))}
       </ol>
-    </section>
+    </details>
   );
 }

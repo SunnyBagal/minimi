@@ -229,19 +229,38 @@ button {
   }
 }
 
-/* oneko (Oneko.tsx): above the cat field and the thread, below the header and composer. */
+/*
+ * Layers inside .app (its own stacking context, above the cat field):
+ *   card and bubble backgrounds (in flow, no stacking context of their own)
+ *   < oneko (z-index 1)
+ *   < the text in cards and bubbles, the timing chips, the empty-state hero (z-index 2)
+ *   < header and composer (z-index 20).
+ * So the cat walks over a card's background and under its text. For this to hold,
+ * .thread, .turns, .turn, .user-row, .answer and .bubble must not create a stacking
+ * context (no z-index, transform, filter, backdrop-filter, opacity < 1, isolation).
+ */
 .oneko {
   position: fixed;
-  z-index: 10;
+  z-index: 1;
   width: 32px;
   height: 32px;
-  pointer-events: none;
+  /* Only the sprite takes clicks (they cycle its mode, as on the portfolio). */
+  pointer-events: auto;
+  cursor: pointer;
   image-rendering: pixelated;
   background-image: url('/oneko/oneko.gif');
 }
 
 .oneko[hidden] {
   display: none;
+}
+
+.answer > *,
+.bubble-text,
+.bubble-actions,
+.timings {
+  position: relative;
+  z-index: 2;
 }
 
 /* ------------------------------------------------------------------ app */
@@ -643,17 +662,56 @@ mark.uncited small {
 
 .sources {
   margin-top: 16px;
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--hairline);
 }
 
+/* The collapsed row: "Sources (n)" and a chevron that turns down when open. */
 .sources-head {
-  margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faint);
+}
+
+.sources-head::-webkit-details-marker {
+  display: none;
+}
+
+.sources-head::marker {
+  content: '';
+}
+
+.sources-head:hover {
+  color: var(--ink-muted);
+}
+
+.sources-head:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+.sources-chevron {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.sources[open] > .sources-head .sources-chevron {
+  transform: rotate(90deg);
+}
+
+.sources[open] > .sources-head {
+  margin-bottom: 4px;
 }
 
 .sources-list {
@@ -1044,7 +1102,7 @@ mark.uncited small {
 .timing {
   padding: 1px 8px;
   border: 1px solid var(--hairline);
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface-glass);
   color: var(--ink-faint);
   font-family: var(--font-mono);
@@ -1061,8 +1119,10 @@ mark.uncited small {
   padding-top: clamp(24px, 10vh, 96px);
 }
 
+/* z-index 2: the hero's text, like card text, stays above the oneko cat. */
 .empty-hero {
   position: relative;
+  z-index: 2;
   isolation: isolate;
   display: flex;
   flex-direction: column;
@@ -1084,6 +1144,7 @@ mark.uncited small {
 
 .examples {
   position: relative;
+  z-index: 2;
   isolation: isolate;
 }
 
@@ -1246,13 +1307,6 @@ mark.uncited small {
   cursor: not-allowed;
 }
 
-.composer-note {
-  margin: 6px 0 0;
-  text-align: center;
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-
 /* ---------------------------------------------------------------- phone */
 
 @media (max-width: 560px) {
@@ -1281,10 +1335,6 @@ mark.uncited small {
   .bubble {
     max-width: 88%;
   }
-
-  .composer-note {
-    display: none;
-  }
 }
 
 @media (max-width: 380px) {
@@ -1304,4 +1354,697 @@ mark.uncited small {
   .dots span {
     opacity: 0.6;
   }
+}
+
+/* ------------------------------------------- ui-r3: evals popovers (.mb-*) */
+
+/*
+ * Chart colours, checked with the dataviz skill's validator against the popover surface:
+ * verdict segments blue / orange / neutral gray / violet (adjacent CVD ΔE >= 9.4, normal-vision
+ * ΔE >= 16 in both themes; the gray is a deliberate neutral for "no verdict", the one check it
+ * fails is the chroma floor that only applies to identity hues). Every segment also has a text
+ * label (the verdict pill) and its count in the legend. Status colours for the case squares
+ * always come with a glyph and a label.
+ */
+:root {
+  --viz-1: #2a78d6;
+  --viz-rest: #bdbbb2;
+  --viz-unchanged: #2a78d6;
+  --viz-changed: #eb6834;
+  --viz-unverifiable: #898781;
+  --viz-unavailable: #6250d6;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-critical: #d03b3b;
+  --on-accent: #ffffff;
+  --mb-surface: rgba(250, 249, 246, 0.8);
+  --mb-raised: rgba(255, 255, 255, 0.78);
+  --mb-hover: rgba(20, 20, 20, 0.06);
+  --mb-border: rgba(20, 20, 20, 0.1);
+  --mb-track: rgba(20, 20, 20, 0.1);
+  --mb-solid: #faf9f6;
+  --mb-shadow: 0 14px 44px rgba(20, 20, 20, 0.16), 0 2px 8px rgba(20, 20, 20, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --viz-1: #3987e5;
+    --viz-rest: #4d4c48;
+    --viz-unchanged: #3987e5;
+    --viz-changed: #d95926;
+    --viz-unverifiable: #898781;
+    --viz-unavailable: #9085e9;
+    --on-accent: #1a1a19;
+    --mb-surface: rgba(38, 38, 41, 0.74);
+    --mb-raised: rgba(255, 255, 255, 0.08);
+    --mb-hover: rgba(255, 255, 255, 0.07);
+    --mb-border: rgba(255, 255, 255, 0.12);
+    --mb-track: rgba(255, 255, 255, 0.13);
+    --mb-solid: #262629;
+    --mb-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+}
+
+:root[data-theme='dark'] {
+  --viz-1: #3987e5;
+  --viz-rest: #4d4c48;
+  --viz-unchanged: #3987e5;
+  --viz-changed: #d95926;
+  --viz-unverifiable: #898781;
+  --viz-unavailable: #9085e9;
+  --on-accent: #1a1a19;
+  --mb-surface: rgba(38, 38, 41, 0.74);
+  --mb-raised: rgba(255, 255, 255, 0.08);
+  --mb-hover: rgba(255, 255, 255, 0.07);
+  --mb-border: rgba(255, 255, 255, 0.12);
+  --mb-track: rgba(255, 255, 255, 0.13);
+  --mb-solid: #262629;
+  --mb-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn[aria-expanded='true'] {
+  background: var(--mb-raised);
+  border-color: var(--ink-faint);
+}
+
+/* Above the header, the composer and the cat (all inside .app). */
+.mb-popover {
+  position: fixed;
+  z-index: 40;
+  max-height: calc(100dvh - 72px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  border: 1px solid var(--mb-border);
+  border-radius: 16px;
+  background: var(--mb-surface);
+  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  backdrop-filter: blur(28px) saturate(1.8);
+  box-shadow: var(--mb-shadow);
+  color: var(--ink);
+  font-size: 13px;
+  animation: mb-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.mb-popover:focus {
+  outline: none;
+}
+
+.mb-closing {
+  animation: mb-out 120ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes mb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+}
+
+@keyframes mb-out {
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+}
+
+/* Header tile */
+.mb-head {
+  border-radius: 12px;
+  background: var(--mb-raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.mb-head > summary,
+.mb-head-plain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  list-style: none;
+}
+
+.mb-head > summary {
+  cursor: pointer;
+}
+
+.mb-head > summary::-webkit-details-marker,
+.mb-row > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mb-head > summary::marker,
+.mb-row > summary::marker {
+  content: '';
+}
+
+.mb-head-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.mb-head-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.3;
+}
+
+.mb-head-title {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.mb-head-sub {
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mb-head-details {
+  padding: 2px 12px 10px 52px;
+}
+
+.mb-row-chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--ink-faint);
+  transition: transform 150ms ease;
+}
+
+details[open] > summary > .mb-row-chevron {
+  transform: rotate(90deg);
+}
+
+.mb-facts {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.mb-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mb-facts dt {
+  color: var(--ink-muted);
+}
+
+.mb-facts dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-facts code,
+.mb-plain code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.mb-note,
+.mb-caption {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* Slider */
+.mb-slider-block {
+  padding: 12px 6px 2px;
+}
+
+.mb-slider-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.mb-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.mb-value {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.mb-slider {
+  position: relative;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--mb-track);
+  overflow: hidden;
+}
+
+.mb-slider-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 300ms ease;
+}
+
+/* The end icons sit on their own discs, independent of the fill, so the fill stays exactly proportional. */
+.mb-slider-icon {
+  position: absolute;
+  top: 50%;
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mb-solid);
+  color: var(--ink-muted);
+  transform: translateY(-50%);
+}
+
+.mb-slider-left {
+  left: 3px;
+}
+
+.mb-slider-right {
+  right: 3px;
+}
+
+/* Round stat tiles */
+.mb-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding: 14px 0 6px;
+}
+
+.mb-tile-round {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  text-align: center;
+}
+
+.mb-round {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--mb-raised);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+/* The ring only; the icon's own svg inside .mb-round-icon stays centred. */
+.mb-round > svg {
+  position: absolute;
+  inset: 0;
+}
+
+.mb-ring-track,
+.mb-ring-fill {
+  fill: none;
+  stroke-width: 3;
+}
+
+.mb-ring-track {
+  stroke: var(--mb-track);
+}
+
+.mb-ring-fill {
+  stroke: var(--accent);
+  stroke-linecap: round;
+}
+
+.mb-round-icon {
+  display: inline-flex;
+  color: var(--ink);
+}
+
+.mb-tile-round figcaption {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.mb-round-label {
+  font-size: 11.5px;
+  color: var(--ink-muted);
+}
+
+.mb-round-value {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.mb-round-reason {
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.mb-divider {
+  margin: 8px 6px;
+  border: 0;
+  border-top: 1px solid var(--mb-border);
+}
+
+.mb-section {
+  margin: 2px 8px 4px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--ink-muted);
+}
+
+/* Rows */
+.mb-row > summary,
+.mb-plain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  list-style: none;
+}
+
+.mb-row > summary {
+  cursor: pointer;
+}
+
+.mb-row > summary:hover {
+  background: var(--mb-hover);
+}
+
+.mb-head > summary:focus-visible,
+.mb-row > summary:focus-visible,
+.mb-copy:focus-visible,
+.mb-square:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+.mb-row-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--mb-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.mb-row-title {
+  font-size: 13px;
+}
+
+.mb-row-summary {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.mb-row-body {
+  padding: 4px 8px 8px;
+}
+
+.mb-empty {
+  margin: 4px 0;
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}
+
+.mb-pad {
+  padding: 6px 10px 0;
+}
+
+.mb-plain-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.mb-copy {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--mb-border);
+  border-radius: 999px;
+  background: var(--mb-raised);
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+/* Charts */
+.mb-chart {
+  margin: 4px 0 10px;
+}
+
+.mb-chart-title {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.mb-seg {
+  display: flex;
+  gap: 2px;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--mb-track);
+}
+
+.mb-seg-part {
+  flex-basis: 0;
+  min-width: 3px;
+}
+
+.mb-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.mb-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mb-legend .pill {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+.mb-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.mb-legend-value {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-legend-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  color: var(--ink-muted);
+}
+
+.mb-hbars {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mb-hbars li {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mb-hbar-label,
+.mb-hbar-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.mb-hbar-label {
+  color: var(--ink-muted);
+}
+
+.mb-hbar-value {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.mb-hbar-track {
+  display: block;
+  height: 8px;
+}
+
+.mb-hbar {
+  display: block;
+  height: 8px;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+  background: var(--accent);
+  transition: width 300ms ease;
+}
+
+.mb-spark-wrap {
+  position: relative;
+  height: 44px;
+}
+
+.mb-spark {
+  display: block;
+  width: 100%;
+  height: 44px;
+  overflow: visible;
+}
+
+.mb-spark-base {
+  stroke: var(--mb-border);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.mb-spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mb-spark-dot {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--mb-solid);
+  transform: translate(-50%, -50%);
+}
+
+.mb-squares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mb-squares li {
+  display: flex;
+}
+
+.mb-square {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: #ffffff;
+}
+
+.mb-square::before {
+  content: '';
+}
+
+.mb-square-pass {
+  background: var(--status-good);
+}
+
+.mb-square-pass::before {
+  content: '✓';
+}
+
+.mb-square-flaky {
+  background: var(--status-warning);
+  color: #0b0b0b;
+}
+
+.mb-square-flaky::before {
+  content: '~';
+}
+
+.mb-square-fail {
+  background: var(--status-critical);
+}
+
+.mb-square-fail::before {
+  content: '×';
+}
+
+.mb-square-incomplete {
+  background: var(--mb-track);
+  color: var(--ink);
+}
+
+.mb-square-incomplete::before {
+  content: '?';
+}
+
+.mb-square[data-tip]:hover::after,
+.mb-square[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 2;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  width: max-content;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11.5px;
+  font-weight: 500;
+  transform: translateX(-50%);
+  pointer-events: none;
 }

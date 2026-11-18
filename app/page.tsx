@@ -23,7 +23,9 @@ import type { SourceRef, VerdictRow } from '../src/core/contracts';
 import type { ChatUIMessage } from './api/chat/route';
 import { CatField } from './components/CatField';
 import { DevFooter } from './components/DevFooter';
-import { CheckIcon, CopyIcon, EditIcon, MoonIcon, NewChatIcon, SendIcon, SunIcon } from './components/icons';
+import { ChatEvalsContent, SuiteContent } from './components/EvalsPopovers';
+import { CheckIcon, CopyIcon, EditIcon, FlaskIcon, MoonIcon, NewChatIcon, PulseIcon, SendIcon, SunIcon } from './components/icons';
+import { MenuPopover } from './components/MenuPopover';
 import { Markdown } from './components/Markdown';
 import { Oneko } from './components/Oneko';
 import { RecallCard } from './components/RecallCard';
@@ -129,6 +131,11 @@ export default function Page() {
   const composerRef = useRef<HTMLDivElement>(null);
   const stickRef = useRef(true);
   const copiedTimer = useRef<number | null>(null);
+  // The two evals popovers in the header; opening one closes the other.
+  const [panel, setPanel] = useState<'chat' | 'suite' | null>(null);
+  const chatEvalsButton = useRef<HTMLButtonElement>(null);
+  const suiteButton = useRef<HTMLButtonElement>(null);
+  const closePanel = useCallback(() => setPanel(null), []);
 
   const transport = useMemo(
     () =>
@@ -317,6 +324,32 @@ export default function Page() {
               </div>
             </div>
             <div className="topbar-actions">
+              <button
+                ref={chatEvalsButton}
+                type="button"
+                className="btn btn-icon"
+                onClick={() => setPanel((open) => (open === 'chat' ? null : 'chat'))}
+                aria-label="This chat: evals"
+                title="This chat: evals"
+                aria-haspopup="dialog"
+                aria-expanded={panel === 'chat'}
+                aria-controls="evals-chat"
+              >
+                <PulseIcon />
+              </button>
+              <button
+                ref={suiteButton}
+                type="button"
+                className="btn btn-icon"
+                onClick={() => setPanel((open) => (open === 'suite' ? null : 'suite'))}
+                aria-label="Test suite: last eval run"
+                title="Test suite: last eval run"
+                aria-haspopup="dialog"
+                aria-expanded={panel === 'suite'}
+                aria-controls="evals-suite"
+              >
+                <FlaskIcon />
+              </button>
               <button type="button" className="btn" onClick={newChat} disabled={busy} aria-label="New chat">
                 <NewChatIcon />
                 <span className="btn-label">New chat</span>
@@ -338,6 +371,13 @@ export default function Page() {
             </div>
           </div>
         </header>
+
+        <MenuPopover id="evals-chat" open={panel === 'chat'} anchor={chatEvalsButton} labelledBy="evals-chat-title" onClose={closePanel}>
+          <ChatEvalsContent messages={messages} titleId="evals-chat-title" />
+        </MenuPopover>
+        <MenuPopover id="evals-suite" open={panel === 'suite'} anchor={suiteButton} labelledBy="evals-suite-title" onClose={closePanel}>
+          <SuiteContent titleId="evals-suite-title" active={panel === 'suite'} />
+        </MenuPopover>
 
         <main className="thread">
           {empty ? (
@@ -390,7 +430,9 @@ export default function Page() {
                             {copiedId === turn.user.id ? <span className="copied">Copied</span> : null}
                           </button>
                         </div>
-                        <div className="bubble">{userText}</div>
+                        <div className="bubble">
+                          <span className="bubble-text">{userText}</span>
+                        </div>
                       </div>
                     ) : null}
 
@@ -446,7 +488,6 @@ export default function Page() {
                 <SendIcon />
               </button>
             </div>
-            <p className="composer-note">Enter to send · Shift+Enter for a new line</p>
           </form>
         </div>
       </div>

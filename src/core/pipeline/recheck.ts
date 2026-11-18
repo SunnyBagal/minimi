@@ -5,6 +5,7 @@
  * emit a verdict event per claim in completion order, then the dated news
  * search and the summary write.
  */
+import { claimLabel } from '../claimLabel';
 import type {
   AgentEvent,
   Check,
@@ -127,7 +128,7 @@ async function judgeClaim(ctx: TurnContext, work: ClaimWork): Promise<VerdictRow
     };
   } else {
     const fresh = await ctx.deps.search.search({
-      query: `${claim.entity} ${claim.attribute}`,
+      query: claimLabel(claim),
       numResults: ctx.config.limits.resultsPerQuery,
       signal: ctx.signal,
     });

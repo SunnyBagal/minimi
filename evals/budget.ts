@@ -379,23 +379,37 @@ export class SpendMeter {
         if (streaming) sse.push(chunk);
         else text += chunk;
       }
-      if (streaming) {
-        sse.end();
-        const problem = sse.problem;
-        if (problem !== null) this.markIncomplete(problem);
-        return this.record(model, sse.usage);
-      }
-      const parsed = JSON.parse(text) as { usage?: Record<string, unknown>; model?: unknown };
-      const usage = emptyUsage();
-      mergeUsage(usage, parsed.usage);
-      if (typeof parsed.usage?.input_tokens !== 'number' || typeof parsed.usage?.output_tokens !== 'number') {
-        this.markIncomplete('a response did not report both input and output tokens');
-      }
-      return this.record(model, usage);
     } catch {
-      // The body broke off (an abort or a dropped connection): what it would have cost is unknown, so charge the worst case.
+      // Transport only: the body broke off (an abort or a dropped connection). Charge the worst case,
+      // but never less than the usage the stream already reported; above the reservation, stop paid work.
+      const observed = streaming && sse.sawUsage ? costUsd(model, sse.usage) : 0;
+      if (observed > reserve + 1e-12) this.markIncomplete('a broken response had already reported more than its reservation');
+      return this.chargeWorstCase(model, Math.max(reserve, observed));
+    }
+    // The whole body arrived: anything wrong from here on is a protocol failure, not an abort.
+    if (streaming) {
+      sse.end();
+      const problem = sse.problem;
+      if (problem !== null) this.markIncomplete(problem);
+      return this.record(model, sse.usage);
+    }
+    let parsed: { usage?: Record<string, unknown> } | null = null;
+    try {
+      const value = JSON.parse(text) as unknown;
+      if (value !== null && typeof value === 'object') parsed = value as { usage?: Record<string, unknown> };
+    } catch {
+      parsed = null;
+    }
+    if (parsed === null) {
+      this.markIncomplete('a response body was not a JSON object');
       return this.chargeWorstCase(model, reserve);
     }
+    const usage = emptyUsage();
+    mergeUsage(usage, parsed.usage);
+    if (typeof parsed.usage?.input_tokens !== 'number' || typeof parsed.usage?.output_tokens !== 'number') {
+      this.markIncomplete('a response did not report both input and output tokens');
+    }
+    return this.record(model, usage);
   }
 }
 

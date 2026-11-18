@@ -101,19 +101,24 @@ describe('SpendMeter', () => {
     expect(meter.incomplete).toBeNull();
   });
 
-  it('charges a stream that breaks part-way its full reservation and carries on; the caller gets the same error', async () => {
+  function brokenStream(firstChunk: string): ReadableStream<Uint8Array> {
     const encoder = new TextEncoder();
-    const broken = new ReadableStream<Uint8Array>({
+    return new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('data: {"type":"message_start","message":{"usage":{"input_tokens":50000}}}\n\n'));
+        controller.enqueue(encoder.encode(firstChunk));
         // The connection drops after the first chunk has been delivered.
         setTimeout(() => controller.error(new Error('connection reset')), 5);
       },
     });
+  }
+
+  it('charges a stream that breaks part-way its full reservation and carries on; the caller gets the same error', async () => {
     const meter = new SpendMeter(100);
+    // 20K tokens of input, within a 60K-byte body's reservation.
+    const stream = brokenStream('data: {"type":"message_start","message":{"usage":{"input_tokens":20000}}}\n\n');
     const fetched = meter.wrap((async () =>
-      new Response(broken, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch);
-    const init = sonnetBody(1000);
+      new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch);
+    const init = paddedSonnetBody(1000, 60_000);
     const response = await fetched(URL_MESSAGES, init);
     await expect(response.text()).rejects.toThrow('connection reset');
     await meter.settle();
@@ -122,6 +127,32 @@ describe('SpendMeter', () => {
     expect(meter.aborted).toBe(1);
     expect(meter.incomplete).toBeNull();
     expect(meter.exhausted()).toBe(false);
+  });
+
+  it('charges a broken stream at least the usage it already reported, and stops paid work when that passes the reservation', async () => {
+    const meter = new SpendMeter(100);
+    // 50K input tokens reported on a tiny request: $0.10 observed, far above its reservation.
+    const stream = brokenStream('data: {"type":"message_start","message":{"usage":{"input_tokens":50000}}}\n\n');
+    const fetched = meter.wrap((async () =>
+      new Response(stream, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as typeof fetch);
+    const response = await fetched(URL_MESSAGES, sonnetBody(1000));
+    await expect(response.text()).rejects.toThrow('connection reset');
+    await meter.settle();
+    expect(meter.spentUsd()).toBeCloseTo(0.1, 9);
+    expect(meter.incomplete).toBe('a broken response had already reported more than its reservation');
+    expect(meter.exhausted()).toBe(true);
+  });
+
+  it('treats a complete but malformed JSON body as a protocol failure, not an abort', async () => {
+    for (const body of ['{nonsense}', 'null']) {
+      const meter = new SpendMeter(100);
+      const fetched = meter.wrap((async () =>
+        new Response(body, { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch);
+      await (await fetched(URL_MESSAGES, sonnetBody(10))).text();
+      await meter.settle();
+      expect(meter.incomplete).toBe('a response body was not a JSON object');
+      expect(meter.exhausted()).toBe(true);
+    }
   });
 
   it('charges a request aborted before any response (a deadline) its full reservation and carries on', async () => {

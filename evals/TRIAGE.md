@@ -91,3 +91,9 @@ From the 19 × 3 run on `6996020` (`evals/results/latest.json` before this round
 
 - Case 10: the traces showed the re-check was right every run (Basalt DB price `unchanged`, 25 USD per month); the claim's entity was "Basalt DB Pro" in runs 1 and 3 and "Basalt DB" in run 2. Product fix: the extractor keeps a plan or tier name out of `entity` and puts it in `scope.plan`. Verified: case 10 at 3 of 3 (`2026-11-18T17-46-56.712Z.json`).
 - Case 17: the mutex answer wrote "0" (a binary semaphore's 0 or 1) in 2 of 3 runs after the chat rule was relaxed. Product fix: a chat answer writes a number only when the question asks for that number, and describes states in words. Verified: 2 of 2 completed runs; the third was cut by the meter after a router deadline abort, which led to the abort rule above.
+
+Codex review of this round (`docs/review/fix-prompts-r1-codex.md`), all fixed offline:
+- An aborted stream is charged at least the usage it had already reported; above its reservation that stops paid work. A complete but malformed JSON body is a protocol failure (stops paid work), not an abort.
+- With the plan in `scope.plan`, fallback searches, the summary rows, the verdict table and recall rows name the plan through one helper (`src/core/claimLabel.ts`), so a Basic and a Pro price never read the same.
+- The chat rule keeps numbers already present in text it is asked to quote, rewrite or check (the eval judge quotes through the chat writer).
+These changes came after the 19 × 3 run on `a423aec` and were not re-measured live.

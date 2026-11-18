@@ -643,17 +643,56 @@ mark.uncited small {
 
 .sources {
   margin-top: 16px;
-  padding-top: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--hairline);
 }
 
+/* The collapsed row: "Sources (n)" and a chevron that turns down when open. */
 .sources-head {
-  margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border-radius: 6px;
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ink-faint);
+}
+
+.sources-head::-webkit-details-marker {
+  display: none;
+}
+
+.sources-head::marker {
+  content: '';
+}
+
+.sources-head:hover {
+  color: var(--ink-muted);
+}
+
+.sources-head:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+.sources-chevron {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.sources[open] > .sources-head .sources-chevron {
+  transform: rotate(90deg);
+}
+
+.sources[open] > .sources-head {
+  margin-bottom: 4px;
 }
 
 .sources-list {
@@ -1044,7 +1083,7 @@ mark.uncited small {
 .timing {
   padding: 1px 8px;
   border: 1px solid var(--hairline);
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface-glass);
   color: var(--ink-faint);
   font-family: var(--font-mono);
@@ -1246,13 +1285,6 @@ mark.uncited small {
   cursor: not-allowed;
 }
 
-.composer-note {
-  margin: 6px 0 0;
-  text-align: center;
-  font-size: 11px;
-  color: var(--ink-faint);
-}
-
 /* ---------------------------------------------------------------- phone */
 
 @media (max-width: 560px) {
@@ -1280,10 +1312,6 @@ mark.uncited small {
 
   .bubble {
     max-width: 88%;
-  }
-
-  .composer-note {
-    display: none;
   }
 }
 

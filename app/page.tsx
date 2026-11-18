@@ -446,7 +446,6 @@ export default function Page() {
                 <SendIcon />
               </button>
             </div>
-            <p className="composer-note">Enter to send · Shift+Enter for a new line</p>
           </form>
         </div>
       </div>

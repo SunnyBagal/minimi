@@ -7,7 +7,8 @@ Third-party pieces used in the chat page. Everything else in the page, including
 The cat that chases the pointer.
 
 - Source: https://github.com/adryd325/oneko.js (`oneko.js` and `oneko.gif` on `main`, fetched 2026-11-18)
-- Used as: a port of `oneko.js` in `app/components/onekoCore.ts` (logic) and `app/components/Oneko.tsx` (drawing), with the original sprite sheet in `public/oneko/oneko.gif` and the licence in `public/oneko/LICENSE`.
+- Used as: the original sprite sheet in `public/oneko/oneko.gif`, with the licence in `public/oneko/LICENSE`, and its sheet offsets in `app/components/onekoCore.ts`.
+- Behaviour: the cat's movement and phases (running, idle, tired, sleeping, alert) come from the `useNeko` hook in the site owner's portfolio code (`src/components/sections/hero.js`, follow mode), which uses this sprite sheet. It is ported to TypeScript in `app/components/onekoCore.ts` (logic) and `app/components/Oneko.tsx` (drawing). Keeping the cat beside the conversation column (`app/components/nekoColumn.ts`) was written for this project.
 - Licence: MIT
 
 ```

@@ -118,6 +118,18 @@ describe('recheck', () => {
     expect(verdicts(events)[0]?.check.decidedBy).not.toBe('fast_path');
   });
 
+  it('a claim that could not be verified gets a code-built line with its last verified value and date', async () => {
+    const r = recheckRig({
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true }), write: ['Summary.'] },
+      search: { pages: { [NEON_PAGE]: { status: 'timeout', live: false, text: '' } }, results: {} },
+    });
+    storedAnswer(r, [{}]);
+    const events = await r.run({ message: 'Is that still right?' });
+    const row = verdicts(events)[0];
+    expect(row?.provenance).toBe('could_not_verify');
+    expect(textOf(events)).toMatch(/Couldn't verify Neon price this time \([^)]*\); last verified 19 USD\/month on \d{1,2} [A-Z][a-z]{2} \d{4}\./);
+  });
+
   it('extraction on demand: a re-check of a turn whose extraction is pending still returns verdicts', async () => {
     const r = recheckRig({
       llm: {

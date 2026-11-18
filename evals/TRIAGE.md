@@ -119,3 +119,15 @@ Codex review of eval-fix-r2 (`docs/review/eval-fix-r2-codex.md`) and that failur
 - With no previous answer in the session, no date is claimed as tried; the writer is told whether dates were shown. Nearest matches are shown as literal text (inline code, one line) and the writer, the user and the recall event get the same three.
 - The "I read "3/11" as …" line only appears when the date came from the numeric lookup.
 - Stronger assertions (spec wording): case 5 must ask for the names or offer a fresh shortlist; case 6 checks the emitted `recall.nearest` topic hit and an actual offer to confirm.
+
+### Round eval-fix-r4 (19 Nov 2026): stronger checks from the research
+
+The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19, $0.43 (one aborted request charged at its reservation). Only case 6 failed, on my narrowed offer check: all three answers did ask to confirm ("Is that match the conversation you meant?"), in wording the regex missed. Research: `docs/research/grok-grounding.md` (Grok, web sources), `docs/research/codex-flake-evidence.md` (Codex, our own results).
+
+- Case 6: the offer check accepts any question that asks the user to confirm which conversation they meant (`asksToConfirm`), tested on those three real answers and two negatives.
+- Every case: **every turn finished** (one `done`, no `error`, a non-empty shown answer) — closes the empty-answer pass Codex found in case 17 after a router timeout.
+- Every case: **every stored claim's quote contains its value's numbers** (Grok, rec. 2: claim-level support). All 183 claims of the `596b1eb` run pass it.
+- Judge: J3 now says that "nothing is saved" is not "it did not happen" (the case 5 false positive); the verdict is the reply's first word ("Not"/"Nope" are not "no"); a yes must quote a sentence that is in the shown answer.
+- Case 2 needs an actual flags event (empty); case 19 needs exactly one stored claim superseding the original.
+- Case 16 and product: for every row that could not be verified, code prints "Couldn't verify Northwind PG price this time (its page could not be fetched live); last verified 19 USD/month on 10 Nov 2026." (Grok, rec. 1: render figures and dates from quote-backed fields). Case 16 now needs one Northwind line pairing 19 with 10 Nov, not the old question's header.
+- The no-record writer never mentions "the app" (one run echoed "The app has shown the dates it checked").

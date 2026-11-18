@@ -184,6 +184,45 @@ export function claimsNoChangeAbout(answer: string, entity: RegExp, others?: Reg
   return false;
 }
 
+/** A sentence that asks the user to confirm which conversation they meant. */
+export function asksToConfirm(answer: string): boolean {
+  return answer
+    .split(/(?<=[?])/)
+    .filter((part) => part.trim().endsWith('?'))
+    .some((question) =>
+      /\b(meant|mean|thinking of|had in mind|the one|that match|that conversation|this conversation|is it|was it|confirm)\b/i.test(
+        question,
+      ),
+    );
+}
+
+/** Each turn finished: exactly one `done`, no `error` event, and a non-empty shown answer. */
+export function turnsFinished(run: CaseRun): Assertion {
+  const problems = run.parts.flatMap((part) =>
+    part.traces.flatMap((trace) => {
+      const done = ofType(trace.events, 'done').length;
+      const errors = ofType(trace.events, 'error').map((event) => `${event.stage}: ${event.message}`);
+      const empty = trace.answerText.trim() === '';
+      if (done === 1 && errors.length === 0 && !empty) return [];
+      return [{ message: trace.message.slice(0, 60), done, errors, empty }];
+    }),
+  );
+  return ok('every turn finished: one done, no error, a non-empty answer', problems.length === 0, problems);
+}
+
+/** Every stored claim's quote carries the numbers of its value (the claim-level support check). */
+export function claimsQuoteTheirValues(run: CaseRun): Assertion {
+  const unsupported = allClaims(run.store).filter((claim) => {
+    const quoted = new Set(numbersIn(claim.quote).map(Number));
+    return numbersIn(claim.value).some((token) => !quoted.has(Number(token)));
+  });
+  return ok(
+    "every stored claim's quote contains its value's numbers",
+    unsupported.length === 0,
+    unsupported.map((claim) => `${claim.entity} ${claim.attribute}: ${claim.value} | ${claim.quote}`),
+  );
+}
+
 export function recallOf(events: AgentEvent[]): Extract<AgentEvent, { type: 'recall' }> | undefined {
   return ofType(events, 'recall')[0];
 }
@@ -450,7 +489,11 @@ export function judgeSaysNo(run: CaseRun, id: JudgeId): Assertion[] {
   if (found === undefined) {
     return [ok(`${id} answers no`, false, 'judge not run')];
   }
-  const quoted = found.answer !== 'yes' || (found.quote !== null && found.quote.length > 0);
+  // A yes must quote a sentence that is really in the answer the user saw.
+  const shown = run.parts.flatMap((part) => part.traces.map((trace) => trace.answerText)).join('\n');
+  const squash = (text: string): string => text.replace(/\s+/g, ' ').trim();
+  const quoted =
+    found.answer !== 'yes' || (found.quote !== null && found.quote.length > 0 && squash(shown).includes(squash(found.quote)));
   return [
     ok(`${id} answers no`, found.answer === 'no', found.answer),
     ok(`${id} quotes the offending sentence when it answers yes`, quoted, found.quote),

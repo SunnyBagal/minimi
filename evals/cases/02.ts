@@ -24,7 +24,7 @@ export const evalCase: EvalCase = {
       ok('answer shows a check time', /\b\d{1,2}:\d{2}\b/.test(answer), answer),
       ok(
         'flags.uncitedNumbers is empty',
-        flags.every((flag) => flag.uncitedNumbers.length === 0),
+        flags.length > 0 && flags.every((flag) => flag.uncitedNumbers.length === 0),
         flags.map((flag) => flag.uncitedNumbers),
       ),
       numbersAllowed(run, events, []),

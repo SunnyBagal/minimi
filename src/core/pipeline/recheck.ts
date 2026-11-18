@@ -6,6 +6,7 @@
  * search and the summary write.
  */
 import { claimLabel } from '../claimLabel';
+import { dateWords } from '../dateWords';
 import type {
   AgentEvent,
   Check,
@@ -341,6 +342,18 @@ export async function* recheck(ctx: TurnContext, resolved: Resolved): AsyncItera
 
   // The check time is made visible in the answer before the summary.
   yield ctx.textEvent(`Checked ${ctx.time.formatLocal(ctx.clock.now().toISOString(), ctx.tz)}.\n`);
+
+  // A claim that could not be verified gets its last verified value and date from code, so the
+  // answer always says what is known and since when, whatever the summary writer chooses to say.
+  const unverified = rows.filter((row) => row.provenance === 'could_not_verify');
+  if (unverified.length > 0) {
+    const lines = unverified.map((row) => {
+      const why = row.check.verdict === 'source_unavailable' ? 'its page could not be fetched live' : 'nothing fetched now confirms it';
+      const since = dateWords(ctx.time.toLocalDate(new Date(row.claim.lastVerifiedAtUtc), ctx.tz));
+      return `Couldn't verify ${claimLabel(row.claim)} this time (${why}); last verified ${row.claim.value} on ${since}.`;
+    });
+    yield ctx.textEvent(`${lines.join('\n')}\n`);
+  }
 
   ctx.stage = 'summary';
   const doneSummary = ctx.timer('summary');

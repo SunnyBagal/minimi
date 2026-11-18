@@ -1,4 +1,4 @@
-import { chosenIs, noVerdicts, numbersAllowed, ok, recallOf } from '../assert';
+import { asksToConfirm, chosenIs, noVerdicts, numbersAllowed, ok, recallOf } from '../assert';
 import { MSG_CASE_3 } from '../messages';
 import { scenarioPgChanged } from '../scenarios';
 import { CLOCK, TZ, type EvalCase } from '../types';
@@ -36,10 +36,7 @@ export const evalCase: EvalCase = {
       ok('answer names Tue 3 Nov or 3 Nov', /3 Nov/.test(answer), answer),
       ok(
         'answer offers Thu 5 Nov by date and asks the user to confirm it',
-        /5 Nov/.test(answer) &&
-          /did you mean|do you mean|is (that|this|it) the one|was (that|this|it) (the one|it)|if (that|this|it)('s| is| was)|that one|confirm|is that what/i.test(
-            answer,
-          ),
+        /5 Nov/.test(answer) && asksToConfirm(answer),
         answer,
       ),
       noVerdicts(events),

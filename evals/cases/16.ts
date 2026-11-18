@@ -11,7 +11,10 @@ export const evalCase: EvalCase = {
     const events = run.parts[0]?.traces[0]?.events ?? [];
     const answer = run.parts[0]?.traces[0]?.answerText ?? '';
     const reached = /could not|couldn't|timed out|unavailable|not reach|not be reached/i.test(answer);
-    const lastValue = answer.includes('19') && /10 Nov|Nov/.test(answer);
+    // One Northwind line pairs the last verified value with its date (not the old question's header).
+    const lastValue = answer
+      .split('\n')
+      .some((line) => /northwind/i.test(line) && /\b19\b/.test(line) && /\b10 Nov\b/.test(line));
     // Scoped to sentences about Northwind: "Basalt DB is unchanged" is not a claim about Northwind.
     const saysNoChange = claimsNoChangeAbout(answer, /northwind/i, /basalt/i);
     return [

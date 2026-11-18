@@ -170,7 +170,16 @@ describe('wander mode', () => {
     state = nekoFrame(state, input(2, 0, 0));
     expect(state.x).toBeCloseTo(100 + SPEED);
     expect(state.phase).toBe('running');
-    while (!state.sitting) state = nekoFrame(state, input(2, 0, 0));
+    // 300 px at 10 px a tick, stopping inside 48 px: it sits within 30 ticks. A fixed budget,
+    // so a regression that never arrives fails here instead of hanging the worker.
+    const budget = 30;
+    let ticks = 0;
+    while (!state.sitting && ticks < budget) {
+      state = nekoFrame(state, input(2, 0, 0));
+      ticks += 1;
+    }
+    expect(state.sitting).toBe(true);
+    expect(ticks).toBeLessThanOrEqual(budget);
     expect(Math.abs(400 - state.x)).toBeLessThan(NEAR);
     expect(state.phase).toBe('sleeping');
     expect(state.bgPos).toBe(spritePosition('sleeping', 0));

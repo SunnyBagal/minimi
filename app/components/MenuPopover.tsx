@@ -105,32 +105,32 @@ export function MenuPopover({
     };
   }, [open, anchor, onClose]);
 
-  // Keep the popover on screen for the closing fade, unless motion is reduced.
-  const [closing, setClosing] = useState(false);
-  const wasOpen = useRef(open);
+  // Keep the popover on screen for the closing fade (none under reduced motion). While it
+  // fades it is inert: no Tab stop, click or screen-reader node inside it is reachable.
+  const [shown, setShown] = useState(open);
+  if (open && !shown) setShown(true);
   useEffect(() => {
-    if (wasOpen.current && !open && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setClosing(true);
-      const timer = window.setTimeout(() => setClosing(false), CLOSE_MS);
-      wasOpen.current = open;
-      return () => window.clearTimeout(timer);
+    if (open || !shown) return undefined;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(false);
+      return undefined;
     }
-    wasOpen.current = open;
-    setClosing(false);
-    return undefined;
-  }, [open]);
+    const timer = window.setTimeout(() => setShown(false), CLOSE_MS);
+    return () => window.clearTimeout(timer);
+  }, [open, shown]);
 
-  if (!open && !closing) return null;
+  if (!shown) return null;
+  const closing = !open;
   return (
     <div
-      ref={open ? ref : undefined}
+      ref={ref}
       id={id}
       role="dialog"
       aria-modal="false"
       aria-labelledby={labelledBy}
-      aria-hidden={open ? undefined : true}
+      inert={closing}
       tabIndex={-1}
-      className={open ? 'mb-popover' : 'mb-popover mb-closing'}
+      className={closing ? 'mb-popover mb-closing' : 'mb-popover'}
       style={
         place === null
           ? { opacity: 0 }

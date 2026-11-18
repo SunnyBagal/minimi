@@ -52,7 +52,16 @@ describe('suiteView', () => {
     expect(suiteView({ ...SUMMARY, runs: 1 }).subtitle).toBe('3 / 5 pass · 1 run · a423aec');
   });
 
-  it('an empty suite has null shares, not 0', () => {
+  it('shows the rates as text for the slider, tiles and caption', () => {
+    const view = suiteView(SUMMARY);
+    expect(view.scoredText).toBe('3 / 5');
+    expect(view.scoredTile).toBe('3/5');
+    expect(view.literalTile).toBe('1/5');
+    expect(view.caption).toBe('3 of 5 cases pass all 3 runs as scored.');
+    expect(view.emptyReason).toBeNull();
+  });
+
+  it('an empty suite shows "—" with a reason everywhere, never 0 / 0', () => {
     const empty = suiteView({
       ...SUMMARY,
       cases: 0,
@@ -64,6 +73,14 @@ describe('suiteView', () => {
     expect(empty.scoredShare).toBeNull();
     expect(empty.literalShare).toBeNull();
     expect(empty.cells).toEqual([]);
+    expect(empty.subtitle).toBe('No cases in the last run · 3 runs · a423aec');
+    expect([empty.scoredText, empty.scoredTile, empty.literalTile]).toEqual(['—', '—', '—']);
+    expect(empty.caption).toBe('The last results file has no cases, so there is no pass rate.');
+    expect(empty.emptyReason).toBe('no cases');
+    for (const value of [empty.subtitle, empty.scoredText, empty.scoredTile, empty.literalTile, empty.caption]) {
+      expect(value).not.toContain('0 / 0');
+      expect(value).not.toContain('0/0');
+    }
   });
 
   it('formats the metered cost, with "—" when none was recorded', () => {

@@ -14,9 +14,12 @@
  * - Layering (globals.css): z-index 1 inside the app, so it walks over the card and
  *   bubble backgrounds but under their text, and under the header and composer.
  * - Only the 32 px sprite takes pointer events (for the click); nothing else changes.
+ *   Where it walks under an answer's text layer, a click on its visible pixels in blank
+ *   space still reaches it; text, links and controls keep their clicks (catClick.ts).
  * - prefers-reduced-motion: reduce shows no cat; turning it on later hides it too.
  */
 import { useEffect, useRef } from 'react';
+import { catTakesClick, CLICKABLE, inRect, onGlyph } from './catClick';
 import {
   changeMode,
   endSit,
@@ -91,22 +94,44 @@ export function Oneko() {
       mouseX = event.clientX;
       mouseY = event.clientY;
     };
-    const onClick = (event: MouseEvent) => {
-      event.stopPropagation();
+    const cycleMode = () => {
       mode = nextMode(mode);
       window.clearTimeout(sitTimer);
       state = changeMode(state, mode, randTarget());
+    };
+    const onClick = (event: MouseEvent) => {
+      event.stopPropagation();
+      cycleMode();
+    };
+    // A click on the visible sprite where it walks under an answer's blank space (catClick.ts).
+    const onPageClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.defaultPrevented || event.target === el) return;
+      const target = event.target instanceof Element ? event.target : null;
+      const selection = window.getSelection();
+      const facts = {
+        spriteShown: !el.hidden,
+        insideSprite: inRect(event.clientX, event.clientY, el.getBoundingClientRect()),
+        inConversation: target?.closest('.thread') != null,
+        onControl: target?.closest(CLICKABLE) != null,
+        selecting: selection !== null && !selection.isCollapsed,
+        onGlyph: false,
+      };
+      if (!catTakesClick(facts)) return;
+      if (onGlyph(document, event.clientX, event.clientY)) return;
+      cycleMode();
     };
 
     start();
     window.addEventListener('mousemove', onMouse);
     el.addEventListener('click', onClick);
+    document.addEventListener('click', onPageClick);
     reduced.addEventListener('change', start);
     return () => {
       window.clearInterval(interval);
       window.clearTimeout(sitTimer);
       window.removeEventListener('mousemove', onMouse);
       el.removeEventListener('click', onClick);
+      document.removeEventListener('click', onPageClick);
       reduced.removeEventListener('change', start);
     };
   }, []);

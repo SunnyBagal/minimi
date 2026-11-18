@@ -5,11 +5,11 @@
  * screen, chatEvals.ts) and "Test suite" (the last scripted eval run, /api/evals). Every
  * figure comes from that data; a figure with no data shows "—" and says why.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Verdict } from '../../src/core/contracts';
 import type { ChatUIMessage } from '../api/chat/route';
 import type { EvalSummary } from '../api/evals/summary';
-import { chatEvals, chatSubtitle, duration, INTENTS, percent, VERDICTS } from './chatEvals';
+import { chatEvals, chatSubtitle, coverageCaption, duration, INTENTS, percent, VERDICTS } from './chatEvals';
 import { HBars, MenuRow, RingTile, SegmentedBar, Sparkline, SliderMeter } from './evalCharts';
 import {
   AlertIcon,
@@ -33,6 +33,8 @@ import {
 import { STATUS_LABEL, suiteView, usd, type CaseCell } from './suiteEvals';
 
 export const SUITE_COMMAND = 'npm run evals -- --runs 3';
+/** How long the copy button says "Copied". */
+const COPIED_MS = 1500;
 
 function HeadTile({
   id,
@@ -113,11 +115,10 @@ const INTENT_LABEL = {
 export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessage[]; titleId: string }) {
   const evals = useMemo(() => chatEvals(messages), [messages]);
   const { coverage, sources, verdicts, latency } = evals;
-
-  const coverageCaption =
-    coverage.share === null
-      ? 'No answer in this chat has cited a source yet.'
-      : `${coverage.fullyCited} of ${coverage.citedAnswers} cited ${coverage.citedAnswers === 1 ? 'answer has' : 'answers have'} every number cited · ${coverage.uncitedNumbers} uncited ${coverage.uncitedNumbers === 1 ? 'number' : 'numbers'} flagged`;
+  const running =
+    latency.inProgress === 0
+      ? null
+      : `${latency.inProgress} ${latency.inProgress === 1 ? 'turn is' : 'turns are'} still running and not counted`;
 
   return (
     <>
@@ -134,11 +135,16 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
             ...(evals.intents !== null && evals.answersWithoutIntent > 0
               ? [['Without an intent yet', String(evals.answersWithoutIntent)] as [string, ReactNode]]
               : []),
+            ['Validated answers', String(coverage.validated)],
+            ['Awaiting validation', String(coverage.pending)],
             ['Uncited numbers flagged', String(coverage.uncitedNumbers)],
             ['Errors', String(evals.errors)],
           ]}
         />
-        <p className="mb-note">Counted from the answers on screen; nothing here is scored by a model.</p>
+        <p className="mb-note">
+          Counted from the answers on screen; nothing here is scored by a model. Citation coverage uses the
+          validator&rsquo;s flags, which do not ask for a citation on numbers taken from your own question.
+        </p>
       </HeadTile>
 
       <SliderMeter
@@ -147,7 +153,7 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
         valueText={percent(coverage.share)}
         left={<QuoteIcon />}
         right={<CheckCircleIcon />}
-        caption={coverageCaption}
+        caption={coverageCaption(evals)}
       />
 
       <div className="mb-tiles">
@@ -170,7 +176,7 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
           share={null}
           valueText={latency.avgAnswerMs === null ? '—' : `${(latency.avgAnswerMs / 1000).toFixed(1)} s`}
           icon={<ClockIcon />}
-          reason="no timings yet"
+          reason={latency.inProgress > 0 ? 'first answer still running' : 'no finished answer yet'}
         />
       </div>
 
@@ -215,26 +221,39 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
         ) : (
           <>
             <HBars
-              title="Average per stage"
+              title="Average per stage, every turn so far"
               rows={latency.stages.map((s) => ({
                 label: s.stage,
                 value: s.avgMs,
               }))}
               format={duration}
             />
-            <Sparkline title="Total time per answer" values={latency.perAnswer} format={duration} />
+            {latency.perAnswer.length === 0 ? (
+              <p className="mb-empty">
+                No answer has finished yet, so there is no total per answer{running === null ? '' : `; ${running}`}.
+              </p>
+            ) : (
+              <>
+                <Sparkline title="Total time per finished answer" values={latency.perAnswer} format={duration} />
+                {running === null ? null : <p className="mb-caption">{running}.</p>}
+              </>
+            )}
           </>
         )}
       </MenuRow>
 
-      <MenuRow icon={<LinkIcon />} title="Sources" summary={sources.total === 0 ? '—' : `${sources.total} cited`}>
-        {sources.total === 0 ? (
-          <p className="mb-empty">No answer in this chat has cited a source yet.</p>
+      <MenuRow
+        icon={<LinkIcon />}
+        title="Sources"
+        summary={sources.supplied === 0 ? '—' : `${sources.supplied} supplied`}
+      >
+        {sources.supplied === 0 ? (
+          <p className="mb-empty">No sources have been supplied with an answer in this chat yet.</p>
         ) : (
           <>
             <SegmentedBar
               title="How each source was read"
-              unit="citations"
+              unit="sources"
               segments={[
                 {
                   key: 'live',
@@ -247,14 +266,14 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
                   key: 'index',
                   name: 'Search-index copy',
                   label: 'Search-index copy',
-                  value: sources.total - sources.live,
+                  value: sources.supplied - sources.live,
                   color: 'var(--viz-rest)',
                 },
               ]}
             />
             <SegmentedBar
               title="Who published it"
-              unit="citations"
+              unit="sources"
               segments={[
                 {
                   key: 'first',
@@ -267,12 +286,15 @@ export function ChatEvalsContent({ messages, titleId }: { messages: ChatUIMessag
                   key: 'other',
                   name: 'Other sites',
                   label: 'Other sites',
-                  value: sources.total - sources.firstParty,
+                  value: sources.supplied - sources.firstParty,
                   color: 'var(--viz-rest)',
                 },
               ]}
             />
-            <p className="mb-caption">Counts every citation in every answer, so a page cited twice counts twice.</p>
+            <p className="mb-caption">
+              Every source supplied with an answer, cited in the text or not; a page supplied to two answers counts
+              twice.
+            </p>
           </>
         )}
       </MenuRow>
@@ -323,6 +345,9 @@ function Squares({ title, cells }: { title: string; cells: CaseCell[] }) {
 export function SuiteContent({ titleId, active }: { titleId: string; active: boolean }) {
   const [state, setState] = useState<SuiteState>({ kind: 'loading' });
   const [copied, setCopied] = useState(false);
+  // The "Copied" reset timer; cleared when the popover closes so no callback outlives it.
+  const copiedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
   useEffect(() => {
     if (!active) return;
@@ -361,7 +386,8 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
       ?.writeText(SUITE_COMMAND)
       .then(() => {
         setCopied(true);
-        window.setTimeout(() => setCopied(false), 1500);
+        window.clearTimeout(copiedTimer.current);
+        copiedTimer.current = window.setTimeout(() => setCopied(false), COPIED_MS);
       })
       .catch(() => undefined);
   };
@@ -436,24 +462,26 @@ export function SuiteContent({ titleId, active }: { titleId: string; active: boo
       <SliderMeter
         label="Scored pass rate"
         share={view.scoredShare}
-        valueText={`${view.scored} / ${view.cases}`}
+        valueText={view.scoredText}
         left={<XCircleIcon />}
         right={<CheckCircleIcon />}
-        caption={`${view.scored} of ${view.cases} cases pass all ${summary.runs} runs as scored.`}
+        caption={view.caption}
       />
 
       <div className="mb-tiles">
         <RingTile
           label="Scored"
           share={view.scoredShare}
-          valueText={`${view.scored}/${view.cases}`}
+          valueText={view.scoredTile}
           icon={<CheckCircleIcon size={16} />}
+          reason={view.emptyReason ?? undefined}
         />
         <RingTile
           label="Literal"
           share={view.literalShare}
-          valueText={`${view.literal}/${view.cases}`}
+          valueText={view.literalTile}
           icon={<QuoteIcon size={16} />}
+          reason={view.emptyReason ?? undefined}
         />
         <RingTile
           label="Cost"

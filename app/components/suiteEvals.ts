@@ -22,8 +22,17 @@ export interface SuiteView {
   /** One cell per case id, in id order. */
   cells: CaseCell[];
   literalCells: CaseCell[];
-  /** "17 / 19 pass · 3 runs · a423aec" */
+  /** "17 / 19 pass · 3 runs · a423aec"; "No cases in the last run · …" for an empty suite. */
   subtitle: string;
+  /** "16 / 19", or "—" for an empty suite. */
+  scoredText: string;
+  /** "16/19" for the tile, or "—". */
+  scoredTile: string;
+  literalTile: string;
+  /** What the slider shows, or why there is nothing to show. */
+  caption: string;
+  /** Why the rates are "—"; null when they have values. */
+  emptyReason: string | null;
 }
 
 function cellsOf(lists: CaseLists, incomplete: readonly number[]): CaseCell[] {
@@ -39,6 +48,24 @@ export function suiteView(summary: EvalSummary): SuiteView {
   const share = (n: number) => (summary.cases === 0 ? null : n / summary.cases);
   const scored = summary.passAtAll.length;
   const literal = summary.strict.passAtAll.length;
+  const runs = `${summary.runs} ${summary.runs === 1 ? 'run' : 'runs'}`;
+  if (summary.cases === 0) {
+    return {
+      scored,
+      literal,
+      cases: 0,
+      scoredShare: null,
+      literalShare: null,
+      cells: [],
+      literalCells: [],
+      subtitle: `No cases in the last run · ${runs} · ${summary.sha}`,
+      scoredText: '—',
+      scoredTile: '—',
+      literalTile: '—',
+      caption: 'The last results file has no cases, so there is no pass rate.',
+      emptyReason: 'no cases',
+    };
+  }
   return {
     scored,
     literal,
@@ -47,7 +74,12 @@ export function suiteView(summary: EvalSummary): SuiteView {
     literalShare: share(literal),
     cells: cellsOf(summary, summary.incomplete),
     literalCells: cellsOf(summary.strict, summary.incomplete),
-    subtitle: `${scored} / ${summary.cases} pass · ${summary.runs} ${summary.runs === 1 ? 'run' : 'runs'} · ${summary.sha}`,
+    subtitle: `${scored} / ${summary.cases} pass · ${runs} · ${summary.sha}`,
+    scoredText: `${scored} / ${summary.cases}`,
+    scoredTile: `${scored}/${summary.cases}`,
+    literalTile: `${literal}/${summary.cases}`,
+    caption: `${scored} of ${summary.cases} cases pass all ${runs} as scored.`,
+    emptyReason: null,
   };
 }
 

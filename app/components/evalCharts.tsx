@@ -9,10 +9,7 @@
 import type { ReactNode } from 'react';
 import { ChevronIcon } from './icons';
 
-/** From this share the fill reaches the right-hand icon, which then takes the on-accent colour. */
-const SLIDER_FULL = 0.92;
-
-/** A share as a CSS width, clamped to 0–100 %. */
+/** A share as a CSS width, clamped to 0–100 %. Exactly proportional: no minimum width. */
 const pct = (share: number) => `${Math.min(100, Math.max(0, share * 100))}%`;
 
 /** The macOS brightness-slider look, for a headline ratio. Null shows an empty track and the reason. */
@@ -38,7 +35,7 @@ export function SliderMeter({
         <span className="mb-value">{valueText}</span>
       </div>
       <div
-        className={share !== null && share >= SLIDER_FULL ? 'mb-slider mb-slider-full' : 'mb-slider'}
+        className="mb-slider"
         role="meter"
         aria-label={`${label}: ${share === null ? 'no data' : valueText}`}
         aria-valuemin={0}
@@ -46,7 +43,8 @@ export function SliderMeter({
         aria-valuenow={share === null ? undefined : Math.round(share * 100)}
         aria-valuetext={share === null ? 'no data' : valueText}
       >
-        {share !== null ? <span className="mb-slider-fill" style={{ width: `max(24px, ${pct(share)})` }} /> : null}
+        {/* The end icons sit on their own small discs, so they read on the fill and on the track alike. */}
+        {share !== null && share > 0 ? <span className="mb-slider-fill" style={{ width: pct(share) }} /> : null}
         <span className="mb-slider-icon mb-slider-left">{left}</span>
         <span className="mb-slider-icon mb-slider-right">{right}</span>
       </div>

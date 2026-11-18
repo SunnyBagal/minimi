@@ -1623,25 +1623,26 @@ details[open] > summary > .mb-row-chevron {
   transition: width 300ms ease;
 }
 
+/* The end icons sit on their own discs, independent of the fill, so the fill stays exactly proportional. */
 .mb-slider-icon {
   position: absolute;
   top: 50%;
-  display: inline-flex;
-  transform: translateY(-50%);
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mb-solid);
   color: var(--ink-muted);
+  transform: translateY(-50%);
 }
 
 .mb-slider-left {
-  left: 6px;
+  left: 3px;
 }
 
 .mb-slider-right {
-  right: 6px;
-}
-
-.mb-slider:has(.mb-slider-fill) .mb-slider-left,
-.mb-slider-full .mb-slider-right {
-  color: var(--on-accent);
+  right: 3px;
 }
 
 /* Round stat tiles */

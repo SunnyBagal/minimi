@@ -566,7 +566,7 @@ describe('SqliteStore', () => {
 describe('writablePath', () => {
   it('keeps the requested path when its directory can be created', async () => {
     const { writablePath } = await import('./sqliteStore');
-    expect(writablePath('/data/minimi.db', () => {})).toBe('/data/minimi.db');
+    expect(writablePath('/data/minimi.db', () => {}, () => {})).toBe('/data/minimi.db');
   });
 
   it('falls back to the temp directory when the directory is read-only (as on Vercel)', async () => {
@@ -576,6 +576,16 @@ describe('writablePath', () => {
     const readOnly = (dir: string): void => {
       if (dir === '/var/task/data') throw Object.assign(new Error('read-only file system'), { code: 'EROFS' });
     };
-    expect(writablePath('/var/task/data/minimi.db', readOnly)).toBe(join(tmpdir(), 'minimi.db'));
+    expect(writablePath('/var/task/data/minimi.db', readOnly, () => {})).toBe(join(tmpdir(), 'minimi.db'));
+  });
+
+  it('falls back when the folder exists but is not writable (what Vercel did: "unable to open database file")', async () => {
+    const { writablePath } = await import('./sqliteStore');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const notWritable = (dir: string): void => {
+      if (dir === '/var/task/data') throw Object.assign(new Error('permission denied'), { code: 'EACCES' });
+    };
+    expect(writablePath('/var/task/data/minimi.db', () => {}, notWritable)).toBe(join(tmpdir(), 'minimi.db'));
   });
 });

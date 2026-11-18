@@ -12,7 +12,7 @@
  * Every ordering in this file means turns.seq / row seq, never timestamps:
  * test clocks do not advance.
  */
-import { mkdirSync, readFileSync } from 'node:fs';
+import { accessSync, constants, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -45,9 +45,15 @@ export const DATE_RANK_MAX_ROWS = 20;
  * same file name in the system temp directory. On such hosts the temp directory is per
  * instance and short-lived, so memory does not persist there.
  */
-export function writablePath(dbPath: string, mkdir: (dir: string) => void = (dir) => mkdirSync(dir, { recursive: true })): string {
+export function writablePath(
+  dbPath: string,
+  mkdir: (dir: string) => void = (dir) => mkdirSync(dir, { recursive: true }),
+  writable: (dir: string) => void = (dir) => accessSync(dir, constants.W_OK),
+): string {
   try {
+    // Creating the folder is not enough: on Vercel it can exist (or be "created") and still be read-only.
     mkdir(dirname(dbPath));
+    writable(dirname(dbPath));
     return dbPath;
   } catch {
     const fallback = join(tmpdir(), basename(dbPath));

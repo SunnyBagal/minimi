@@ -227,6 +227,20 @@ function renewsDateQuestion(text: string): boolean {
   });
 }
 
+/**
+ * Sentences with any citation markers that follow their full stop attached, the rule the app's own
+ * validator uses (src/core/search/validate.ts, TRAILING_CITATIONS): "… since your question. [3]" cites that sentence.
+ * Added after the second held-out run (case 117), per its review.
+ */
+export function citedSentencesOf(text: string): string[] {
+  const out: string[] = [];
+  for (const sentence of sentencesOf(text)) {
+    if (/^(?:\[\d+\]\s*)+$/.test(sentence) && out.length > 0) out[out.length - 1] = `${out[out.length - 1]} ${sentence}`;
+    else out.push(sentence);
+  }
+  return out;
+}
+
 function claimOn(run: CaseRun, entity: string, value: string, localDate: string): Claim | undefined {
   const hits = run.store.findTurns({ dates: [localDate], excludeTurnIds: [], limit: 50 });
   const turnIds = new Set(hits.flatMap((hit) => (hit.assistantTurn === null ? [] : [hit.assistantTurn.id])));
@@ -1088,7 +1102,7 @@ const case117: EvalCase = {
     const events = eventsAt(run);
     const answer = shown(run);
     const entities = verdictsOf(events).map((row) => row.claim.entity);
-    const passage = sentencesOf(answer).some(
+    const passage = citedSentencesOf(answer).some(
       (sentence) => /shared drafts/i.test(sentence) && namesDate(sentence, 12, 'Nov') && citesUrl(sentence, events, LOOMERY_CHANGELOG),
     );
     return [

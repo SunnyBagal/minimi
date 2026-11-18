@@ -38,3 +38,7 @@ The first run (`evals/results/heldout-first.json`, commit `20e0b11`, before any 
 | 111 | Check too strict: "look up … pricing fresh" was not accepted as forward-looking. | "fresh" counts; a historical lookup or a refusal still fails (`predicates.test.ts`). |
 
 Runs after these changes are written to `evals/results/heldout.json` and are reported as "after fixes", never in place of the first run.
+
+### Second run after fixes
+
+`0ce1ea0`: 17 of 19 at 3 of 3; 114 and 117 flaky. 114 (product): the re-check writer computed "an increase of 9 USD per month"; it now has the fresh writer's rule against computed differences, totals and percentages. 117 (check): the news citation came right after the full stop ("…question. [3]"), which the app's validator counts as citing that sentence; the check now uses the same rule (`citedSentencesOf`, tested).

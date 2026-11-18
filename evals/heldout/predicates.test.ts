@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { offersRelayLookup, shorterMove } from './cases';
+import { citedSentencesOf, offersRelayLookup, shorterMove } from './cases';
 
 // Changed after the first held-out run, per the Codex review of its failures; the first run's score is kept in
 // evals/results/heldout-first.json. Each fix is tested on the saved answers and on the counterexamples it must reject.
@@ -22,5 +22,17 @@ describe('held-out case 111: offersRelayLookup', () => {
   it('rejects a historical lookup and a refusal', () => {
     expect(offersRelayLookup('I can look up Copperlane Relay plan pricing from last Thursday.')).toBe(false);
     expect(offersRelayLookup("I can't look up Copperlane Relay plan pricing fresh.")).toBe(false);
+  });
+});
+
+describe('held-out case 117: citedSentencesOf', () => {
+  it('attaches a marker that follows the full stop to its sentence, as the validator does', () => {
+    expect(citedSentencesOf('Loomery shipped shared drafts on 12 Nov 2026, news since your question. [3]\n\nNothing else.')).toEqual([
+      'Loomery shipped shared drafts on 12 Nov 2026, news since your question. [3]',
+      'Nothing else.',
+    ]);
+  });
+  it('does not attach a marker to a sentence it does not follow', () => {
+    expect(citedSentencesOf('Shared drafts shipped. Prices are unchanged [3].')).toEqual(['Shared drafts shipped.', 'Prices are unchanged [3].']);
   });
 });

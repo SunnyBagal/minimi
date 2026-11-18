@@ -92,7 +92,7 @@ From the 19 × 3 run on `6996020` (`evals/results/latest.json` before this round
 - Case 10: the traces showed the re-check was right every run (Basalt DB price `unchanged`, 25 USD per month); the claim's entity was "Basalt DB Pro" in runs 1 and 3 and "Basalt DB" in run 2. Product fix: the extractor keeps a plan or tier name out of `entity` and puts it in `scope.plan`. Verified: case 10 at 3 of 3 (`2026-11-18T17-46-56.712Z.json`).
 - Case 17: the mutex answer wrote "0" (a binary semaphore's 0 or 1) in 2 of 3 runs after the chat rule was relaxed. Product fix: a chat answer writes a number only when the question asks for that number, and describes states in words. Verified: 2 of 2 completed runs; the third was cut by the meter after a router deadline abort, which led to the abort rule above.
 
-Codex review of this round (`docs/review/fix-prompts-r1-codex.md`), all fixed offline:
+Codex review of this round (a Codex code review), all fixed offline:
 - An aborted stream is charged at least the usage it had already reported; above its reservation that stops paid work. A complete but malformed JSON body is a protocol failure (stops paid work), not an abort.
 - With the plan in `scope.plan`, fallback searches, the summary rows, the verdict table and recall rows name the plan through one helper (`src/core/claimLabel.ts`), so a Basic and a Pro price never read the same.
 - The chat rule keeps numbers already present in text it is asked to quote, rewrite or check (the eval judge quotes through the chat writer).
@@ -113,7 +113,7 @@ Replay of `evals/results/latest.json` (19 × 3 on `a423aec`, scored 17 of 19, li
 
 The 19 × 3 run on `0ad1520` (eval-fix-r2): scored 18 of 19 and literal 18 of 19 at 3 of 3, $0.34. The one failure: case 5 run 3, judge J3 answered "yes", quoting the code-built line "I found no saved answer for 9 Nov 2026." as implying the conversation never happened.
 
-Codex review of eval-fix-r2 (`docs/review/eval-fix-r2-codex.md`) and that failure, fixed offline:
+Codex review of eval-fix-r2 (a Codex code review) and that failure, fixed offline:
 - Change 12 tightened: a timestamp field contributes only its date (year, month, day, in UTC and in the case's zone), never its clock digits; an evidence number counts only inside a `[n]` marker that names one of this turn's evidence items, never as a free figure. `numbers.test.ts` › "a timestamp gives only its date …", "an evidence number counts only inside a marker …".
 - The no-record line is worded about what is saved, not whether the conversation happened: "I have nothing saved about Postgres hosting from 10 Nov 2026 or 3 Nov 2026, so I can't look that conversation up." It names the topic, as case 6 asks ("nothing about Postgres hosting").
 - With no previous answer in the session, no date is claimed as tried; the writer is told whether dates were shown. Nearest matches are shown as literal text (inline code, one line) and the writer, the user and the recall event get the same three.
@@ -122,7 +122,7 @@ Codex review of eval-fix-r2 (`docs/review/eval-fix-r2-codex.md`) and that failur
 
 ### Round eval-fix-r4 (19 Nov 2026): stronger checks from the research
 
-The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19, $0.43 (one aborted request charged at its reservation). Only case 6 failed, on my narrowed offer check: all three answers did ask to confirm ("Is that match the conversation you meant?"), in wording the regex missed. Research: `docs/research/grok-grounding.md` (Grok, web sources), `docs/research/codex-flake-evidence.md` (Codex, our own results).
+The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19, $0.43 (one aborted request charged at its reservation). Only case 6 failed, on my narrowed offer check: all three answers did ask to confirm ("Is that match the conversation you meant?"), in wording the regex missed. Research: Grok's web research on grounding numbers, Codex's analysis of our own result files.
 
 - Case 6: the offer check accepts any question that asks the user to confirm which conversation they meant (`asksToConfirm`), tested on those three real answers and two negatives.
 - Every case: **every turn finished** (one `done`, no `error`, a non-empty shown answer) — closes the empty-answer pass Codex found in case 17 after a router timeout.
@@ -134,7 +134,7 @@ The 19 × 3 run on `596b1eb` (eval-fix-r3): scored 18 of 19 and literal 18 of 19
 
 ### Round eval-fix-r5 (19 Nov 2026): wrong prose that passed, and the checks that let it
 
-The 19 × 3 run on `07453de` (r4) scored 19 of 19 on both readings, $0.35. Codex's read of its traces (`docs/review/eval-fix-r34-codex.md`) found wrong prose that passed and check gaps. Fixed:
+The 19 × 3 run on `07453de` (r4) scored 19 of 19 on both readings, $0.35. Codex's read of its traces (a Codex code review) found wrong prose that passed and check gaps. Fixed:
 
 Product
 - Case 11 (all 3 runs): the re-check writer wrote "As of Tue 10 Nov 2026" about a check run on 13 Nov, because its prompt said "Name dates exactly as they are written in the input" and its only date was the earlier question's. The writer now writes no dates or times (code prints when the user asked, on the recall card, and when the check ran, on the Checked line), except the date a news item states; its input labels the date "Earlier question asked on". The Lane 4 pin on the old sentence now pins the new rule.
@@ -153,7 +153,7 @@ Checks
 
 ### Round eval-fix-r6 (19 Nov 2026)
 
-Codex's r5 review (`docs/review/eval-fix-r5-codex.md`) supports reporting 19 of 19 on both readings for `77fe8b4` and lists remaining edge cases, all fixed offline and replayed against the `77fe8b4` traces (cases 4–6 still pass; no saved sentence dates a verification wrongly):
+Codex's r5 review (a Codex code review) supports reporting 19 of 19 on both readings for `77fe8b4` and lists remaining edge cases, all fixed offline and replayed against the `77fe8b4` traces (cases 4–6 still pass; no saved sentence dates a verification wrongly):
 - Offers must be phrased to the user ("I can …", "Want me to …?", "If you send me …") and not negated; a confirming question must itself carry the confirm wording, not borrow it from an earlier "I can't tell which one you meant."
 - The check-date assertion compares any date a verification sentence names (any format) with the day the check actually ran.
 - A judge "yes" must quote most of one sentence of the answer, not a fragment.

@@ -13,7 +13,7 @@ One line per Lane 0 VERIFY item (V1–V8): `V<n>: <what was found> → <what the
 
 ## Later decisions (18 Nov 2026)
 
-- Duplicate display: the "On <date> you asked: …" line was streamed as answer text and also shown by the recall card. It now appears only in the card. The recalled question and its timestamp stay a structured field on the recall event (`asked`, contract request `docs/contract-requests/recall-asked.md`), so API consumers still get them. The no-record event also carries the `nearest` turns the writer was given.
+- Duplicate display: the "On <date> you asked: …" line was streamed as answer text and also shown by the recall card. It now appears only in the card. The recalled question and its timestamp stay a structured field on the recall event (`asked`, an additive contract change), so API consumers still get them. The no-record event also carries the `nearest` turns the writer was given.
 - Dates stay as `formatLocal` prints them ("Tue 3 Nov 2026"). Eval case 8's "3 November 2026" is our eval's wording, not the challenge brief's, so the format is not changed for it.
 - Time zones stay as `formatLocal` prints them (for example "GMT+5:30").
 - Evals: the literal number reading skips spans the app itself injects (timestamps, dates and the recall line in code-built lines); see `evals/TRIAGE.md` change 8. Live eval runs are capped by `--budget-usd` (default 4.5).

@@ -175,6 +175,39 @@ describe('SpendMeter', () => {
     }
   });
 
+  it('requires an input count at message_start, and message_stop after the final usage', async () => {
+    const cases: Array<[string, string]> = [
+      [
+        'data: {"type":"message_start","message":{"usage":{}}}\n\n' +
+          'data: {"type":"message_delta","usage":{"output_tokens":10}}\n\n' +
+          'data: {"type":"message_stop"}\n\n',
+        'a stream did not report its input tokens at message_start',
+      ],
+      [
+        'data: {"type":"message_start","message":{"usage":{"input_tokens":10}}}\n\n' +
+          'data: {"type":"message_stop"}\n\n' +
+          'data: {"type":"message_delta","usage":{"output_tokens":10}}\n\n',
+        'a stream stopped before its final usage',
+      ],
+    ];
+    for (const [body, reason] of cases) {
+      const meter = new SpendMeter(100);
+      const fetched = meter.wrap((async () => sseResponse(body)) as typeof fetch);
+      await (await fetched(URL_MESSAGES, sonnetBody(100))).text();
+      await meter.settle();
+      expect(meter.incomplete).toBe(reason);
+    }
+    // An explicit zero input count is valid.
+    const zeroInput = new SpendMeter(100);
+    const ok =
+      'data: {"type":"message_start","message":{"usage":{"input_tokens":0}}}\n\n' +
+      'data: {"type":"message_delta","usage":{"output_tokens":3}}\n\n' +
+      'data: {"type":"message_stop"}\n\n';
+    await (await zeroInput.wrap((async () => sseResponse(ok)) as typeof fetch)(URL_MESSAGES, sonnetBody(100))).text();
+    await zeroInput.settle();
+    expect(zeroInput.incomplete).toBeNull();
+  });
+
   it('marks a stream with message_stop but no final output total as incomplete', async () => {
     const meter = new SpendMeter(100);
     const body =

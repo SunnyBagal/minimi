@@ -63,3 +63,17 @@ describe('claimsNoChangeAbout: the phrase belongs to the product named before it
     ).toBe(true);
   });
 });
+
+describe('claimsNoChangeAbout: every phrase, names on either side', () => {
+  it('finds a second no-change phrase in the same clause', () => {
+    expect(claimsNoChangeAbout('Basalt DB is unchanged and Northwind PG is unchanged.', /northwind/i, /basalt/i)).toBe(true);
+  });
+
+  it('gives a phrase to every product coordinated after it', () => {
+    expect(claimsNoChangeAbout('No change for Basalt DB and Northwind PG.', /northwind/i, /basalt/i)).toBe(true);
+  });
+
+  it('keeps the mixed sentence negative', () => {
+    expect(claimsNoChangeAbout('Basalt DB is unchanged and Northwind PG timed out.', /northwind/i, /basalt/i)).toBe(false);
+  });
+});

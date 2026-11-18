@@ -48,30 +48,39 @@ export function VerdictTable({ rows }: { rows: VerdictRow[] }) {
                 <td className="verdict-claim">
                   {row.claim.entity} {row.claim.attribute}
                 </td>
-                <td>
-                  {row.claim.value}
-                  <div className="cell-note">as of {checkedAt(row.claim.asOfUtc)}</div>
+                {/* data-label and the inner div let a phone show each row as a stacked, labelled block. */}
+                <td data-label="Then">
+                  <div className="cell">
+                    {row.claim.value}
+                    <div className="cell-note">as of {checkedAt(row.claim.asOfUtc)}</div>
+                  </div>
                 </td>
-                <td>
-                  <span className="verdict-now">{nowValue}</span>
-                  {row.provenance !== 'could_not_verify' && row.check.newQuote !== null ? (
-                    <div className="cell-note cell-quote">&ldquo;{row.check.newQuote}&rdquo;</div>
-                  ) : null}
-                  {row.nowSource !== null ? (
-                    <div className="cell-source">
-                      <a className="cite" href={row.nowSource.url} target="_blank" rel="noopener noreferrer">
-                        [{row.nowSource.n}]
-                      </a>{' '}
-                      <span className="cell-note">{row.nowSource.live ? 'live' : 'cached'}</span>
-                    </div>
-                  ) : null}
+                <td data-label="Now">
+                  <div className="cell">
+                    <span className="verdict-now">{nowValue}</span>
+                    {row.provenance !== 'could_not_verify' && row.check.newQuote !== null ? (
+                      <div className="cell-note cell-quote">&ldquo;{row.check.newQuote}&rdquo;</div>
+                    ) : null}
+                    {row.nowSource !== null ? (
+                      <div className="cell-source">
+                        <a className="cite" href={row.nowSource.url} target="_blank" rel="noopener noreferrer">
+                          [{row.nowSource.n}]
+                        </a>{' '}
+                        <span className="cell-note">{row.nowSource.live ? 'live' : 'cached'}</span>
+                      </div>
+                    ) : null}
+                  </div>
                 </td>
-                <td>
-                  <span className={`pill pill-${row.check.verdict}`} title={VERDICT[row.check.verdict]}>
-                    {BADGE[row.provenance]}
-                  </span>
+                <td data-label="State">
+                  <div className="cell">
+                    <span className={`pill pill-${row.check.verdict}`} title={VERDICT[row.check.verdict]}>
+                      {BADGE[row.provenance]}
+                    </span>
+                  </div>
                 </td>
-                <td className="verdict-why">{row.check.reason}</td>
+                <td data-label="Why" className="verdict-why">
+                  <div className="cell">{row.check.reason}</div>
+                </td>
               </tr>
             );
           })}

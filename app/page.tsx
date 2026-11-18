@@ -31,7 +31,7 @@ import { Sources } from './components/Sources';
 import { Alert, StatusLine } from './components/StatusLine';
 import { effectiveTheme, nextTheme, writeTheme } from './components/theme';
 import { groupTurns, textOf } from './components/turns';
-import { VerdictTable } from './components/VerdictTable';
+import { VerdictBlock } from './components/VerdictBlock';
 
 const EXAMPLES = [
   "What does Supabase's Pro plan cost right now?",
@@ -74,7 +74,7 @@ function renderAssistantParts(message: ChatUIMessage, data: MessageData): ReactN
     } else if (part.type === 'data-verdict') {
       if (!tableShown) {
         tableShown = true;
-        rendered.push(<VerdictTable key={index} rows={data.rows} />);
+        rendered.push(<VerdictBlock key={index} rows={data.rows} />);
       }
     } else if (part.type === 'data-error') {
       rendered.push(
@@ -340,12 +340,15 @@ export default function Page() {
         <main className="thread">
           {empty ? (
             <section className="empty">
-              <Logo size={72} className="empty-logo" />
-              <h1 className="empty-title">minimi</h1>
-              <p className="empty-lede">
-                Ask about anything that can change. minimi searches the web, cites what it read, and can re-check an
-                earlier answer against today&rsquo;s pages.
-              </p>
+              {/* The hero has a soft paper backdrop, so no cat sprite sits behind its text. */}
+              <div className="empty-hero">
+                <Logo size={72} className="empty-logo" />
+                <h1 className="empty-title">minimi</h1>
+                <p className="empty-lede">
+                  Ask about anything that can change. minimi searches the web, cites what it read, and can re-check an
+                  earlier answer against today&rsquo;s pages.
+                </p>
+              </div>
               <div className="examples">
                 {EXAMPLES.map((example) => (
                   <button key={example} type="button" className="example" onClick={() => fillComposer(example)}>

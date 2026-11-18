@@ -775,6 +775,107 @@ mark.uncited small {
   color: var(--pill-unavailable-fg);
 }
 
+.verdict-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px dashed var(--hairline);
+  border-radius: 10px;
+  background: var(--paper);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.verdict-toggle:hover {
+  border-color: var(--ink-faint);
+}
+
+.verdict-toggle-action {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.verdict-toggle-counts {
+  color: var(--ink-muted);
+}
+
+/* Phones: each verdict row becomes a stacked block with labelled lines. */
+@media (max-width: 640px) {
+  .table-wrap {
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .verdicts,
+  .verdicts tbody,
+  .verdicts tr,
+  .verdicts td {
+    display: block;
+    width: 100%;
+  }
+
+  .verdicts thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .verdicts tr {
+    padding: 10px 12px;
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+  }
+
+  .verdicts tr + tr {
+    margin-top: 8px;
+  }
+
+  .verdicts td,
+  .verdicts tbody tr:first-child td {
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 10px;
+    min-width: 0;
+    padding: 4px 0;
+    border-top: 0;
+  }
+
+  .verdicts td::before {
+    content: attr(data-label);
+    padding-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .verdicts td.verdict-claim {
+    display: block;
+    padding: 0 0 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--hairline);
+    font-size: 14px;
+  }
+
+  .verdicts td.verdict-claim::before {
+    content: none;
+  }
+
+  .verdicts .verdict-why {
+    min-width: 0;
+  }
+}
+
 /* ------------------------------------------------ status, alert, timings */
 
 .status {
@@ -864,6 +965,43 @@ mark.uncited small {
   align-items: center;
   text-align: center;
   padding-top: clamp(24px, 10vh, 96px);
+}
+
+.empty-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0 4px;
+}
+
+/* An opaque paper backdrop with blurred edges over the cat field, under the hero. */
+.empty-hero::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -12px -4px;
+  border-radius: 48px;
+  background: var(--paper);
+  box-shadow: 0 0 40px 28px var(--paper);
+  pointer-events: none;
+}
+
+.examples {
+  position: relative;
+  isolation: isolate;
+}
+
+.examples::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -6px -4px;
+  border-radius: 24px;
+  background: var(--paper);
+  box-shadow: 0 0 32px 20px var(--paper);
+  pointer-events: none;
 }
 
 .empty-logo {

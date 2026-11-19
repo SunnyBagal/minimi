@@ -138,6 +138,10 @@ class SeedStore implements MemoryStore {
     return this.inner.getTurns(ids);
   }
 
+  hideFrom(sessionId: Id, userTurnId: Id): number {
+    return this.inner.hideFrom(sessionId, userTurnId);
+  }
+
   findTurns(query: {
     dates?: LocalDate[];
     range?: { from: LocalDate; to: LocalDate };

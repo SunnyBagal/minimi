@@ -228,6 +228,14 @@ export interface MemoryStore {
   setExtraction(turnId: Id, state: ExtractionState): void;
   recentTurns(sessionId: Id, limit: number): Turn[];
   getTurns(ids: Id[]): Turn[];
+  /**
+   * Soft-deletes that user turn and every later turn in the session (a `hidden`
+   * flag, not a row delete). Returns how many turns the span covers. An unknown
+   * id, a different session, or a turn that is not a user turn hides nothing
+   * and returns 0. Hidden turns drop out of recentTurns, findTurns,
+   * nearestTurns, getTurns, and claimsForTurns.
+   */
+  hideFrom(sessionId: Id, userTurnId: Id): number;
 
   /**
    * Dates or range act as a hard filter. Topic and entities rank within it.
@@ -417,7 +425,11 @@ export type AgentEvent =
   | { type: 'flags'; strippedCitations: number[]; uncitedNumbers: string[] }
   | { type: 'timing'; stage: string; ms: number }
   | { type: 'error'; stage: string; message: string }
-  | { type: 'done'; turnId: Id; intent: Intent };
+  /**
+   * turnId is the assistant turn. userTurnId and createdAtUtc identify the user
+   * turn this answer belongs to, so the UI can edit that turn in place.
+   */
+  | { type: 'done'; turnId: Id; intent: Intent; userTurnId?: Id; createdAtUtc?: IsoUtc };
 
 export interface AgentDeps {
   clock: Clock;

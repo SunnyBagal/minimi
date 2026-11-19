@@ -16,6 +16,7 @@ import { accessSync, constants, mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
+import { assistantOriginUserId } from './assistantVisibility';
 import type {
   AgentConfig,
   Check,
@@ -37,6 +38,32 @@ import type {
 
 /** Date-filtered hits above this many rows get ranked by the text search. */
 export const DATE_RANK_MAX_ROWS = 20;
+
+interface SqlExec {
+  exec(sql: string): void;
+  prepare(sql: string): { all(...params: unknown[]): unknown[] };
+}
+
+/**
+ * Databases created before the hidden flag have no column. CREATE TABLE
+ * IF NOT EXISTS does not add one. A second connection can pass the same
+ * check and lose the ALTER race; a duplicate-column error is success when
+ * the column is present afterwards.
+ */
+export function ensureHiddenColumn(db: SqlExec): void {
+  const present = (): boolean => {
+    const columns = db.prepare('PRAGMA table_info(turns)').all() as { name: string }[];
+    return columns.some((column) => column.name === 'hidden');
+  };
+  if (present()) return;
+  try {
+    db.exec('ALTER TABLE turns ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!message.includes('duplicate column name')) throw error;
+  }
+  if (!present()) throw new Error('turns.hidden is missing after ALTER TABLE');
+}
 
 /** Mirrors InMemoryStore.terms(): words of 3+ letters or digits, lowercased. */
 /**
@@ -113,6 +140,7 @@ interface TurnRow {
   extraction: string;
   intent: string | null;
   target_turn_ids_json: string;
+  hidden: number;
 }
 
 function rowToTurn(row: TurnRow): Turn {
@@ -248,6 +276,7 @@ export class SqliteStore implements MemoryStore {
     this.db.exec('PRAGMA journal_mode = WAL');
     this.db.exec('PRAGMA foreign_keys = ON');
     this.db.exec(readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
+    ensureHiddenColumn(this.db);
 
     const compileOptions = (
       this.db.prepare('PRAGMA compile_options').all() as { compile_options?: string }[]
@@ -277,6 +306,19 @@ export class SqliteStore implements MemoryStore {
     this.db.prepare(sql).run(...params);
   }
 
+  /** Check and write on one lock, so a second connection cannot slip between them. */
+  private immediate<T>(body: () => T): T {
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const value = body();
+      this.db.exec('COMMIT');
+      return value;
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
   /** A NOT IN (...) clause over excludeTurnIds, with bound parameters. */
   private exclusion(excludeTurnIds: Id[]): { clause: string; params: string[] } {
     if (excludeTurnIds.length === 0) return { clause: '', params: [] };
@@ -302,7 +344,7 @@ export class SqliteStore implements MemoryStore {
             params: [...excludeTurnIds],
           };
     const rows = this.all<{ rowid: number }>(
-      `SELECT rowid FROM turns_fts WHERE turns_fts MATCH ?${excluded.clause}`,
+      `SELECT rowid FROM turns_fts WHERE turns_fts MATCH ? AND rowid IN (SELECT seq FROM turns WHERE hidden = 0)${excluded.clause}`,
       [expression, ...excluded.params],
     );
     return new Set(rows.map((row) => row.rowid));
@@ -326,7 +368,7 @@ export class SqliteStore implements MemoryStore {
     const like = this.likeClause(queryTerms);
     const excluded = this.exclusion(excludeTurnIds);
     const rows = this.all<{ seq: number }>(
-      `SELECT seq FROM turns WHERE role = 'user'${excluded.clause}${dateClause} AND ${like.clause}`,
+      `SELECT seq FROM turns WHERE role = 'user' AND hidden = 0${excluded.clause}${dateClause} AND ${like.clause}`,
       [...excluded.params, ...dateParams, ...like.params],
     );
     return new Set(rows.map((row) => row.seq));
@@ -359,7 +401,7 @@ export class SqliteStore implements MemoryStore {
       [sessionId, seq],
     );
     const next = rows[0];
-    if (next === undefined || next.role !== 'assistant' || excludeTurnIds.includes(next.id)) return null;
+    if (next === undefined || next.role !== 'assistant' || next.hidden === 1 || excludeTurnIds.includes(next.id)) return null;
     return rowToTurn(next);
   }
 
@@ -394,43 +436,67 @@ export class SqliteStore implements MemoryStore {
 
   // ----------------------------------------------------------------- turns
 
-  saveTurn(turn: NewTurn): Turn {
-    this.run('INSERT INTO sessions (id, created_at_utc) VALUES (?, ?) ON CONFLICT(id) DO NOTHING', [
-      turn.sessionId,
-      this.clock.now().toISOString(),
-    ]);
-    const id = crypto.randomUUID();
-    this.run(
-      `INSERT INTO turns (id, session_id, role, content, created_at_utc, tz, local_date, origin, topic, entities_json, summary, extraction, intent, target_turn_ids_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        turn.sessionId,
-        turn.role,
-        turn.content,
-        turn.createdAtUtc,
-        turn.tz,
-        turn.localDate,
-        turn.origin,
-        turn.topic,
-        JSON.stringify(turn.entities),
-        turn.summary,
-        turn.extraction,
-        turn.intent,
-        JSON.stringify(turn.targetTurnIds),
-      ],
+  /**
+   * True when this assistant's originating user turn is already hidden,
+   * missing, not a user turn, or in another session. The read runs inside
+   * `saveTurn`'s transaction, on the same lock as the insert.
+   */
+  private assistantShouldHide(sessionId: Id): boolean {
+    const originId = assistantOriginUserId();
+    if (originId === null) return false;
+    const origin = this.all<{ hidden: number; session_id: string; role: string }>(
+      'SELECT hidden, session_id, role FROM turns WHERE id = ?',
+      [originId],
+    )[0];
+    return (
+      origin === undefined ||
+      origin.hidden === 1 ||
+      origin.role !== 'user' ||
+      origin.session_id !== sessionId
     );
-    const seq = (this.all<{ seq: number }>('SELECT seq FROM turns WHERE id = ?', [id])[0] as { seq: number }).seq;
-    if (this.textSearch === 'fts' && turn.role === 'user') {
-      this.run('INSERT INTO turns_fts (rowid, content, topic, entities) VALUES (?, ?, ?, ?)', [
-        seq,
-        turn.content,
-        turn.topic ?? '',
-        turn.entities.join(' '),
+  }
+
+  saveTurn(turn: NewTurn): Turn {
+    return this.immediate(() => {
+      const hideAssistant = turn.role === 'assistant' && this.assistantShouldHide(turn.sessionId);
+      this.run('INSERT INTO sessions (id, created_at_utc) VALUES (?, ?) ON CONFLICT(id) DO NOTHING', [
+        turn.sessionId,
+        this.clock.now().toISOString(),
       ]);
-    }
-    const saved = this.all<TurnRow>('SELECT * FROM turns WHERE id = ?', [id])[0];
-    return rowToTurn(saved as TurnRow);
+      const id = crypto.randomUUID();
+      this.run(
+        `INSERT INTO turns (id, session_id, role, content, created_at_utc, tz, local_date, origin, topic, entities_json, summary, extraction, intent, target_turn_ids_json)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          turn.sessionId,
+          turn.role,
+          turn.content,
+          turn.createdAtUtc,
+          turn.tz,
+          turn.localDate,
+          turn.origin,
+          turn.topic,
+          JSON.stringify(turn.entities),
+          turn.summary,
+          turn.extraction,
+          turn.intent,
+          JSON.stringify(turn.targetTurnIds),
+        ],
+      );
+      if (hideAssistant) this.run('UPDATE turns SET hidden = 1 WHERE id = ?', [id]);
+      const seq = (this.all<{ seq: number }>('SELECT seq FROM turns WHERE id = ?', [id])[0] as { seq: number }).seq;
+      if (this.textSearch === 'fts' && turn.role === 'user') {
+        this.run('INSERT INTO turns_fts (rowid, content, topic, entities) VALUES (?, ?, ?, ?)', [
+          seq,
+          turn.content,
+          turn.topic ?? '',
+          turn.entities.join(' '),
+        ]);
+      }
+      const saved = this.all<TurnRow>('SELECT * FROM turns WHERE id = ?', [id])[0];
+      return rowToTurn(saved as TurnRow);
+    });
   }
 
   updateTurnMeta(id: Id, meta: Pick<Turn, 'topic' | 'entities' | 'summary'>): void {
@@ -461,7 +527,7 @@ export class SqliteStore implements MemoryStore {
   recentTurns(sessionId: Id, limit: number): Turn[] {
     if (limit <= 0) return [];
     const rows = this.all<TurnRow>(
-      'SELECT * FROM (SELECT * FROM turns WHERE session_id = ? ORDER BY seq DESC LIMIT ?) ORDER BY seq',
+      'SELECT * FROM (SELECT * FROM turns WHERE session_id = ? AND hidden = 0 ORDER BY seq DESC LIMIT ?) ORDER BY seq',
       [sessionId, limit],
     );
     return rows.map(rowToTurn);
@@ -470,10 +536,31 @@ export class SqliteStore implements MemoryStore {
   getTurns(ids: Id[]): Turn[] {
     const found: Turn[] = [];
     for (const id of ids) {
-      const row = this.all<TurnRow>('SELECT * FROM turns WHERE id = ?', [id])[0];
+      const row = this.all<TurnRow>('SELECT * FROM turns WHERE id = ? AND hidden = 0', [id])[0];
       if (row !== undefined) found.push(rowToTurn(row));
     }
     return found;
+  }
+
+  /**
+   * Marks the user turn and every later turn in the session hidden.
+   * Returns the size of that span. An anchor that is missing, not a user
+   * turn, in another session, or already hidden returns 0 and writes nothing.
+   */
+  hideFrom(sessionId: Id, userTurnId: Id): number {
+    return this.immediate(() => {
+      const anchor = this.all<{ seq: number; role: string; hidden: number }>(
+        'SELECT seq, role, hidden FROM turns WHERE id = ? AND session_id = ?',
+        [userTurnId, sessionId],
+      )[0];
+      if (anchor === undefined || anchor.role !== 'user' || anchor.hidden !== 0) return 0;
+      this.run('UPDATE turns SET hidden = 1 WHERE session_id = ? AND seq >= ?', [sessionId, anchor.seq]);
+      const count = this.all<{ n: number }>(
+        'SELECT count(*) AS n FROM turns WHERE session_id = ? AND seq >= ?',
+        [sessionId, anchor.seq],
+      )[0];
+      return count?.n ?? 0;
+    });
   }
 
   findTurns(query: {
@@ -496,7 +583,7 @@ export class SqliteStore implements MemoryStore {
         seqs.size === 0
           ? []
           : this.all<TurnRow>(
-              `SELECT * FROM turns WHERE role = 'user' AND seq IN (${marks})${excluded.clause}`,
+              `SELECT * FROM turns WHERE role = 'user' AND hidden = 0 AND seq IN (${marks})${excluded.clause}`,
               [...seqs, ...excluded.params],
             );
       const scored = rows.map((row) => {
@@ -519,7 +606,7 @@ export class SqliteStore implements MemoryStore {
     }
     const dateClause = dateParts.length > 0 ? ` AND (${dateParts.join(' OR ')})` : '';
     const rows = this.all<TurnRow>(
-      `SELECT * FROM turns WHERE role = 'user'${excluded.clause}${dateClause} ORDER BY seq`,
+      `SELECT * FROM turns WHERE role = 'user' AND hidden = 0${excluded.clause}${dateClause} ORDER BY seq`,
       [...excluded.params, ...dateParams],
     );
 
@@ -570,7 +657,7 @@ export class SqliteStore implements MemoryStore {
     if (adjacent.size > 0) {
       const marks = [...adjacent].map(() => '?').join(', ');
       const rows = this.all<TurnRow>(
-        `SELECT * FROM turns WHERE role = 'user' AND local_date IN (${marks})${excluded.clause}`,
+        `SELECT * FROM turns WHERE role = 'user' AND hidden = 0 AND local_date IN (${marks})${excluded.clause}`,
         [...adjacent, ...excluded.params],
       );
       for (const row of rows) {
@@ -595,7 +682,7 @@ export class SqliteStore implements MemoryStore {
       if (seqs.size > 0) {
         const marks = [...seqs].map(() => '?').join(', ');
         const rows = this.all<TurnRow>(
-          `SELECT * FROM turns WHERE role = 'user' AND seq IN (${marks})${excluded.clause}`,
+          `SELECT * FROM turns WHERE role = 'user' AND hidden = 0 AND seq IN (${marks})${excluded.clause}`,
           [...seqs, ...excluded.params],
         );
         for (const row of rows) {
@@ -775,25 +862,47 @@ export class SqliteStore implements MemoryStore {
     return saved;
   }
 
-  /** The newest claim in the chain, following supersedes links, never timestamps. */
+  /**
+   * The visible claim with the highest seq among this claim and every
+   * successor. Hidden turns stay in the walk, so a newer hidden branch
+   * cannot mask an older visible one. A hidden claim is never chosen.
+   */
   private newestInChain(claim: ClaimRow): ClaimRow {
-    let current = claim;
-    const seen = new Set<Id>([current.id]);
-    for (;;) {
-      const next = this.all<ClaimRow>(
-        'SELECT * FROM claims WHERE supersedes_id = ? ORDER BY seq DESC LIMIT 1',
-        [current.id],
-      )[0];
-      if (next === undefined || seen.has(next.id)) return current;
-      seen.add(next.id);
-      current = next;
+    const seen = new Set<Id>([claim.id]);
+    const queue: Id[] = [claim.id];
+    let best = claim;
+    let cursor = 0;
+    while (cursor < queue.length) {
+      const id = queue[cursor];
+      cursor += 1;
+      if (id === undefined) continue;
+      const children = this.all<ClaimRow & { turn_hidden: number }>(
+        `SELECT claims.*, turns.hidden AS turn_hidden FROM claims
+         JOIN turns ON turns.id = claims.turn_id
+         WHERE claims.supersedes_id = ?
+         ORDER BY claims.seq`,
+        [id],
+      );
+      for (const next of children) {
+        if (seen.has(next.id)) continue;
+        seen.add(next.id);
+        queue.push(next.id);
+        if (next.turn_hidden === 0 && next.seq > best.seq) best = next;
+      }
     }
+    return best;
   }
 
   claimsForTurns(turnIds: Id[], version: ClaimVersion): Claim[] {
     if (turnIds.length === 0) return [];
     const marks = turnIds.map(() => '?').join(', ');
-    const stated = this.all<ClaimRow>(`SELECT * FROM claims WHERE turn_id IN (${marks}) ORDER BY seq`, turnIds);
+    const stated = this.all<ClaimRow>(
+      `SELECT claims.* FROM claims
+       JOIN turns ON turns.id = claims.turn_id
+       WHERE claims.turn_id IN (${marks}) AND turns.hidden = 0
+       ORDER BY claims.seq`,
+      turnIds,
+    );
     if (version === 'as_stated') return stated.map(rowToClaim);
     const current: Claim[] = [];
     const seen = new Set<Id>();

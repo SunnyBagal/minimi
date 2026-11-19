@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Id, IsoUtc, LocalDate, MemoryHit, NewClaim, NewTurn } from '../contracts';
+import { withAssistantOrigin } from '../store/assistantVisibility';
 import { InMemoryStore } from './inMemoryStore';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -115,6 +116,143 @@ describe('InMemoryStore.claimsForTurns', () => {
     expect(ids(store.claimsForTurns([t2], 'current'))).toEqual([`${c.id}:15 USD`]);
     expect(ids(store.claimsForTurns([t1, t2], 'current'))).toEqual([`${c.id}:15 USD`]);
     expect(ids(store.claimsForTurns([t3], 'as_stated'))).toEqual([`${c.id}:15 USD`]);
+  });
+});
+
+describe('InMemoryStore.hideFrom', () => {
+  it('hides that user turn and every later turn from recentTurns, findTurns, nearestTurns, getTurns and claimsForTurns', () => {
+    const store = new InMemoryStore();
+    const firstUser = store.saveTurn(
+      turn({ content: 'first zephyr question', topic: 'zephyr', localDate: '2026-11-10', createdAtUtc: utc(10) }),
+    );
+    const firstAssistant = store.saveTurn(
+      turn({
+        role: 'assistant',
+        content: 'first zephyr answer',
+        topic: 'zephyr',
+        localDate: '2026-11-10',
+        createdAtUtc: utc(10),
+        intent: 'chat',
+      }),
+    );
+    const [claimA] = store.saveClaims([claim(firstAssistant.id, { value: '10 USD' })]);
+    if (claimA === undefined) throw new Error('claim A not saved');
+    const secondUser = store.saveTurn(
+      turn({ content: 'second zephyr question', topic: 'zephyr', localDate: '2026-11-11', createdAtUtc: utc(11) }),
+    );
+    const secondAssistant = store.saveTurn(
+      turn({
+        role: 'assistant',
+        content: 'second zephyr answer',
+        topic: 'zephyr',
+        localDate: '2026-11-11',
+        createdAtUtc: utc(11),
+        intent: 'chat',
+      }),
+    );
+    store.saveClaims([claim(secondAssistant.id, { value: '12 USD', supersedesId: claimA.id })]);
+    const other = store.saveTurn(
+      turn({
+        sessionId: 's2',
+        content: 'other session zephyr',
+        topic: 'zephyr',
+        localDate: '2026-11-11',
+        createdAtUtc: utc(11),
+      }),
+    );
+
+    expect(store.hideFrom('s1', firstAssistant.id)).toBe(0);
+    expect(store.hideFrom('s2', secondUser.id)).toBe(0);
+    expect(store.hideFrom('s1', 'missing-turn')).toBe(0);
+    expect(store.recentTurns('s1', 10)).toHaveLength(4);
+
+    expect(store.hideFrom('s1', secondUser.id)).toBe(2);
+    expect(store.hideFrom('s1', secondUser.id)).toBe(0);
+
+    expect(store.recentTurns('s1', 20).map((row) => row.id)).toEqual([firstUser.id, firstAssistant.id]);
+    expect(store.recentTurns('s1', 2).map((row) => row.id)).toEqual([firstUser.id, firstAssistant.id]);
+    expect(store.getTurns([secondUser.id, secondAssistant.id, firstUser.id]).map((row) => row.id)).toEqual([firstUser.id]);
+    expect(store.recentTurns('s2', 10).map((row) => row.id)).toEqual([other.id]);
+
+    const onLaterDay = store.findTurns({ dates: ['2026-11-11'], excludeTurnIds: [], limit: 10 });
+    expect(hitIds(onLaterDay)).toContain(other.id);
+    expect(hitIds(onLaterDay)).not.toContain(secondUser.id);
+
+    const byTopic = store.findTurns({ topic: 'zephyr', excludeTurnIds: [], limit: 10 });
+    expect(hitIds(byTopic)).toContain(firstUser.id);
+    expect(hitIds(byTopic)).not.toContain(secondUser.id);
+
+    const near = store.nearestTurns({ around: ['2026-11-10'], topic: 'zephyr', excludeTurnIds: [], limit: 10 });
+    expect(hitIds(near)).toContain(other.id);
+    expect(hitIds(near)).not.toContain(secondUser.id);
+
+    expect(store.claimsForTurns([secondAssistant.id], 'as_stated')).toEqual([]);
+    expect(store.claimsForTurns([secondAssistant.id], 'current')).toEqual([]);
+    expect(store.claimsForTurns([firstAssistant.id], 'as_stated').map((row) => row.value)).toEqual(['10 USD']);
+    expect(store.claimsForTurns([firstAssistant.id], 'current').map((row) => row.id)).toEqual([claimA.id]);
+  });
+
+  it('leaves a replacement visible when the anchor is replayed and hides a late answer for the hidden prompt', () => {
+    const store = new InMemoryStore();
+    const firstUser = store.saveTurn(turn({ content: 'first question' }));
+    store.saveTurn(turn({ role: 'assistant', content: 'first answer', intent: 'chat' }));
+    const followUser = store.saveTurn(turn({ content: 'follow-up question' }));
+    expect(store.hideFrom('s1', firstUser.id)).toBe(3);
+
+    const replacementUser = store.saveTurn(turn({ content: 'replacement question' }));
+    const replacementAssistant = store.saveTurn(turn({ role: 'assistant', content: 'replacement answer', intent: 'chat' }));
+    expect(store.hideFrom('s1', firstUser.id)).toBe(0);
+    expect(store.hideFrom('s1', followUser.id)).toBe(0);
+
+    const late = withAssistantOrigin(firstUser.id, () =>
+      store.saveTurn(turn({ role: 'assistant', content: 'orphan answer', intent: 'chat' })),
+    );
+    expect(store.getTurns([late.id])).toEqual([]);
+    expect(store.recentTurns('s1', 10).map((row) => row.id)).toEqual([replacementUser.id, replacementAssistant.id]);
+    expect(store.recentTurns('s1', 10).map((row) => row.content).join('\n')).not.toContain('orphan');
+    expect(store.recentTurns('s1', 10).map((row) => row.content).join('\n')).not.toContain('follow-up');
+  });
+
+  it('walks a hidden claim through to a later visible claim in another session', () => {
+    const store = new InMemoryStore();
+    const a = exchange(store, '2026-11-08', 'chain-a', 'price');
+    const b = exchange(store, '2026-11-09', 'chain-b', 'price');
+    const c = exchange(store, '2026-11-10', 'chain-c', 'price');
+    const [claimA] = store.saveClaims([claim(a.assistant, { value: '10 USD' })]);
+    if (claimA === undefined) throw new Error('claim A not saved');
+    const [claimB] = store.saveClaims([claim(b.assistant, { value: '12 USD', supersedesId: claimA.id })]);
+    if (claimB === undefined) throw new Error('claim B not saved');
+    const [claimC] = store.saveClaims([claim(c.assistant, { value: '14 USD', supersedesId: claimB.id })]);
+    if (claimC === undefined) throw new Error('claim C not saved');
+
+    expect(store.hideFrom('chain-b', b.user)).toBe(2);
+    expect(store.claimsForTurns([b.assistant], 'as_stated')).toEqual([]);
+    expect(store.claimsForTurns([b.assistant], 'current')).toEqual([]);
+    expect(store.claimsForTurns([a.assistant], 'as_stated').map((row) => row.value)).toEqual(['10 USD']);
+    expect(store.claimsForTurns([a.assistant], 'current').map((row) => row.id)).toEqual([claimC.id]);
+    expect(store.claimsForTurns([c.assistant], 'current').map((row) => row.value)).toEqual(['14 USD']);
+  });
+
+  it('does not let a newer hidden branch mask a visible claim', () => {
+    const store = new InMemoryStore();
+    const a = exchange(store, '2026-11-08', 'branch-a', 'price');
+    const b = exchange(store, '2026-11-09', 'branch-b', 'price');
+    const c = exchange(store, '2026-11-10', 'branch-c', 'price');
+    const d = exchange(store, '2026-11-11', 'branch-d', 'price');
+    const [claimA] = store.saveClaims([claim(a.assistant, { value: '10 USD' })]);
+    if (claimA === undefined) throw new Error('claim A not saved');
+    const [claimB] = store.saveClaims([claim(b.assistant, { value: '12 USD', supersedesId: claimA.id })]);
+    if (claimB === undefined) throw new Error('claim B not saved');
+    const [claimC] = store.saveClaims([claim(c.assistant, { value: '14 USD', supersedesId: claimB.id })]);
+    if (claimC === undefined) throw new Error('claim C not saved');
+    store.saveClaims([claim(d.assistant, { value: '16 USD', supersedesId: claimA.id })]);
+
+    expect(store.hideFrom('branch-b', b.user)).toBe(2);
+    expect(store.hideFrom('branch-d', d.user)).toBe(2);
+    expect(store.claimsForTurns([b.assistant], 'current')).toEqual([]);
+    expect(store.claimsForTurns([d.assistant], 'current')).toEqual([]);
+    expect(store.claimsForTurns([a.assistant], 'current').map((row) => row.id)).toEqual([claimC.id]);
+    expect(store.claimsForTurns([a.assistant], 'current').map((row) => row.value)).toEqual(['14 USD']);
   });
 });
 

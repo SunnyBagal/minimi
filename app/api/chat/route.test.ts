@@ -1,26 +1,29 @@
 import { Chat } from '@ai-sdk/react';
 import { DefaultChatTransport, type ChatOnDataCallback } from 'ai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentDeps, AgentEvent, Check, Claim, TurnInput, VerdictRow } from '../../../src/core/contracts';
+import type { AgentDeps, AgentEvent, Check, Claim, NewSource, NewTurn, TurnInput, VerdictRow } from '../../../src/core/contracts';
 import { defaultConfig } from '../../../src/core/config';
 import { FakeClock, FakeLlm, FakeSearch, fakeTime, passThroughGuard } from '../../../src/core/testing/fakes';
 import { InMemoryStore } from '../../../src/core/testing/inMemoryStore';
 import type { ChatUIMessage } from './route';
 import { POST } from './route';
 
-const { runTurnMock, receivedInputs, NOW } = vi.hoisted(() => ({
+const { runTurnMock, receivedInputs, NOW, storeHolder } = vi.hoisted(() => ({
   runTurnMock: vi.fn(),
   receivedInputs: [] as TurnInput[],
   NOW: '2026-11-10T20:00:00.000Z',
+  storeHolder: { current: null as InMemoryStore | null },
 }));
 const CLAIM_ID = 'claim-1';
 const TURN_ID = 'turn-9';
 
 vi.mock('../../../src/compose', () => {
   const clock = new FakeClock(NOW);
+  const store = new InMemoryStore();
+  storeHolder.current = store;
   const deps: AgentDeps = {
     clock,
-    store: new InMemoryStore(),
+    store,
     search: new FakeSearch(clock),
     llm: new FakeLlm(),
     time: fakeTime(),
@@ -76,7 +79,7 @@ const SCRIPT: AgentEvent[] = [
   { type: 'flags', strippedCitations: [2], uncitedNumbers: ['99'] },
   { type: 'timing', stage: 'write', ms: 12 },
   { type: 'error', stage: 'write', message: 'Error: boom' },
-  { type: 'done', turnId: TURN_ID, intent: 'chat' },
+  { type: 'done', turnId: TURN_ID, intent: 'chat', userTurnId: 'user-9', createdAtUtc: NOW },
 ];
 
 beforeEach(() => {
@@ -188,7 +191,12 @@ describe('POST /api/chat', () => {
     ]);
 
     const finish = stream.at(-1);
-    expect(finish?.messageMetadata).toEqual({ turnId: TURN_ID, intent: 'chat' });
+    expect(finish?.messageMetadata).toEqual({
+      turnId: TURN_ID,
+      intent: 'chat',
+      userTurnId: 'user-9',
+      createdAtUtc: NOW,
+    });
   });
 
   it('status is transient: reaches onData, absent from messages', async () => {
@@ -219,5 +227,225 @@ describe('POST /api/chat', () => {
     expect(partTypes).toContain('data-error');
     expect(partTypes).toContain('data-verdict');
     expect(chat.status).toBe('ready');
+  });
+
+  it('editFrom hides that user turn and every later turn before the turn runs', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const sessionId = 'edit-s';
+    const saved = (fields: Partial<NewTurn> & { role: 'user' | 'assistant'; content: string }) =>
+      store.saveTurn({
+        sessionId,
+        createdAtUtc: NOW,
+        tz: 'UTC',
+        localDate: '2026-11-10',
+        origin: 'live',
+        topic: null,
+        entities: [],
+        summary: null,
+        extraction: 'skipped',
+        intent: fields.role === 'assistant' ? 'chat' : null,
+        targetTurnIds: [],
+        ...fields,
+      });
+    saved({ role: 'user', content: 'first question about basalt' });
+    saved({ role: 'assistant', content: 'first answer about basalt' });
+    const secondUser = saved({ role: 'user', content: 'secret later question' });
+    const secondAssistant = saved({ role: 'assistant', content: 'secret later answer' });
+    const source: NewSource = {
+      url: 'https://example.test/p',
+      finalUrl: 'https://example.test/p',
+      title: null,
+      publishedAt: null,
+      fetchedAtUtc: NOW,
+      live: true,
+      firstParty: true,
+      httpStatus: 200,
+      text: 'page text',
+    };
+    const savedSource = store.saveSource(source);
+    store.saveClaims([
+      {
+        turnId: secondAssistant.id,
+        entity: 'Basalt',
+        attribute: 'price',
+        value: '12 USD',
+        scope: {},
+        sourceId: savedSource.id,
+        quote: 'secret later quote',
+        asOfUtc: NOW,
+        volatility: 'high',
+        lastVerifiedAtUtc: NOW,
+        supersedesId: null,
+      },
+    ]);
+
+    const seen: string[][] = [];
+    runTurnMock.mockImplementation(async function* (input: TurnInput) {
+      receivedInputs.push(input);
+      seen.push(store.recentTurns(sessionId, 20).map((turn) => turn.content));
+      yield { type: 'done', turnId: 'new-a', intent: 'chat', userTurnId: 'new-u', createdAtUtc: NOW };
+    });
+
+    const edited = await post({ message: 'edited question', sessionId, tz: 'UTC', editFrom: secondUser.id });
+    expect(edited.status).toBe(200);
+    await chunks(edited);
+    expect(seen[0]).toEqual(['first question about basalt', 'first answer about basalt']);
+    expect(receivedInputs[0]?.message).toBe('edited question');
+
+    const followUp = await post({ message: 'What did I ask?', sessionId, tz: 'UTC' });
+    expect(followUp.status).toBe(200);
+    await chunks(followUp);
+    expect(seen[1]).toEqual(['first question about basalt', 'first answer about basalt']);
+    expect(seen[1]?.join('\n')).not.toContain('secret later');
+    expect(store.getTurns([secondUser.id, secondAssistant.id])).toEqual([]);
+    expect(store.claimsForTurns([secondAssistant.id], 'as_stated')).toEqual([]);
+    expect(store.claimsForTurns([secondAssistant.id], 'current')).toEqual([]);
+  });
+
+  it('an unknown editFrom hides nothing and does not run the turn', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const kept = store.saveTurn({
+      sessionId: 'untouched',
+      role: 'user',
+      content: 'keep me',
+      createdAtUtc: NOW,
+      tz: 'UTC',
+      localDate: '2026-11-10',
+      origin: 'live',
+      topic: null,
+      entities: [],
+      summary: null,
+      extraction: 'skipped',
+      intent: null,
+      targetTurnIds: [],
+    });
+    const response = await post({ message: 'hi', sessionId: 'untouched', tz: 'UTC', editFrom: 'missing-turn' });
+    expect(response.status).toBe(400);
+    expect(receivedInputs).toEqual([]);
+    expect(store.getTurns([kept.id]).map((turn) => turn.content)).toEqual(['keep me']);
+  });
+
+  it('rejects a replayed edit and leaves the replacement visible', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const sessionId = 'replay-s';
+    const saved = (fields: Partial<NewTurn> & { role: 'user' | 'assistant'; content: string }) =>
+      store.saveTurn({
+        sessionId,
+        createdAtUtc: NOW,
+        tz: 'UTC',
+        localDate: '2026-11-10',
+        origin: 'live',
+        topic: null,
+        entities: [],
+        summary: null,
+        extraction: 'skipped',
+        intent: fields.role === 'assistant' ? 'chat' : null,
+        targetTurnIds: [],
+        ...fields,
+      });
+    const original = saved({ role: 'user', content: 'original question' });
+    saved({ role: 'assistant', content: 'original answer' });
+    const first = await post({ message: 'edited question', sessionId, tz: 'UTC', editFrom: original.id });
+    expect(first.status).toBe(200);
+    await chunks(first);
+
+    const replacement = saved({ role: 'user', content: 'replacement question' });
+    saved({ role: 'assistant', content: 'replacement answer' });
+    const again = await post({ message: 'edited again', sessionId, tz: 'UTC', editFrom: original.id });
+    expect(again.status).toBe(400);
+    expect(receivedInputs.map((input) => input.message)).toEqual(['edited question']);
+    expect(store.recentTurns(sessionId, 10).map((turn) => turn.id)).toContain(replacement.id);
+    expect(store.recentTurns(sessionId, 10).map((turn) => turn.content).join('\n')).not.toContain('original');
+  });
+
+  it('resolves a legacy assistant id to the preceding visible user turn', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const sessionId = 'legacy-s';
+    const saved = (fields: Partial<NewTurn> & { role: 'user' | 'assistant'; content: string }) =>
+      store.saveTurn({
+        sessionId,
+        createdAtUtc: NOW,
+        tz: 'UTC',
+        localDate: '2026-11-10',
+        origin: 'live',
+        topic: null,
+        entities: [],
+        summary: null,
+        extraction: 'skipped',
+        intent: fields.role === 'assistant' ? 'chat' : null,
+        targetTurnIds: [],
+        ...fields,
+      });
+    const user = saved({ role: 'user', content: 'old prompt' });
+    const assistant = saved({ role: 'assistant', content: 'old answer' });
+    const seen: string[][] = [];
+    runTurnMock.mockImplementation(async function* (input: TurnInput) {
+      receivedInputs.push(input);
+      seen.push(store.recentTurns(sessionId, 20).map((turn) => turn.content));
+      yield { type: 'done', turnId: 'new-a', intent: 'chat', userTurnId: 'new-u', createdAtUtc: NOW };
+    });
+    const response = await post({ message: 'edited old', sessionId, tz: 'UTC', editFrom: assistant.id });
+    expect(response.status).toBe(200);
+    await chunks(response);
+    expect(seen[0]).toEqual([]);
+    expect(store.getTurns([user.id, assistant.id])).toEqual([]);
+  });
+
+  it('pairs an overlapping legacy assistant with the user turn saved first', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const sessionId = 'overlap-s';
+    const saved = (fields: Partial<NewTurn> & { role: 'user' | 'assistant'; content: string }) =>
+      store.saveTurn({
+        sessionId,
+        createdAtUtc: NOW,
+        tz: 'UTC',
+        localDate: '2026-11-10',
+        origin: 'live',
+        topic: null,
+        entities: [],
+        summary: null,
+        extraction: 'skipped',
+        intent: fields.role === 'assistant' ? 'chat' : null,
+        targetTurnIds: [],
+        ...fields,
+      });
+    const userA = saved({ role: 'user', content: 'prompt A' });
+    const userB = saved({ role: 'user', content: 'prompt B' });
+    const assistantA = saved({ role: 'assistant', content: 'answer A' });
+    const assistantB = saved({ role: 'assistant', content: 'answer B' });
+    const response = await post({ message: 'edited A', sessionId, tz: 'UTC', editFrom: assistantA.id });
+    expect(response.status).toBe(200);
+    await chunks(response);
+    expect(store.getTurns([userA.id, userB.id, assistantA.id, assistantB.id])).toEqual([]);
+    expect(receivedInputs.map((input) => input.message)).toContain('edited A');
+  });
+
+  it('rejects an assistant id that has no preceding user turn', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    const assistant = store.saveTurn({
+      sessionId: 'solo-assistant',
+      role: 'assistant',
+      content: 'no prompt',
+      createdAtUtc: NOW,
+      tz: 'UTC',
+      localDate: '2026-11-10',
+      origin: 'live',
+      topic: null,
+      entities: [],
+      summary: null,
+      extraction: 'skipped',
+      intent: 'chat',
+      targetTurnIds: [],
+    });
+    const response = await post({ message: 'edit', sessionId: 'solo-assistant', tz: 'UTC', editFrom: assistant.id });
+    expect(response.status).toBe(400);
+    expect(receivedInputs).toEqual([]);
+    expect(store.getTurns([assistant.id]).map((turn) => turn.content)).toEqual(['no prompt']);
   });
 });

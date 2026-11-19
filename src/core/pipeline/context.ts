@@ -22,6 +22,7 @@ import type {
   Turn,
   TurnInput,
 } from '../contracts';
+import { withAssistantOrigin } from '../store/assistantVisibility';
 
 export interface AssistantFields {
   intent: Intent;
@@ -42,7 +43,8 @@ export class TurnContext {
   stage = 'route';
   /** Text deltas emitted so far — becomes the saved assistant content. */
   answer = '';
-  private assistantId: Id | null = null;
+  /** The assistant row from the first save. A hidden row is absent from getTurns, so a later call must not insert another. */
+  private savedAssistant: Turn | null = null;
   private readonly afterSaveQueue: (() => void)[] = [];
 
   constructor(fields: {
@@ -100,19 +102,17 @@ export class TurnContext {
 
   /** The saved assistant turn id, when it exists. */
   get savedTurnId(): Id | null {
-    return this.assistantId;
+    return this.savedAssistant?.id ?? null;
   }
 
   /**
    * Saves the assistant turn once (later calls are ignored) and runs the
-   * afterSave queue. Returns the saved turn.
+   * afterSave queue. Returns the saved turn. The store hides the row when
+   * the originating user turn is already hidden, checked in the same write.
    */
   saveAssistant(fields: AssistantFields): Turn {
-    if (this.assistantId !== null) {
-      const found = this.store.getTurns([this.assistantId])[0];
-      if (found !== undefined) return found;
-    }
-    const saved = this.store.saveTurn({
+    if (this.savedAssistant !== null) return this.savedAssistant;
+    const saved = withAssistantOrigin(this.currentId, () => this.store.saveTurn({
       sessionId: this.input.sessionId,
       role: 'assistant',
       content: this.answer,
@@ -126,8 +126,8 @@ export class TurnContext {
       extraction: fields.extraction,
       intent: fields.intent,
       targetTurnIds: fields.targetTurnIds,
-    });
-    this.assistantId = saved.id;
+    }));
+    this.savedAssistant = saved;
     for (const callback of this.afterSaveQueue.splice(0)) callback();
     return saved;
   }

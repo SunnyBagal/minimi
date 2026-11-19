@@ -13,7 +13,7 @@
 import { createUIMessageStream, createUIMessageStreamResponse, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { getDeps } from '../../../src/compose';
-import type { AgentEvent, IanaTz } from '../../../src/core/contracts';
+import type { AgentEvent, IanaTz, Id, MemoryStore } from '../../../src/core/contracts';
 import { runTurn } from '../../../src/core/pipeline/runTurn';
 
 export const runtime = 'nodejs';
@@ -33,7 +33,38 @@ const bodySchema = z.object({
   message: z.string().trim().min(1),
   sessionId: z.string().min(1),
   tz: z.string().optional(),
+  /**
+   * Server id of the user turn being replaced, or a legacy assistant turn id
+   * from before edits carried userTurnId. Absent on a new message.
+   */
+  editFrom: z.string().min(1).optional(),
 });
+
+/** How many visible turns to scan when editFrom is an old assistant id. */
+const EDIT_SCAN = 10_000;
+
+/**
+ * The visible user turn an edit starts from. A user id is used directly.
+ * An assistant id is paired in order with the visible user turns: each
+ * assistant takes the oldest user that does not yet have an assistant.
+ * An assistant with no pending user, or any other id, does not resolve.
+ */
+export function visibleEditAnchor(store: MemoryStore, sessionId: Id, editFrom: Id): Id | null {
+  const direct = store.getTurns([editFrom])[0];
+  if (direct !== undefined && direct.sessionId === sessionId && direct.role === 'user') return direct.id;
+  const visible = store.recentTurns(sessionId, EDIT_SCAN);
+  const pending: Id[] = [];
+  for (const turn of visible) {
+    if (turn.role === 'user') {
+      pending.push(turn.id);
+      continue;
+    }
+    if (turn.role !== 'assistant') continue;
+    const paired = pending.shift() ?? null;
+    if (turn.id === editFrom) return paired;
+  }
+  return null;
+}
 
 export async function POST(request: Request): Promise<Response> {
   const body = bodySchema.safeParse(await request.json().catch(() => null));
@@ -41,6 +72,15 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json({ error: 'Expected { message, sessionId, tz }.' }, { status: 400 });
   }
   const deps = getDeps();
+
+  // A stale or unknown anchor must not run the turn, and must not hide a later replacement.
+  if (body.data.editFrom !== undefined) {
+    const anchor = visibleEditAnchor(deps.store, body.data.sessionId, body.data.editFrom);
+    const hidden = anchor === null ? 0 : deps.store.hideFrom(body.data.sessionId, anchor);
+    if (hidden === 0) {
+      return Response.json({ error: 'That message can no longer be edited.' }, { status: 400 });
+    }
+  }
 
   // An unknown zone makes the time functions throw; the turn then runs in UTC.
   let tz: IanaTz = body.data.tz ?? 'UTC';
@@ -113,7 +153,15 @@ export async function POST(request: Request): Promise<Response> {
             break;
           case 'done':
             closeText();
-            writer.write({ type: 'finish', messageMetadata: { turnId: event.turnId, intent: event.intent } });
+            writer.write({
+              type: 'finish',
+              messageMetadata: {
+                turnId: event.turnId,
+                intent: event.intent,
+                ...(event.userTurnId !== undefined ? { userTurnId: event.userTurnId } : {}),
+                ...(event.createdAtUtc !== undefined ? { createdAtUtc: event.createdAtUtc } : {}),
+              },
+            });
             break;
         }
       }

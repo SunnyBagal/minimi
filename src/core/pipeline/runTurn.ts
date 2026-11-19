@@ -8,6 +8,7 @@
  * still emits `done`.
  */
 import type { AgentEvent, RouterPlan, RunTurn } from '../contracts';
+import { withAssistantOrigin } from '../store/assistantVisibility';
 import { TurnContext } from './context';
 import { chat } from './chat';
 import { fresh } from './fresh';
@@ -90,24 +91,34 @@ export const runTurn: RunTurn = async function* (input, deps): AsyncIterable<Age
   if (ctx !== null) {
     ctx.saveAssistant({ intent: plan?.intent ?? 'chat', extraction: 'skipped', targetTurnIds: [] });
   }
+  const savedId = ctx?.savedTurnId ?? null;
+  const loaded = savedId !== null ? store.getTurns([savedId])[0] : undefined;
   const assistant =
-    ctx?.savedTurnId !== null && ctx?.savedTurnId !== undefined
-      ? store.getTurns([ctx.savedTurnId])[0]
-      : store.saveTurn({
-          sessionId: input.sessionId,
-          role: 'assistant',
-          content: answer,
-          createdAtUtc: clock.now().toISOString(),
-          tz: input.tz,
-          localDate: time.toLocalDate(clock.now(), input.tz),
-          origin: input.origin ?? 'live',
-          topic: plan?.topic ?? null,
-          entities: plan?.entities ?? [],
-          summary: null,
-          targetTurnIds: [],
-          extraction: 'skipped',
-          intent: plan?.intent ?? 'chat',
-        });
+    savedId !== null
+      ? loaded
+      : withAssistantOrigin(userTurn.id, () =>
+          store.saveTurn({
+            sessionId: input.sessionId,
+            role: 'assistant',
+            content: answer,
+            createdAtUtc: clock.now().toISOString(),
+            tz: input.tz,
+            localDate: time.toLocalDate(clock.now(), input.tz),
+            origin: input.origin ?? 'live',
+            topic: plan?.topic ?? null,
+            entities: plan?.entities ?? [],
+            summary: null,
+            targetTurnIds: [],
+            extraction: 'skipped',
+            intent: plan?.intent ?? 'chat',
+          }),
+        );
 
-  yield { type: 'done', turnId: assistant?.id ?? '', intent: plan?.intent ?? 'chat' };
+  yield {
+    type: 'done',
+    turnId: loaded?.id ?? savedId ?? assistant?.id ?? '',
+    intent: plan?.intent ?? 'chat',
+    userTurnId: userTurn.id,
+    createdAtUtc: userTurn.createdAtUtc,
+  };
 };

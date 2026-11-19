@@ -4,6 +4,7 @@
  * Rows are copied on the way in and on the way out, so a caller cannot change
  * stored state by mutating what it passed or received.
  */
+import { assistantOriginUserId } from '../store/assistantVisibility';
 import type {
   AgentConfig,
   Check,
@@ -48,6 +49,8 @@ export class InMemoryStore implements MemoryStore {
   private readonly sourceRows: Source[] = [];
   private readonly claimRows: Claim[] = [];
   private readonly checkRows: Check[] = [];
+  /** Turn ids hidden by hideFrom. Absent from every read below. */
+  private readonly hidden = new Set<Id>();
   private readonly shelfLifeDays: Record<Volatility, number>;
   private nextId = 1;
 
@@ -80,8 +83,19 @@ export class InMemoryStore implements MemoryStore {
   // --------------------------------------------------------------------- turns
 
   saveTurn(turn: NewTurn): Turn {
+    const originId = turn.role === 'assistant' ? assistantOriginUserId() : null;
+    let hide = false;
+    if (originId !== null) {
+      const origin = this.turnRows.find((row) => row.id === originId);
+      hide =
+        origin === undefined ||
+        this.hidden.has(origin.id) ||
+        origin.role !== 'user' ||
+        origin.sessionId !== turn.sessionId;
+    }
     const row: Turn = { ...structuredClone(turn), id: this.newId('turn') };
     this.turnRows.push(row);
+    if (hide) this.hidden.add(row.id);
     return structuredClone(row);
   }
 
@@ -98,21 +112,36 @@ export class InMemoryStore implements MemoryStore {
     if (row !== undefined) row.extraction = state;
   }
 
-  /** The last `limit` turns of the session, oldest first. */
+  /** The last `limit` visible turns of the session, oldest first. */
   recentTurns(sessionId: Id, limit: number): Turn[] {
     if (limit <= 0) return [];
-    const inSession = this.turnRows.filter((turn) => turn.sessionId === sessionId);
+    const inSession = this.turnRows.filter((turn) => turn.sessionId === sessionId && !this.hidden.has(turn.id));
     return structuredClone(inSession.slice(-limit));
   }
 
-  /** In the order of `ids`. Unknown ids are left out. */
+  /** In the order of `ids`. Unknown ids and hidden turns are left out. */
   getTurns(ids: Id[]): Turn[] {
     const found: Turn[] = [];
     for (const id of ids) {
       const row = this.turnRows.find((turn) => turn.id === id);
-      if (row !== undefined) found.push(structuredClone(row));
+      if (row !== undefined && !this.hidden.has(row.id)) found.push(structuredClone(row));
     }
     return found;
+  }
+
+  /**
+   * Marks the user turn and every later turn in the session hidden.
+   * Returns the size of that span. An anchor that is missing, not a user
+   * turn, in another session, or already hidden returns 0 and writes nothing.
+   */
+  hideFrom(sessionId: Id, userTurnId: Id): number {
+    const inSession = this.turnRows.filter((turn) => turn.sessionId === sessionId);
+    const start = inSession.findIndex((turn) => turn.id === userTurnId && turn.role === 'user');
+    const anchor = start < 0 ? undefined : inSession[start];
+    if (anchor === undefined || this.hidden.has(anchor.id)) return 0;
+    const span = inSession.slice(start);
+    for (const turn of span) this.hidden.add(turn.id);
+    return span.length;
   }
 
   /**
@@ -125,10 +154,11 @@ export class InMemoryStore implements MemoryStore {
     const excluded = new Set(excludeTurnIds);
     const result: Pair[] = [];
     for (const userTurn of this.turnRows) {
-      if (userTurn.role !== 'user' || excluded.has(userTurn.id)) continue;
+      if (userTurn.role !== 'user' || excluded.has(userTurn.id) || this.hidden.has(userTurn.id)) continue;
       const session = this.turnRows.filter((turn) => turn.sessionId === userTurn.sessionId);
       const next = session[session.indexOf(userTurn) + 1];
-      const answered = next !== undefined && next.role === 'assistant' && !excluded.has(next.id);
+      const answered =
+        next !== undefined && next.role === 'assistant' && !excluded.has(next.id) && !this.hidden.has(next.id);
       result.push({ userTurn, assistantTurn: answered ? next : null });
     }
     return result;
@@ -248,17 +278,33 @@ export class InMemoryStore implements MemoryStore {
     return structuredClone(rows);
   }
 
-  /** The newest claim in the supersedes chain that `claim` belongs to. */
+  /**
+   * The visible claim inserted latest among this claim and every successor.
+   * Hidden turns stay in the walk, so a newer hidden branch cannot mask an
+   * older visible one. A hidden claim is never chosen.
+   */
   private newestInChain(claim: Claim): Claim {
-    let current = claim;
-    const seen = new Set<Id>([current.id]);
-    for (;;) {
-      const currentId = current.id;
-      const next = this.claimRows.find((row) => row.supersedesId === currentId && !seen.has(row.id));
-      if (next === undefined) return current;
-      seen.add(next.id);
-      current = next;
+    const seen = new Set<Id>([claim.id]);
+    const queue: Id[] = [claim.id];
+    let best = claim;
+    let bestIndex = this.claimRows.findIndex((row) => row.id === claim.id);
+    let cursor = 0;
+    while (cursor < queue.length) {
+      const id = queue[cursor];
+      cursor += 1;
+      if (id === undefined) continue;
+      for (let index = 0; index < this.claimRows.length; index += 1) {
+        const next = this.claimRows[index];
+        if (next === undefined || next.supersedesId !== id || seen.has(next.id)) continue;
+        seen.add(next.id);
+        queue.push(next.id);
+        if (!this.hidden.has(next.turnId) && index > bestIndex) {
+          best = next;
+          bestIndex = index;
+        }
+      }
     }
+    return best;
   }
 
   /**
@@ -268,7 +314,7 @@ export class InMemoryStore implements MemoryStore {
    */
   claimsForTurns(turnIds: Id[], version: ClaimVersion): Claim[] {
     const wanted = new Set(turnIds);
-    const stated = this.claimRows.filter((claim) => wanted.has(claim.turnId));
+    const stated = this.claimRows.filter((claim) => wanted.has(claim.turnId) && !this.hidden.has(claim.turnId));
     if (version === 'as_stated') return structuredClone(stated);
     const current: Claim[] = [];
     for (const claim of stated) {

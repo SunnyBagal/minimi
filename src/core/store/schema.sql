@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS turns (
   summary TEXT,
   extraction TEXT NOT NULL,
   intent TEXT,
-  target_turn_ids_json TEXT NOT NULL
+  target_turn_ids_json TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS turns_session_seq ON turns (session_id, seq);

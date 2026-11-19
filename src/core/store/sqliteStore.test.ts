@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import type { AgentConfig, Clock, LocalDate, MemoryStore, NewClaim, NewSource, NewTurn, Turn } from '../contracts';
 import { defaultConfig } from '../config';
-import { chooseTextSearch, Fts5MissingError, SqliteStore } from './sqliteStore';
+import { withAssistantOrigin } from './assistantVisibility';
+import { chooseTextSearch, ensureHiddenColumn, Fts5MissingError, SqliteStore } from './sqliteStore';
 import { createStore } from './index';
 import { InMemoryStore } from '../testing/inMemoryStore';
 
@@ -545,6 +546,252 @@ describe('SqliteStore', () => {
     const counts = store.deleteSeed();
     expect(counts.sources).toBe(0);
     expect(store.getSources([sharedSource.id])).toHaveLength(1);
+  });
+
+  it('hideFrom hides that user turn and every later turn from recentTurns, findTurns, nearestTurns, getTurns and claimsForTurns', () => {
+    const modes: Array<'like' | 'fts'> = ['like'];
+    if (ftsAvailable()) modes.push('fts');
+    for (const textSearch of modes) {
+      const store = makeStore({ textSearch });
+      const firstUser = userTurn(store, { content: 'first zephyr question', topic: 'zephyr', localDate: '2026-11-10' });
+      const firstAssistant = assistantTurn(store, {
+        content: 'first zephyr answer',
+        topic: 'zephyr',
+        localDate: '2026-11-10',
+      });
+      const source = sourceFixture(store);
+      const claimA = claimFixture(store, firstAssistant.id, source.id, { value: '10 USD' });
+      if (claimA === undefined) throw new Error('claim A not saved');
+      const secondUser = userTurn(store, { content: 'second zephyr question', topic: 'zephyr', localDate: '2026-11-11' });
+      const secondAssistant = assistantTurn(store, {
+        content: 'second zephyr answer',
+        topic: 'zephyr',
+        localDate: '2026-11-11',
+      });
+      const claimB = claimFixture(store, secondAssistant.id, source.id, {
+        value: '12 USD',
+        supersedesId: claimA.id,
+      });
+      if (claimB === undefined) throw new Error('claim B not saved');
+      const other = userTurn(store, {
+        content: 'other session zephyr',
+        sessionId: 's2',
+        topic: 'zephyr',
+        localDate: '2026-11-11',
+      });
+
+      expect(store.hideFrom('s1', firstAssistant.id)).toBe(0);
+      expect(store.hideFrom('s2', secondUser.id)).toBe(0);
+      expect(store.hideFrom('s1', 'missing-turn')).toBe(0);
+      expect(store.recentTurns('s1', 10)).toHaveLength(4);
+
+      expect(store.hideFrom('s1', secondUser.id)).toBe(2);
+      expect(store.hideFrom('s1', secondUser.id)).toBe(0);
+
+      expect(store.recentTurns('s1', 20).map((turn) => turn.id)).toEqual([firstUser.id, firstAssistant.id]);
+      expect(store.recentTurns('s1', 2).map((turn) => turn.id)).toEqual([firstUser.id, firstAssistant.id]);
+      expect(store.getTurns([secondUser.id, secondAssistant.id, firstUser.id]).map((turn) => turn.id)).toEqual([
+        firstUser.id,
+      ]);
+      expect(store.recentTurns('s2', 10).map((turn) => turn.id)).toEqual([other.id]);
+
+      const onLaterDay = store.findTurns({ dates: ['2026-11-11'], excludeTurnIds: [], limit: 10 });
+      expect(onLaterDay.map((hit) => hit.userTurn.id)).toContain(other.id);
+      expect(onLaterDay.map((hit) => hit.userTurn.id)).not.toContain(secondUser.id);
+
+      const byTopic = store.findTurns({ topic: 'zephyr', excludeTurnIds: [], limit: 10 });
+      expect(byTopic.map((hit) => hit.userTurn.id)).toContain(firstUser.id);
+      expect(byTopic.map((hit) => hit.userTurn.id)).not.toContain(secondUser.id);
+
+      const near = store.nearestTurns({ around: ['2026-11-10'], topic: 'zephyr', excludeTurnIds: [], limit: 10 });
+      expect(near.map((hit) => hit.userTurn.id)).toContain(other.id);
+      expect(near.map((hit) => hit.userTurn.id)).not.toContain(secondUser.id);
+
+      expect(store.claimsForTurns([secondAssistant.id], 'as_stated')).toEqual([]);
+      expect(store.claimsForTurns([secondAssistant.id], 'current')).toEqual([]);
+      expect(store.claimsForTurns([firstAssistant.id], 'as_stated').map((claim) => claim.value)).toEqual(['10 USD']);
+      expect(store.claimsForTurns([firstAssistant.id], 'current').map((claim) => claim.id)).toEqual([claimA.id]);
+    }
+  });
+
+  it('hideFrom adds the hidden column to a database created without it', () => {
+    const dbPath = tmpDb();
+    const raw = new DatabaseSync(dbPath);
+    raw.exec(`
+      CREATE TABLE sessions (
+        id TEXT PRIMARY KEY,
+        created_at_utc TEXT NOT NULL
+      );
+      CREATE TABLE turns (
+        seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        id TEXT NOT NULL UNIQUE,
+        session_id TEXT NOT NULL REFERENCES sessions(id),
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at_utc TEXT NOT NULL,
+        tz TEXT NOT NULL,
+        local_date TEXT NOT NULL,
+        origin TEXT NOT NULL,
+        topic TEXT,
+        entities_json TEXT NOT NULL,
+        summary TEXT,
+        extraction TEXT NOT NULL,
+        intent TEXT,
+        target_turn_ids_json TEXT NOT NULL
+      );
+    `);
+    raw.prepare('INSERT INTO sessions (id, created_at_utc) VALUES (?, ?)').run('s1', '2026-11-10T08:35:00.000Z');
+    raw
+      .prepare(
+        `INSERT INTO turns (
+          id, session_id, role, content, created_at_utc, tz, local_date, origin, entities_json, extraction, target_turn_ids_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run('t1', 's1', 'user', 'old question', '2026-11-10T08:35:00.000Z', 'UTC', '2026-11-10', 'live', '[]', 'skipped', '[]');
+    raw.close();
+
+    const store = new SqliteStore(dbPath, clock, config, { textSearch: 'like' });
+    stores.push(store);
+    expect(store.recentTurns('s1', 10).map((turn) => turn.id)).toEqual(['t1']);
+    expect(store.hideFrom('s1', 't1')).toBe(1);
+    expect(store.recentTurns('s1', 10)).toEqual([]);
+    expect(store.getTurns(['t1'])).toEqual([]);
+
+    const again = new SqliteStore(dbPath, clock, config, { textSearch: 'like' });
+    stores.push(again);
+    expect(again.getTurns(['t1'])).toEqual([]);
+  });
+
+  it('treats a duplicate hidden column as success when the column is present', () => {
+    let checks = 0;
+    const db = {
+      exec(sql: string) {
+        if (sql.startsWith('ALTER')) throw new Error('duplicate column name: hidden');
+      },
+      prepare() {
+        return {
+          all: () => {
+            checks += 1;
+            return checks === 1 ? [{ name: 'id' }] : [{ name: 'hidden' }];
+          },
+        };
+      },
+    };
+    expect(() => ensureHiddenColumn(db)).not.toThrow();
+    expect(checks).toBe(2);
+  });
+
+  it('rethrows when the hidden column is still missing after a duplicate-column error', () => {
+    const db = {
+      exec() {
+        throw new Error('duplicate column name: hidden');
+      },
+      prepare() {
+        return { all: () => [{ name: 'id' }] };
+      },
+    };
+    expect(() => ensureHiddenColumn(db)).toThrow(/turns\.hidden is missing/);
+  });
+
+  it('rethrows an alter error that is not a duplicate column', () => {
+    const db = {
+      exec() {
+        throw new Error('disk I/O error');
+      },
+      prepare() {
+        return { all: () => [{ name: 'id' }] };
+      },
+    };
+    expect(() => ensureHiddenColumn(db)).toThrow(/disk I\/O error/);
+  });
+
+  it('does not hide a replacement when the anchor is replayed and hides a late answer for the hidden prompt', () => {
+    const store = makeStore({ textSearch: 'like' });
+    const firstUser = userTurn(store, { content: 'first question' });
+    assistantTurn(store, { content: 'first answer' });
+    const followUser = userTurn(store, { content: 'follow-up question' });
+    expect(store.hideFrom('s1', firstUser.id)).toBe(3);
+
+    const replacementUser = userTurn(store, { content: 'replacement question' });
+    const replacementAssistant = assistantTurn(store, { content: 'replacement answer' });
+    expect(store.hideFrom('s1', firstUser.id)).toBe(0);
+    expect(store.hideFrom('s1', followUser.id)).toBe(0);
+
+    const late = withAssistantOrigin(firstUser.id, () => assistantTurn(store, { content: 'orphan answer' }));
+    expect(store.getTurns([late.id])).toEqual([]);
+    const visible = store.recentTurns('s1', 10).map((turn) => turn.content);
+    expect(visible).toEqual(['replacement question', 'replacement answer']);
+    expect(visible.join('\n')).not.toContain('orphan');
+    expect(store.getTurns([replacementUser.id, replacementAssistant.id])).toHaveLength(2);
+  });
+
+  it('walks a hidden claim through to a later visible claim in another session', () => {
+    const store = makeStore({ textSearch: 'like' });
+    const source = sourceFixture(store);
+    const aUser = userTurn(store, { sessionId: 'chain-a', content: 'a question' });
+    const aAssistant = assistantTurn(store, { sessionId: 'chain-a', content: 'a answer' });
+    const claimA = claimFixture(store, aAssistant.id, source.id, { value: '10 USD' });
+    if (claimA === undefined) throw new Error('claim A not saved');
+    const bUser = userTurn(store, { sessionId: 'chain-b', content: 'b question' });
+    const bAssistant = assistantTurn(store, { sessionId: 'chain-b', content: 'b answer' });
+    const claimB = claimFixture(store, bAssistant.id, source.id, { value: '12 USD', supersedesId: claimA.id });
+    if (claimB === undefined) throw new Error('claim B not saved');
+    userTurn(store, { sessionId: 'chain-c', content: 'c question' });
+    const cAssistant = assistantTurn(store, { sessionId: 'chain-c', content: 'c answer' });
+    const claimC = claimFixture(store, cAssistant.id, source.id, { value: '14 USD', supersedesId: claimB.id });
+    if (claimC === undefined) throw new Error('claim C not saved');
+    void aUser;
+
+    expect(store.hideFrom('chain-b', bUser.id)).toBe(2);
+    expect(store.claimsForTurns([bAssistant.id], 'as_stated')).toEqual([]);
+    expect(store.claimsForTurns([bAssistant.id], 'current')).toEqual([]);
+    expect(store.claimsForTurns([aAssistant.id], 'as_stated').map((claim) => claim.value)).toEqual(['10 USD']);
+    expect(store.claimsForTurns([aAssistant.id], 'current').map((claim) => claim.id)).toEqual([claimC.id]);
+    expect(store.claimsForTurns([cAssistant.id], 'current').map((claim) => claim.value)).toEqual(['14 USD']);
+  });
+
+  it('hides an assistant inserted after its user turn was hidden on another connection', () => {
+    const dbPath = tmpDb();
+    const writer = new SqliteStore(dbPath, clock, config, { textSearch: 'like' });
+    const editor = new SqliteStore(dbPath, clock, config, { textSearch: 'like' });
+    stores.push(writer, editor);
+    const user = userTurn(writer, { content: 'prompt to hide' });
+    const shown = withAssistantOrigin(user.id, () => assistantTurn(writer, { content: 'shown answer' }));
+    expect(editor.getTurns([shown.id])).toHaveLength(1);
+    expect(editor.hideFrom('s1', user.id)).toBe(2);
+    const late = withAssistantOrigin(user.id, () => assistantTurn(writer, { content: 'late answer' }));
+    expect(writer.getTurns([late.id])).toEqual([]);
+    expect(editor.getTurns([late.id])).toEqual([]);
+    expect(writer.recentTurns('s1', 10)).toEqual([]);
+    expect(editor.recentTurns('s1', 10)).toEqual([]);
+  });
+
+  it('does not let a newer hidden branch mask a visible claim', () => {
+    const store = makeStore({ textSearch: 'like' });
+    const source = sourceFixture(store);
+    const aUser = userTurn(store, { sessionId: 'branch-a', content: 'a question' });
+    const aAssistant = assistantTurn(store, { sessionId: 'branch-a', content: 'a answer' });
+    const claimA = claimFixture(store, aAssistant.id, source.id, { value: '10 USD' });
+    if (claimA === undefined) throw new Error('claim A not saved');
+    const bUser = userTurn(store, { sessionId: 'branch-b', content: 'b question' });
+    const bAssistant = assistantTurn(store, { sessionId: 'branch-b', content: 'b answer' });
+    const claimB = claimFixture(store, bAssistant.id, source.id, { value: '12 USD', supersedesId: claimA.id });
+    if (claimB === undefined) throw new Error('claim B not saved');
+    userTurn(store, { sessionId: 'branch-c', content: 'c question' });
+    const cAssistant = assistantTurn(store, { sessionId: 'branch-c', content: 'c answer' });
+    const claimC = claimFixture(store, cAssistant.id, source.id, { value: '14 USD', supersedesId: claimB.id });
+    if (claimC === undefined) throw new Error('claim C not saved');
+    const dUser = userTurn(store, { sessionId: 'branch-d', content: 'd question' });
+    const dAssistant = assistantTurn(store, { sessionId: 'branch-d', content: 'd answer' });
+    claimFixture(store, dAssistant.id, source.id, { value: '16 USD', supersedesId: claimA.id });
+    void aUser;
+
+    expect(store.hideFrom('branch-b', bUser.id)).toBe(2);
+    expect(store.hideFrom('branch-d', dUser.id)).toBe(2);
+    expect(store.claimsForTurns([bAssistant.id], 'current')).toEqual([]);
+    expect(store.claimsForTurns([dAssistant.id], 'current')).toEqual([]);
+    expect(store.claimsForTurns([aAssistant.id], 'current').map((claim) => claim.id)).toEqual([claimC.id]);
+    expect(store.claimsForTurns([aAssistant.id], 'current').map((claim) => claim.value)).toEqual(['14 USD']);
   });
 
   it('parity with InMemoryStore: staleClaims', () => {

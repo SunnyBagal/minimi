@@ -217,6 +217,25 @@ export function CoinIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function ChatsIcon() {
+  return (
+    <Icon size={16}>
+      <rect x="3.5" y="4" width="17" height="16" rx="2" />
+      <path d="M9 4v16" />
+    </Icon>
+  );
+}
+
+export function TrashIcon() {
+  return (
+    <Icon size={15}>
+      <path d="M5 7h14" />
+      <path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7" />
+      <path d="M7 7l1 12.5h8L17 7" />
+    </Icon>
+  );
+}
+
 export function TerminalIcon({ size = 15 }: { size?: number }) {
   return (
     <Icon size={size}>

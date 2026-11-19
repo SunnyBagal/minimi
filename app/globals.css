@@ -1337,6 +1337,223 @@ mark.uncited small {
   }
 }
 
+/* --------------------------------------------------------------- sidebar */
+
+.app-body {
+  --sidebar-w: 260px;
+  display: flex;
+  align-items: stretch;
+}
+
+.app-column {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar {
+  flex: none;
+  width: var(--sidebar-w);
+  position: sticky;
+  top: var(--topbar-h, 56px);
+  align-self: flex-start;
+  height: calc(100dvh - var(--topbar-h, 56px));
+  overflow: auto;
+  border-right: 1px solid var(--hairline);
+  background: var(--surface);
+  padding: 12px 10px calc(var(--composer-h) + 16px);
+}
+
+.sidebar[hidden] {
+  display: none;
+}
+
+.sidebar:focus {
+  outline: none;
+}
+
+.sidebar:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: -2px;
+}
+
+.sidebar-new,
+.sidebar-open,
+.sidebar-delete,
+.sidebar-empty {
+  position: relative;
+  z-index: 2;
+}
+
+.sidebar-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 36px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sidebar-new:hover:not(:disabled) {
+  border-color: var(--ink-faint);
+}
+
+.sidebar-new:disabled,
+.sidebar-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sidebar-empty {
+  margin: 14px 8px;
+  color: var(--ink-muted);
+  font-size: 13px;
+}
+
+.sidebar-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-row {
+  display: flex;
+  align-items: stretch;
+  border-radius: 10px;
+}
+
+.sidebar-row.current {
+  background: var(--accent-soft);
+}
+
+.sidebar-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sidebar-title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+
+.sidebar-day {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.sidebar-delete {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.sidebar-delete:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.sidebar-open:focus-visible,
+.sidebar-delete:focus-visible,
+.sidebar-new:focus-visible,
+.bubble-edit-actions button:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.app-body:has(.sidebar:not([hidden])) .composer {
+  left: var(--sidebar-w);
+}
+
+.bubble-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(70vw, 280px);
+}
+
+.bubble-edit textarea,
+.bubble-edit-actions {
+  position: relative;
+  z-index: 2;
+}
+
+.bubble-edit textarea {
+  width: 100%;
+  min-height: 3em;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  resize: vertical;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.45;
+  outline: none;
+}
+
+.bubble-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bubble-edit-actions button {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.bubble-edit-cancel {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+}
+
+.bubble-edit-save {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid transparent;
+}
+
+.bubble-edit-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @media (max-width: 380px) {
   .tagline {
     display: none;
@@ -2056,4 +2273,32 @@ details[open] > summary > .mb-row-chevron {
   font-weight: 500;
   transform: translateX(-50%);
   pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .sidebar {
+    position: fixed;
+    z-index: 40;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    height: auto;
+    width: min(280px, 86vw);
+    box-shadow: var(--shadow);
+  }
+
+  .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: rgba(0, 0, 0, 0.4);
+    cursor: pointer;
+  }
+
+  .app-body:has(.sidebar:not([hidden])) .composer {
+    left: 0;
+  }
 }

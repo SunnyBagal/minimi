@@ -20,16 +20,50 @@ import {
   type ReactNode,
 } from 'react';
 import type { SourceRef, VerdictRow } from '../src/core/contracts';
+import { systemClock } from '../src/core/systemClock';
 import type { ChatUIMessage } from './api/chat/route';
 import { CatField } from './components/CatField';
+import {
+  applyMigration,
+  coveredControlsInert,
+  deleteChat,
+  editAnchor,
+  editApplied,
+  loadSessionMessages,
+  messagesBefore,
+  newChatClosesSidebar,
+  persistChatRecord,
+  readChatIndex,
+  readSidebarOpen,
+  removeChatMessages,
+  requestSessionId,
+  shouldWriteTranscript,
+  snapshotChat,
+  upsertChat,
+  writeChatIndex,
+  writeSidebarOpen,
+  type ChatRow,
+} from './components/chats';
 import { DevFooter } from './components/DevFooter';
 import { ChatEvalsContent, SuiteContent } from './components/EvalsPopovers';
-import { CheckIcon, CopyIcon, EditIcon, FlaskIcon, MoonIcon, NewChatIcon, PulseIcon, SendIcon, SunIcon } from './components/icons';
+import {
+  ChatsIcon,
+  CheckIcon,
+  CopyIcon,
+  EditIcon,
+  FlaskIcon,
+  MoonIcon,
+  NewChatIcon,
+  PulseIcon,
+  SendIcon,
+  SunIcon,
+} from './components/icons';
 import { MenuPopover } from './components/MenuPopover';
 import { Markdown } from './components/Markdown';
 import { Oneko } from './components/Oneko';
 import { RecallCard } from './components/RecallCard';
-import { HISTORY_KEY, resetSession, sessionId } from './components/session';
+import { SESSION_KEY, sessionId } from './components/session';
+import { Sidebar } from './components/Sidebar';
 import { Sources } from './components/Sources';
 import { Alert, StatusLine } from './components/StatusLine';
 import { effectiveTheme, nextTheme, writeTheme } from './components/theme';
@@ -127,10 +161,32 @@ export default function Page() {
   const [statusLine, setStatusLine] = useState('');
   const [restored, setRestored] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [chats, setChats] = useState<ChatRow[]>([]);
+  const [currentId, setCurrentId] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [phone, setPhone] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const composerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const chatsButtonRef = useRef<HTMLButtonElement>(null);
   const stickRef = useRef(true);
   const copiedTimer = useRef<number | null>(null);
+  const sessionRef = useRef('');
+  /** Server user-turn id for the next send. Cleared as the request is built. */
+  const editFromRef = useRef<string | null>(null);
+  /**
+   * Transcript from before an edit. While this is set, the shortened thread
+   * stays on screen but is not written to storage. Cleared when the server
+   * accepts the edit, or restored when it does not.
+   */
+  const editHoldRef = useRef<{ messages: ChatUIMessage[]; draft: string; editingId: string } | null>(null);
+  /** Session whose transcript still lives only in the legacy key. */
+  const legacyPendingRef = useRef<string | null>(null);
+  const persistRef = useRef<(id: string, next: ChatUIMessage[]) => void>(() => {});
+  const restoreEditRef = useRef<() => void>(() => {});
   // The two evals popovers in the header; opening one closes the other.
   const [panel, setPanel] = useState<'chat' | 'suite' | null>(null);
   const chatEvalsButton = useRef<HTMLButtonElement>(null);
@@ -142,14 +198,21 @@ export default function Page() {
       new DefaultChatTransport<ChatUIMessage>({
         api: '/api/chat',
         // The server keeps the history. It needs only the new message, the
-        // session and the browser's zone.
-        prepareSendMessagesRequest: ({ messages }) => ({
-          body: {
-            message: lastUserText(messages),
-            sessionId: sessionId(window.localStorage, () => crypto.randomUUID()),
-            tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          },
-        }),
+        // session and the browser's zone. editFrom is set only for an in-place edit.
+        prepareSendMessagesRequest: ({ messages: outgoing }) => {
+          const editFrom = editFromRef.current;
+          editFromRef.current = null;
+          return {
+            body: {
+              message: lastUserText(outgoing),
+              sessionId: requestSessionId(sessionRef.current, () =>
+                sessionId(window.localStorage, () => crypto.randomUUID()),
+              ),
+              tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              ...(editFrom !== null ? { editFrom } : {}),
+            },
+          };
+        },
       }),
     [],
   );
@@ -160,6 +223,22 @@ export default function Page() {
     onData: (part) => {
       if (part.type === 'data-status') setStatusLine(part.data.text);
     },
+    onFinish: (event) => {
+      if (editHoldRef.current === null) return;
+      const turnId = event.message.metadata?.turnId;
+      if (!editApplied({
+        isAbort: event.isAbort,
+        isDisconnect: event.isDisconnect,
+        isError: event.isError,
+        finishReason: event.finishReason,
+        turnId,
+      })) {
+        restoreEditRef.current();
+        return;
+      }
+      editHoldRef.current = null;
+      persistRef.current(sessionRef.current, event.messages);
+    },
   });
 
   // Compile the chat route's dependencies before the first message needs them.
@@ -167,22 +246,88 @@ export default function Page() {
     void fetch('/api/warm').catch(() => {});
   }, []);
 
-  // Message history survives a reload. Only what is in `messages` is saved.
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(HISTORY_KEY);
-      if (saved !== null) setMessages(JSON.parse(saved) as ChatUIMessage[]);
-    } catch {
-      window.localStorage.removeItem(HISTORY_KEY);
+  const persist = useCallback((id: string, next: ChatUIMessage[]) => {
+    const store = storage();
+    if (store === null || id === '') return;
+    const row = snapshotChat(next, id, systemClock.now().toISOString());
+    if (row === null) {
+      removeChatMessages(store, id);
+      return;
     }
+    const updated = upsertChat(readChatIndex(store), row);
+    const clearLegacy = legacyPendingRef.current === id;
+    if (!persistChatRecord(store, id, next, updated, clearLegacy)) return;
+    if (clearLegacy) legacyPendingRef.current = null;
+    setChats(updated);
+  }, []);
+
+  function restoreEdit() {
+    const hold = editHoldRef.current;
+    if (hold === null) return;
+    editHoldRef.current = null;
+    editFromRef.current = null;
+    setMessages(hold.messages);
+    setEditingId(hold.editingId);
+    setDraft(hold.draft);
+    persist(sessionRef.current, hold.messages);
+  }
+  persistRef.current = persist;
+  restoreEditRef.current = restoreEdit;
+
+  // One-time: migrate the old single history, then open that chat.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 560px)');
+    const applyPhone = () => setPhone(mq.matches);
+    applyPhone();
+    mq.addEventListener('change', applyPhone);
+
+    const store = storage();
+    if (store === null) {
+      setRestored(true);
+      return () => mq.removeEventListener('change', applyPhone);
+    }
+    let id = '';
+    try {
+      id = sessionId(store, () => crypto.randomUUID());
+    } catch {
+      id = crypto.randomUUID();
+    }
+    sessionRef.current = id;
+    setCurrentId(id);
+    setChats(applyMigration(store, id, systemClock.now().toISOString()));
+    const openStored = readSidebarOpen(store);
+    setSidebarOpen(openStored);
+    if (mq.matches && openStored) {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => sidebarRef.current?.focus());
+      });
+    }
+    const loaded = loadSessionMessages<ChatUIMessage>(store, id);
+    if (loaded.fromLegacy) legacyPendingRef.current = id;
+    if (loaded.messages !== null) setMessages(loaded.messages);
     setRestored(true);
+    return () => mq.removeEventListener('change', applyPhone);
   }, [setMessages]);
 
   useEffect(() => {
-    if (!restored || status === 'submitted' || status === 'streaming') return;
-    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(messages));
+    if (!restored || !shouldWriteTranscript(editHoldRef.current !== null, status)) return;
+    persist(sessionRef.current, messages);
     setStatusLine('');
-  }, [restored, status, messages]);
+  }, [restored, status, messages, persist]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      event.preventDefault();
+      setSidebarOpen(false);
+      const store = storage();
+      if (store !== null) writeSidebarOpen(store, false);
+      window.requestAnimationFrame(() => chatsButtonRef.current?.focus());
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sidebarOpen]);
 
   const busy = status === 'submitted' || status === 'streaming';
 
@@ -201,13 +346,16 @@ export default function Page() {
   }, [messages, statusLine, busy, error]);
 
   // The list's bottom padding follows the composer's height, so the last item is never under it.
+  // The sidebar sticks just below the header.
   useEffect(() => {
     const composer = composerRef.current;
-    if (composer === null) return;
+    const header = headerRef.current;
     const observer = new ResizeObserver(() => {
-      document.documentElement.style.setProperty('--composer-h', `${composer.offsetHeight}px`);
+      if (composer !== null) document.documentElement.style.setProperty('--composer-h', `${composer.offsetHeight}px`);
+      if (header !== null) document.documentElement.style.setProperty('--topbar-h', `${header.offsetHeight}px`);
     });
-    observer.observe(composer);
+    if (composer !== null) observer.observe(composer);
+    if (header !== null) observer.observe(header);
     return () => observer.disconnect();
   }, []);
 
@@ -261,23 +409,137 @@ export default function Page() {
     }
   }
 
-  function newChat() {
-    if (busy) return;
+  function rememberSession(id: string) {
     const store = storage();
-    if (store !== null) {
-      try {
-        resetSession(store, crypto.randomUUID());
-      } catch {
-        // Storage refused the write; the on-screen reset still happens.
-      }
+    if (store === null) return;
+    try {
+      store.setItem(SESSION_KEY, id);
+    } catch {
+      // The on-screen session still changes; the next reload may reopen the previous one.
     }
+  }
+
+  function newChat() {
+    if (busy || !restored) return;
+    persist(sessionRef.current, messages);
+    const id = crypto.randomUUID();
+    rememberSession(id);
+    sessionRef.current = id;
+    setCurrentId(id);
     setMessages([]);
+    setEditingId(null);
+    setDraft('');
     setInput('');
     setStatusLine('');
     clearError();
     stickRef.current = true;
     window.scrollTo({ top: 0, behavior: 'auto' });
+    if (newChatClosesSidebar(phone)) {
+      setSidebarOpen(false);
+      const store = storage();
+      if (store !== null) writeSidebarOpen(store, false);
+    }
     window.requestAnimationFrame(focusComposer);
+  }
+
+  function openChat(id: string) {
+    if (busy || !restored || id === sessionRef.current) return;
+    persist(sessionRef.current, messages);
+    rememberSession(id);
+    sessionRef.current = id;
+    setCurrentId(id);
+    const store = storage();
+    const loaded = store === null ? null : loadSessionMessages<ChatUIMessage>(store, id);
+    if (loaded?.fromLegacy) legacyPendingRef.current = id;
+    setMessages(loaded?.messages ?? []);
+    setEditingId(null);
+    setDraft('');
+    setInput('');
+    setStatusLine('');
+    clearError();
+    stickRef.current = true;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    if (newChatClosesSidebar(phone)) {
+      setSidebarOpen(false);
+      if (store !== null) writeSidebarOpen(store, false);
+      window.requestAnimationFrame(focusComposer);
+    }
+  }
+
+  function removeChat(id: string) {
+    if (busy || !restored) return;
+    if (!window.confirm('Delete this chat?')) return;
+    const next = deleteChat(chats, id);
+    const store = storage();
+    if (store !== null) {
+      writeChatIndex(store, next);
+      removeChatMessages(store, id);
+    }
+    setChats(next);
+    if (id !== sessionRef.current) return;
+    const fresh = crypto.randomUUID();
+    rememberSession(fresh);
+    sessionRef.current = fresh;
+    setCurrentId(fresh);
+    setMessages([]);
+    setEditingId(null);
+    setDraft('');
+    setInput('');
+    setStatusLine('');
+    clearError();
+  }
+
+  function toggleSidebar() {
+    const next = !sidebarOpen;
+    setSidebarOpen(next);
+    const store = storage();
+    if (store !== null) writeSidebarOpen(store, next);
+    window.requestAnimationFrame(() => {
+      if (next) sidebarRef.current?.focus();
+      else chatsButtonRef.current?.focus();
+    });
+  }
+
+  function beginEdit(messageId: string, text: string) {
+    setEditingId(messageId);
+    setDraft(text);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft('');
+  }
+
+  function saveEdit() {
+    if (editingId === null || busy) return;
+    const text = draft.trim();
+    if (text === '') return;
+    const turn = groupTurns(messages).find((item) => item.user?.id === editingId);
+    const fromId = editAnchor(turn?.answers ?? []);
+    if (fromId === null) return;
+    const kept = messagesBefore(messages, editingId);
+    editHoldRef.current = { messages, draft, editingId };
+    editFromRef.current = fromId;
+    setEditingId(null);
+    setDraft('');
+    setMessages(kept);
+    stickRef.current = true;
+    void sendMessage({ text });
+  }
+
+  function onEditKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.nativeEvent.isComposing) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      event.nativeEvent.stopPropagation();
+      cancelEdit();
+      return;
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      saveEdit();
+    }
   }
 
   function toggleTheme() {
@@ -300,6 +562,8 @@ export default function Page() {
       .catch(() => {});
   }
 
+  const nowIso = systemClock.now().toISOString();
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const turns = groupTurns(messages);
   const lastTurn = turns[turns.length - 1];
   const lastAssistant = messages.findLast((message) => message.role === 'assistant');
@@ -308,13 +572,14 @@ export default function Page() {
   const answerStarted = lastTurn !== undefined && lastTurn.answers.length > 0;
   const errorText = error ? error.message : null;
   const empty = messages.length === 0;
+  const coverThread = coveredControlsInert(phone, sidebarOpen);
 
   return (
     <>
       <CatField />
       <div className="app">
         <Oneko />
-        <header className="topbar">
+        <header className="topbar" ref={headerRef} inert={coverThread ? true : undefined}>
           <div className="topbar-inner">
             <div className="brand">
               <Logo size={30} className="brand-logo" />
@@ -324,6 +589,18 @@ export default function Page() {
               </div>
             </div>
             <div className="topbar-actions">
+              <button
+                ref={chatsButtonRef}
+                type="button"
+                className="btn btn-icon"
+                onClick={toggleSidebar}
+                aria-label="Chats"
+                title="Chats"
+                aria-expanded={sidebarOpen}
+                aria-controls="chat-sidebar"
+              >
+                <ChatsIcon />
+              </button>
               <button
                 ref={chatEvalsButton}
                 type="button"
@@ -379,6 +656,23 @@ export default function Page() {
           <SuiteContent titleId="evals-suite-title" active={panel === 'suite'} />
         </MenuPopover>
 
+        <div className="app-body">
+          {phone && sidebarOpen ? (
+            <button type="button" className="sidebar-scrim" aria-label="Close chats" onClick={toggleSidebar} />
+          ) : null}
+          <Sidebar
+            open={sidebarOpen}
+            chats={chats}
+            currentId={currentId}
+            nowIso={nowIso}
+            timeZone={timeZone}
+            busy={busy}
+            navRef={sidebarRef}
+            onNewChat={newChat}
+            onOpenChat={openChat}
+            onDeleteChat={removeChat}
+          />
+          <div className="app-column" inert={coverThread ? true : undefined}>
         <main className="thread">
           {empty ? (
             <section className="empty">
@@ -408,31 +702,60 @@ export default function Page() {
                   <li key={turn.key} className="turn">
                     {turn.user !== null ? (
                       <div className="user-row" data-role="user">
-                        <div className="bubble-actions">
-                          <button
-                            type="button"
-                            className="mini-btn"
-                            aria-label="Edit this message"
-                            title="Edit"
-                            disabled={busy}
-                            onClick={() => fillComposer(userText)}
+                        {editingId === turn.user.id ? (
+                          <form
+                            className="bubble bubble-edit"
+                            onSubmit={(event) => {
+                              event.preventDefault();
+                              saveEdit();
+                            }}
                           >
-                            <EditIcon />
-                          </button>
-                          <button
-                            type="button"
-                            className="mini-btn"
-                            aria-label={copiedId === turn.user.id ? 'Copied' : 'Copy this message'}
-                            title={copiedId === turn.user.id ? 'Copied' : 'Copy'}
-                            onClick={() => copy((turn.user as ChatUIMessage).id, userText)}
-                          >
-                            {copiedId === turn.user.id ? <CheckIcon /> : <CopyIcon />}
-                            {copiedId === turn.user.id ? <span className="copied">Copied</span> : null}
-                          </button>
-                        </div>
-                        <div className="bubble">
-                          <span className="bubble-text">{userText}</span>
-                        </div>
+                            <textarea
+                              aria-label="Edit message"
+                              value={draft}
+                              rows={2}
+                              autoFocus
+                              onChange={(event) => setDraft(event.target.value)}
+                              onKeyDown={onEditKeyDown}
+                            />
+                            <div className="bubble-edit-actions">
+                              <button type="button" className="bubble-edit-cancel" onClick={cancelEdit}>
+                                Cancel
+                              </button>
+                              <button type="submit" className="bubble-edit-save" disabled={draft.trim() === '' || busy}>
+                                Save
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <>
+                            <div className="bubble-actions">
+                              <button
+                                type="button"
+                                className="mini-btn"
+                                aria-label="Edit this message"
+                                title="Edit"
+                                disabled={busy || editAnchor(turn.answers) === null}
+                                onClick={() => beginEdit((turn.user as ChatUIMessage).id, userText)}
+                              >
+                                <EditIcon />
+                              </button>
+                              <button
+                                type="button"
+                                className="mini-btn"
+                                aria-label={copiedId === turn.user.id ? 'Copied' : 'Copy this message'}
+                                title={copiedId === turn.user.id ? 'Copied' : 'Copy'}
+                                onClick={() => copy((turn.user as ChatUIMessage).id, userText)}
+                              >
+                                {copiedId === turn.user.id ? <CheckIcon /> : <CopyIcon />}
+                                {copiedId === turn.user.id ? <span className="copied">Copied</span> : null}
+                              </button>
+                            </div>
+                            <div className="bubble">
+                              <span className="bubble-text">{userText}</span>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ) : null}
 
@@ -489,6 +812,8 @@ export default function Page() {
               </button>
             </div>
           </form>
+        </div>
+          </div>
         </div>
       </div>
     </>

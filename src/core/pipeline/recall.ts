@@ -24,11 +24,12 @@ import type {
 } from '../contracts';
 import { claimLabel } from '../claimLabel';
 import { dateWords } from '../dateWords';
-import { REPEAT_QUESTION_RULE } from '../recallHeadline';
+import { REPEAT_FOLLOW_UP_RULE, REPEAT_QUESTION_RULE } from '../recallHeadline';
 import { noRecord } from './noRecord';
 import { recheck } from './recheck';
 import { evidenceFor, extractInto } from './evidence';
 import type { TurnContext } from './context';
+import type { RepeatedQuestion } from './repeat';
 
 /** The candidates for "the previous answer": just that turn's local date. */
 function previousAnswerCandidates(localDate: LocalDate): DateCandidates {
@@ -114,31 +115,35 @@ async function resolveTargets(ctx: TurnContext, referenced: Turn, askedOn: Local
 
 const NO_STORED_FACTS = 'That answer has no stored facts to check. I can look this up fresh if you like.';
 
-export async function* repeatAnswer(ctx: TurnContext, hit: MemoryHit & { assistantTurn: Turn }): AsyncIterable<AgentEvent> {
+export async function* repeatAnswer(ctx: TurnContext, { hit, followUps }: RepeatedQuestion): AsyncIterable<AgentEvent> {
   ctx.stage = 'resolve';
   const doneResolve = ctx.timer('resolve');
-  const { userTurn, assistantTurn } = hit;
+  const { userTurn } = hit;
+  const latest = followUps.at(-1) ?? hit.assistantTurn;
   const chosen = userTurn.localDate;
+  const rule = followUps.length > 0 ? REPEAT_FOLLOW_UP_RULE : REPEAT_QUESTION_RULE;
   yield {
     type: 'recall',
-    candidates: { dates: [chosen], range: null, ambiguous: false, rule: REPEAT_QUESTION_RULE },
-    hits: [hit],
+    candidates: { dates: [chosen], range: null, ambiguous: false, rule },
+    hits: [{ ...hit, assistantTurn: latest }],
     chosen,
     asked: askedOf(userTurn),
   };
   yield doneResolve();
 
-  const resolved = await resolveTargets(ctx, assistantTurn, chosen);
-  if (resolved.baseline.length > 0) {
+  // Try the newest answer first. A follow-up may rely on claims from an earlier link.
+  for (const answer of [hit.assistantTurn, ...followUps].reverse()) {
+    const resolved = await resolveTargets(ctx, answer, chosen);
+    if (resolved.baseline.length === 0) continue;
     ctx.plan = { ...ctx.plan, intent: 'recheck' };
     yield* recheck(ctx, resolved);
     return;
   }
 
-  // A derived answer can lose its underlying claims when its targets are hidden.
-  const memory = assistantTurn.targetTurnIds.length === 0 ? assistantTurn.content : null;
+  // A derived answer can lose its underlying turns after an edit.
+  const targetsVisible = ctx.store.getTurns(latest.targetTurnIds).length === latest.targetTurnIds.length;
   ctx.plan = { ...ctx.plan, intent: 'recall' };
-  yield ctx.textEvent(memory === null ? NO_STORED_FACTS : `From memory:\n\n${memory}\n\nI can look this up fresh if you like.`);
+  yield ctx.textEvent(targetsVisible ? `From memory:\n\n${latest.content}\n\nI can look this up fresh if you like.` : NO_STORED_FACTS);
   ctx.saveAssistant({ intent: 'recall', extraction: 'skipped', targetTurnIds: [] });
 }
 

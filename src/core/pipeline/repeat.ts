@@ -1,4 +1,4 @@
-import type { MemoryHit, Turn } from '../contracts';
+import type { MemoryHit, MemoryStore, Turn } from '../contracts';
 import type { TurnContext } from './context';
 
 const MIN_REPEAT_OVERLAP = 0.8;
@@ -21,9 +21,56 @@ function qualifiers(words: readonly string[]): string {
 
 type AnsweredHit = MemoryHit & { assistantTurn: Turn };
 
+export interface RepeatedQuestion {
+  hit: AnsweredHit;
+  followUps: Turn[];
+}
+
+const FOLLOW_UP_REQUESTS = [
+  /^search(?: the web| online)?(?: for)? (?:this|that|it|(?:this|that|your) answer)(?: online| again)?$/u,
+  /^(?:look (?:this|that|it) up|google (?:this|that|it)|(?:check|verify|double check) (?:this|that|it|your answer))(?: online| again)?$/u,
+  /^is (?:this|that|it|your answer) (?:still )?(?:right|correct|true|accurate)$/u,
+  /^has (?:this|that|it) changed$/u,
+];
+
+/** Legacy follow-ups may have no stored target, even when the router recognised one. */
+function isFollowUp(text: string): boolean {
+  const words = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+    .replace(/^(?:please |(?:can|could|would) you )+| please$/gu, '');
+  return FOLLOW_UP_REQUESTS.some((request) => request.test(words));
+}
+
+/** Walk in store order. Explicit links can reconnect the chain after a new topic. */
+function laterAnswers(store: MemoryStore, original: Turn): Turn[] | null {
+  const thread = store.recentTurns(original.sessionId, Number.MAX_SAFE_INTEGER);
+  const anchor = thread.findIndex((turn) => turn.id === original.id);
+  if (anchor === -1) return null;
+
+  const followUps: Turn[] = [];
+  const related = new Set([original.id]);
+  let adjacent = true;
+  let prompt: Turn | null = null;
+  for (const turn of thread.slice(anchor + 1)) {
+    if (turn.role === 'user') {
+      if (prompt !== null) adjacent = false;
+      prompt = turn;
+      continue;
+    }
+    const linksBack = turn.targetTurnIds.some((id) => related.has(id));
+    const refersBack: boolean = adjacent && turn.targetTurnIds.length === 0 && prompt !== null && isFollowUp(prompt.content);
+    adjacent = turn.content.trim() !== '' && (linksBack || refersBack);
+    prompt = null;
+    if (adjacent) {
+      followUps.push(turn);
+      related.add(turn.id);
+    }
+  }
+  return followUps;
+}
+
 /** Dated lookups and references to the last answer keep their explicit target. */
-export function findRepeatedQuestion(ctx: TurnContext): AnsweredHit | null {
-  if (ctx.plan.timeRef.kind !== 'none' || ctx.plan.refersToPrevious) return null;
+export function findRepeatedQuestion(ctx: TurnContext): RepeatedQuestion | null {
+  if (ctx.plan.timeRef.kind !== 'none' || ctx.plan.refersToPrevious || isFollowUp(ctx.input.message)) return null;
 
   const words = questionWords(ctx.input.message);
   const current = new Set(words);
@@ -51,5 +98,7 @@ export function findRepeatedQuestion(ctx: TurnContext): AnsweredHit | null {
       newest = { ...hit, assistantTurn };
     }
   }
-  return newest;
+  if (newest === null) return null;
+  const followUps = laterAnswers(ctx.store, newest.assistantTurn);
+  return followUps === null ? null : { hit: newest, followUps };
 }

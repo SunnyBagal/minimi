@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { validateAnswer } from '../../src/core/search/validate';
 import { Markdown, safeHref } from './Markdown';
 
 const CITATIONS = [
@@ -204,6 +205,16 @@ describe('Markdown citations and uncited marks', () => {
     const html = md('Pro starts at **$25/month** [1].\n\nThe page says "from $25/month".', ['$25']);
     expect(html.match(/<mark/g) ?? []).toHaveLength(1);
     expect(html.indexOf('<mark')).toBeGreaterThan(html.indexOf('href='));
+  });
+
+  it('leaves a bold 100% completion heading intact while marking 100% uptime elsewhere', () => {
+    const text = '### **100% completion**\n\nThe server had 100% uptime.';
+    const { uncitedNumbers } = validateAnswer(text, [], []);
+    expect(uncitedNumbers).toEqual(['100%']);
+    const html = md(text, uncitedNumbers, []);
+    expect(html).toContain('<h5 class="md-h md-h3"><strong>100% completion</strong></h5>');
+    expect(html.match(/<mark/g)).toHaveLength(1);
+    expect(html).toContain('<mark class="uncited" title="not verified">100%<small> (not verified)</small></mark> uptime');
   });
 
   it('never marks a digit inside a citation', () => {

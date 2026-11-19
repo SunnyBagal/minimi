@@ -3,6 +3,7 @@
  */
 import type { AgentEvent, Claim, MemoryStore, Verdict, VerdictRow } from '../src/core/contracts';
 import { containsQuote } from '../src/core/search/index';
+import { withoutFixedNumberTerms } from '../src/core/search/numberTerms';
 import { recallHeadline } from '../src/core/recallHeadline';
 import { formatLocal } from '../src/core/time/format';
 import type { JudgeAnswer, JudgeId } from './judge';
@@ -322,6 +323,10 @@ export function numbersIn(text: string, scored = false): string[] {
   return tokens;
 }
 
+function measurableNumbersIn(text: string): string[] {
+  return numbersIn(withoutFixedNumberTerms(text));
+}
+
 /** Same shape as `isListMarker` in `src/core/search/validate.ts`. */
 function isListMarker(text: string, start: number, end: number): boolean {
   const lineStart = text.lastIndexOf('\n', start - 1) + 1;
@@ -374,15 +379,17 @@ export function formatLocalDate(iso: string, zone: string): string {
 
 /** Every number a stored claim holds: its value and quote, and its date (not its clock time). */
 function claimNumbers(claims: readonly Claim[], zone: string): string[] {
-  return claims.flatMap((claim) => [...numbersIn(`${claim.value} ${claim.quote}`), ...dateParts(claim.asOfUtc, zone)]);
+  return claims.flatMap((claim) => [
+    ...[claim.value, claim.quote].flatMap(measurableNumbersIn),
+    ...dateParts(claim.asOfUtc, zone),
+  ]);
 }
 
 /** Every number a verdict row holds: values, quotes and reason, and the claim's and check's dates (not clock times). */
 function rowNumbers(row: VerdictRow, zone: string): string[] {
   return [
-    ...numbersIn(
-      [row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason].join(' '),
-    ),
+    ...[row.claim.value, row.claim.quote, row.check.newValue ?? '', row.check.newQuote ?? '', row.check.reason]
+      .flatMap(measurableNumbersIn),
     ...dateParts(row.claim.asOfUtc, zone),
     ...dateParts(row.check.checkedAtUtc, zone),
   ];
@@ -418,10 +425,10 @@ const literalByRun = new WeakMap<CaseRun, Assertion[]>();
 
 function baseAllowed(run: CaseRun, events: AgentEvent[], sources: string[], zone: string): Set<string> {
   return new Set<string>([
-    ...run.parts.flatMap((part) => part.traces.flatMap((trace) => numbersIn(trace.message))),
+    ...run.parts.flatMap((part) => part.traces.flatMap((trace) => measurableNumbersIn(trace.message))),
     ...claimNumbers(allClaims(run.store), zone),
     ...verdictsOf(events).flatMap((row) => rowNumbers(row, zone)),
-    ...sources.flatMap((text) => numbersIn(text)),
+    ...sources.flatMap(measurableNumbersIn),
   ]);
 }
 
@@ -482,9 +489,10 @@ function modelTextOf(run: CaseRun, events: AgentEvent[]): string {
  * not by its wording, so a model sentence styled like one of those lines is
  * still checked.
  *
- * Literal reading (the spec's subset check on the model's text): every digit,
- * list markers and citation digits included, must appear in the message,
- * claims, verdict rows or evidence. Recorded; it does not decide `passed`.
+ * Both readings ignore percentages inside the product's fixed completion
+ * terms, including when gathering allowed numbers from the inputs.
+ * The literal reading is the subset check on the model's text. Recorded; it
+ * does not decide `passed`.
  *
  * Scored reading: as literal, plus line-start list markers and digits inside
  * `[n]` are skipped (the `validateAnswer` rules), and digits of dates the
@@ -496,7 +504,7 @@ export function numbersAllowed(run: CaseRun, events: AgentEvent[], sources: stri
   const evidence = evidenceNumberSet(events);
   const writerText = modelTextOf(run, events);
   const badMarkers = invalidMarkers(writerText, evidence);
-  const modelBody = withoutEvidenceMarkers(writerText, evidence).replace(/\[\d+\]/g, ' ');
+  const modelBody = withoutEvidenceMarkers(withoutFixedNumberTerms(writerText), evidence).replace(/\[\d+\]/g, ' ');
   const allowed = baseAllowed(run, events, sources, zone);
   const literalExtra = [...badMarkers, ...extras(numbersIn(modelBody), allowed)];
   const scoredAllowed = new Set<string>([...allowed, ...emittedDateNumbers(events, zone)]);

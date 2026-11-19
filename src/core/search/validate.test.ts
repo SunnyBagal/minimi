@@ -58,6 +58,31 @@ describe('uncitedNumbers', () => {
     expect(result.uncitedNumbers).toEqual(['$24.50', '1,200', '15%']);
   });
 
+  it.each([
+    '### **100% completion**',
+    'Try the **100% COMPLETE** objective.',
+    '100% completionist',
+    '100%-ing',
+    '100%ing',
+    'a 100% run',
+    '100% playthrough',
+  ])('ignores the fixed completion term in %s', (text) => {
+    expect(validateAnswer(text, evidence, []).uncitedNumbers).toEqual([]);
+  });
+
+  it.each([
+    ['100% uptime', ['100%']],
+    ['reached 100% of users', ['100%']],
+    ['a 100% increase', ['100%']],
+    ['100 hours', ['100']],
+    ['50 to 70 hours', ['50', '70']],
+    ['a 100% completion rate', ['100%']],
+    ['a 100% run rate', ['100%']],
+    ['1,100% completion', ['1,100%']],
+  ])('still flags unsupported figures in %s', (text, expected) => {
+    expect(validateAnswer(text, evidence, []).uncitedNumbers).toEqual(expected);
+  });
+
   it('trims a trailing sentence period from the token', () => {
     const result = validateAnswer('The price is 24. And more.', evidence, []);
     expect(result.uncitedNumbers).toEqual(['24']);

@@ -1,6 +1,7 @@
 'use client';
 
 import type { SourceRef } from '../../src/core/contracts';
+import { fixedNumberTermStarts } from '../../src/core/search/numberTerms';
 import type { ReactNode } from 'react';
 
 export type Citation = Omit<SourceRef, 'text'>;
@@ -50,9 +51,11 @@ export function piecesOf(text: string, byN: Map<number, Citation>, uncited: stri
   if (uncited.length === 0) return links;
   // Whole tokens only, so "24" does not mark inside "240" or "1.24".
   const pattern = new RegExp(`(?<![\\d.,])(${uncited.map(escapeRegExp).join('|')})(?![\\d])`, 'g');
+  const fixedTerms = fixedNumberTermStarts(text);
   const marks: Piece[] = [];
   for (const match of text.matchAll(pattern)) {
     const start = match.index;
+    if (fixedTerms.has(start)) continue;
     const end = start + match[0].length;
     if (links.some((link) => start >= link.start && start < link.end)) continue;
     const windowEnd = sentenceEnd(text, end);

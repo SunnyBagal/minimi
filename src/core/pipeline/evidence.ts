@@ -18,6 +18,7 @@ import type {
   SourceRef,
 } from '../contracts';
 import { containsQuote } from '../search/index';
+import { withoutFixedNumberTerms } from '../search/numberTerms';
 import type { TurnContext } from './context';
 
 // ------------------------------------------------------------- numbers
@@ -39,7 +40,7 @@ export function numbersIn(text: string): number[] {
 export function allowedNumbersOf(...texts: string[]): string[] {
   const allowed = new Set<string>();
   for (const text of texts) {
-    for (const token of numberTokens(text)) {
+    for (const token of numberTokens(withoutFixedNumberTerms(text))) {
       allowed.add(token);
       allowed.add(String(Number(token.replace(/,/g, ''))));
     }

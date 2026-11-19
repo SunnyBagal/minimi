@@ -163,3 +163,5 @@ Codex's r5 review (a Codex code review) supports reporting 19 of 19 on both read
 ### After the held-out follow-ups (19 Nov 2026)
 
 The 19 × 3 main run on `94f69ea` scored 18 of 19: case 5 run 2 asked "Could you paste the names or list them in your own words?", which the offer check did not recognise ("paste" was not a request verb, and "Could you …?" not a request form). The no-record prompt had just started suggesting "paste it or describe it" (held-out case 118). The check now accepts "paste" and polite request forms; a negated request still fails (`strength.test.ts`).
+
+- Fixed completion terms such as `100% completion` are ignored in both number readings and cannot license a factual amount elsewhere. The check shares the product validator’s explicit term list. `numbers.test.ts` covers the heading and unsupported percentages and durations. No evals were rerun for this change.

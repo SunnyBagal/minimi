@@ -32,6 +32,12 @@ describe('fresh', () => {
     expect(citations.items[0]?.url).toBe(HIT.url);
   });
 
+  it('does not let a 100% completion term in the question support a factual duration', async () => {
+    const { run } = freshRig({ llm: { write: ['### **100% completion**\n\nIt takes 100 hours.'] } });
+    const events = await run({ message: 'How long does a 100% completion run take?' });
+    expect(events.find((event) => event.type === 'flags')).toMatchObject({ uncitedNumbers: ['100'] });
+  });
+
   it('sources are saved before the first write call', async () => {
     const { run, store, llm } = freshRig();
     await run({ message: 'q' });

@@ -31,6 +31,27 @@ function textEvents(answer: string): AgentEvent[] {
 }
 
 describe('numbers', () => {
+  it('ignores fixed completion terms in headings in both readings', () => {
+    const events = textEvents('### **100% Completion**\n\nFor completionists, try a 100% playthrough or a 100% run.');
+    const run = runWith('What play styles are there?', events);
+    expect(numbersAllowed(run, events, [])).toMatchObject({ pass: true, observed: [] });
+    expect(literalAssertions(run)[0]).toMatchObject({ pass: true, observed: [] });
+  });
+
+  it.each([
+    ['100% uptime', ['100']],
+    ['reached 100% of users', ['100']],
+    ['a 100% increase', ['100']],
+    ['100 hours', ['100']],
+    ['50 to 70 hours', ['50', '70']],
+  ])('both readings still reject %s when only completion terms contain that number', (claim, expected) => {
+    const events = textEvents(`### **100% completion**\n\nThe result was ${claim}.`);
+    const run = runWith('Tell me about 100% completion.', events);
+    const sources = ['A 100% playthrough is possible.'];
+    expect(numbersAllowed(run, events, sources)).toMatchObject({ pass: false, observed: expected });
+    expect(literalAssertions(run)[0]).toMatchObject({ pass: false, observed: expected });
+  });
+
   it('skips text the app injected, by provenance: a recall-line clock outside the writer\'s output passes both readings', () => {
     const answer = [
       'On Tue 10 Nov 2026, 14:05 GMT+5:30 you asked: "What does it cost?".',

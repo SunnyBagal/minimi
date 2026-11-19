@@ -1,4 +1,5 @@
 import type { ValidateAnswer } from '../contracts';
+import { fixedNumberTermStarts } from './numberTerms';
 
 const CITATION = /\[(\d+)\]/g;
 // Digits with optional separators/percent, optionally led by a currency
@@ -49,6 +50,7 @@ export const validateAnswer: ValidateAnswer = (text, evidence, allowedNumbers) =
   const valid = new Set(evidence.map((item) => item.n));
   const citations = citationSpans(text);
   const allowed = new Set(allowedNumbers.map((n) => n.replace(NUMBER_DECORATION, '')));
+  const fixedTerms = fixedNumberTermStarts(text);
 
   const strippedCitations = [
     ...new Set(citations.filter((c) => !valid.has(c.n)).map((c) => c.n)),
@@ -57,6 +59,7 @@ export const validateAnswer: ValidateAnswer = (text, evidence, allowedNumbers) =
   const uncitedNumbers: string[] = [];
   for (const match of text.matchAll(NUMBER_TOKEN)) {
     const start = match.index ?? 0;
+    if (fixedTerms.has(start)) continue;
     const raw = match[0];
     const trimmed = raw.replace(/[.,]+$/, '');
     const span: Span = { start, end: start + trimmed.length };

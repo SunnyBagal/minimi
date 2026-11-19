@@ -39,6 +39,7 @@ import {
   requestSessionId,
   shouldWriteTranscript,
   snapshotChat,
+  transcriptTitle,
   upsertChat,
   writeChatIndex,
   writeSidebarOpen,
@@ -563,7 +564,8 @@ export default function Page() {
   }
 
   const nowIso = systemClock.now().toISOString();
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { locale, timeZone } = Intl.DateTimeFormat().resolvedOptions();
+  const title = transcriptTitle(messages);
   const turns = groupTurns(messages);
   const lastTurn = turns[turns.length - 1];
   const lastAssistant = messages.findLast((message) => message.role === 'assistant');
@@ -666,6 +668,7 @@ export default function Page() {
             currentId={currentId}
             nowIso={nowIso}
             timeZone={timeZone}
+            locale={locale}
             busy={busy}
             navRef={sidebarRef}
             onNewChat={newChat}
@@ -674,6 +677,7 @@ export default function Page() {
           />
           <div className="app-column" inert={coverThread ? true : undefined}>
         <main className="thread">
+          {title !== null ? <h1 className="thread-title">{title}</h1> : null}
           {empty ? (
             <section className="empty">
               {/* The hero has a soft paper backdrop, so no cat sprite sits behind its text. */}

@@ -6,6 +6,9 @@
  */
 import type { IanaTz, IsoUtc, RecalledQuestion } from './contracts';
 
+/** Rule on the recall event for questions matched across sessions. */
+export const REPEAT_QUESTION_RULE = 'repeated question from another session';
+
 export function recallHeadline(
   asked: RecalledQuestion,
   formatLocal: (utc: IsoUtc, tz: IanaTz) => string,

@@ -1,16 +1,15 @@
 /**
  * Recall and recheck share the first half: resolve which stored answer the
- * user means (a date ref or "the previous answer"), emit the recall event
+ * user means (by date, by topic, or "the previous answer"), emit the recall event
  * (which carries the chosen question as `asked`; the UI shows it above the
  * answer, so the answer text does not repeat it), then either list the claims
  * from memory or hand off to the re-check.
  *
- * Choosing: group the store's hits by their user turn's local date. When the
- * plan names a topic, only dates with a 'date+topic' hit qualify; otherwise
- * any hit qualifies. With more than one qualifying date and a plan topic,
- * dates whose best hit scores below MIN_SCORE_SHARE of the top score are
- * dropped first. One remaining date → the highest-scoring hit on it.
- * More than one → ambiguous. None → no record.
+ * Choosing: group the store's hits by their user turn's local date. Undated
+ * lookups require topic overlap, as do dated lookups that name a topic.
+ * For those lookups, dates whose best hit scores below MIN_SCORE_SHARE of
+ * the top score are dropped first. One remaining date → its highest-scoring
+ * hit. More than one → ambiguous. None → no record.
  */
 import type {
   AgentEvent,
@@ -25,6 +24,7 @@ import type {
 } from '../contracts';
 import { claimLabel } from '../claimLabel';
 import { dateWords } from '../dateWords';
+import { REPEAT_QUESTION_RULE } from '../recallHeadline';
 import { noRecord } from './noRecord';
 import { recheck } from './recheck';
 import { evidenceFor, extractInto } from './evidence';
@@ -112,6 +112,36 @@ async function resolveTargets(ctx: TurnContext, referenced: Turn, askedOn: Local
   return { targets, version, baseline: ctx.store.claimsForTurns(targets, version), askedOn };
 }
 
+const NO_STORED_FACTS = 'That answer has no stored facts to check. I can look this up fresh if you like.';
+
+export async function* repeatAnswer(ctx: TurnContext, hit: MemoryHit & { assistantTurn: Turn }): AsyncIterable<AgentEvent> {
+  ctx.stage = 'resolve';
+  const doneResolve = ctx.timer('resolve');
+  const { userTurn, assistantTurn } = hit;
+  const chosen = userTurn.localDate;
+  yield {
+    type: 'recall',
+    candidates: { dates: [chosen], range: null, ambiguous: false, rule: REPEAT_QUESTION_RULE },
+    hits: [hit],
+    chosen,
+    asked: askedOf(userTurn),
+  };
+  yield doneResolve();
+
+  const resolved = await resolveTargets(ctx, assistantTurn, chosen);
+  if (resolved.baseline.length > 0) {
+    ctx.plan = { ...ctx.plan, intent: 'recheck' };
+    yield* recheck(ctx, resolved);
+    return;
+  }
+
+  // A derived answer can lose its underlying claims when its targets are hidden.
+  const memory = assistantTurn.targetTurnIds.length === 0 ? assistantTurn.content : null;
+  ctx.plan = { ...ctx.plan, intent: 'recall' };
+  yield ctx.textEvent(memory === null ? NO_STORED_FACTS : `From memory:\n\n${memory}\n\nI can look this up fresh if you like.`);
+  ctx.saveAssistant({ intent: 'recall', extraction: 'skipped', targetTurnIds: [] });
+}
+
 export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   ctx.stage = 'resolve';
   const doneResolve = ctx.timer('resolve');
@@ -123,6 +153,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   let chosenHit: MemoryHit | null = null;
   let ambiguousHits: MemoryHit[] = [];
   let referenced: Turn | null = null;
+  let topicOnly = false;
 
   // A message that names a date ("On 9 November … is that still correct?") is about that date, even
   // when the router also set refersToPrevious: code enforces the router's own rule (router.md).
@@ -142,34 +173,44 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
     chosenHit = hits[0] ?? null;
   } else {
     candidates = ctx.time.resolveTimeRef(plan.timeRef, ctx.now, ctx.tz);
-    const hasDates = candidates.dates.length > 0;
-    const hasRange = candidates.range !== null;
-    if (!hasDates && !hasRange) {
+    topicOnly = candidates.dates.length === 0 && candidates.range === null;
+    if (topicOnly && plan.topic === null && plan.entities.length === 0) {
       yield* noRecord(ctx, candidates);
       yield doneResolve();
       return;
     }
     hits = ctx.store.findTurns({
-      ...(hasDates ? { dates: candidates.dates } : {}),
-      ...(hasRange && candidates.range !== null ? { range: candidates.range } : {}),
+      ...(candidates.dates.length > 0 ? { dates: candidates.dates } : {}),
+      ...(candidates.range !== null ? { range: candidates.range } : {}),
       ...(plan.topic !== null ? { topic: plan.topic } : {}),
       ...(plan.entities.length > 0 ? { entities: plan.entities } : {}),
       excludeTurnIds: [ctx.currentId],
       // The "how many turns to show" default is reused for memory lookup.
       limit: ctx.config.limits.recentTurns,
     });
-    const qualifying = [...datesWithHits(hits, plan.topic !== null).entries()];
+    if (topicOnly) hits = hits.filter((hit) => hit.matched.includes('topic'));
+    const dateStatus = plan.timeRef.kind === 'none' ? 'no date given' : 'no date resolved';
+    const qualifying = [...datesWithHits(hits, !topicOnly && plan.topic !== null).entries()];
     if (qualifying.length === 0) {
+      if (topicOnly) candidates = { ...candidates, rule: `${dateStatus}: no topic match` };
       yield* noRecord(ctx, candidates);
       yield doneResolve();
       return;
     }
     let choices = qualifying;
-    if (plan.topic !== null && choices.length > 1) {
+    if ((topicOnly || plan.topic !== null) && choices.length > 1) {
       const bestOf = (dateHits: MemoryHit[]): number =>
         dateHits.reduce((best, hit) => Math.max(best, hit.score), 0);
       const top = Math.max(...choices.map(([, dateHits]) => bestOf(dateHits)));
       choices = choices.filter(([, dateHits]) => bestOf(dateHits) >= top * MIN_SCORE_SHARE);
+    }
+    if (topicOnly) {
+      candidates = {
+        dates: choices.map(([date]) => date),
+        range: null,
+        ambiguous: choices.length > 1,
+        rule: `${dateStatus}: matched by topic`,
+      };
     }
     ambiguousHits = choices.flatMap(([, dateHits]) => dateHits);
     if (choices.length === 1) {
@@ -188,6 +229,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   // Only when the date came from the numeric lookup, never on the previous-answer path.
   if (
     !previousAnswer &&
+    !topicOnly &&
     chosen !== null &&
     plan.timeRef.kind === 'numeric' &&
     plan.timeText !== null &&
@@ -206,7 +248,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
 
   if (referenced === null) {
     // The chosen question has no stored answer: nothing to check.
-    yield ctx.textEvent('That answer has no stored facts to check. I can look this up fresh if you like.');
+    yield ctx.textEvent(NO_STORED_FACTS);
     ctx.saveAssistant({ intent: plan.intent, extraction: 'skipped', targetTurnIds: [] });
     return;
   }
@@ -214,7 +256,7 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
   const resolved = await resolveTargets(ctx, referenced, chosen ?? referenced.localDate);
 
   if (resolved.baseline.length === 0) {
-    yield ctx.textEvent('That answer has no stored facts to check. I can look this up fresh if you like.');
+    yield ctx.textEvent(NO_STORED_FACTS);
     ctx.saveAssistant({ intent: plan.intent, extraction: 'skipped', targetTurnIds: [] });
     return;
   }

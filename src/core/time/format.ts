@@ -8,3 +8,12 @@ export const toLocalDate: ToLocalDate = (instant, tz) => localDay(instant, tz).t
 /** "Tue 10 Nov 2026, 14:05 GMT+5:30" — the zone label is whatever Luxon/Intl gives. */
 export const formatLocal: FormatLocal = (instant, tz) =>
   DateTime.fromISO(instant).setZone(assertZone(tz)).setLocale('en-GB').toFormat('ccc d LLL yyyy, HH:mm ZZZZ');
+
+/** Local clock time for chat labels, with a compact day period. */
+export function formatClockTime(instant: Date, timeZone: string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', hour12: true, timeZone })
+    .formatToParts(instant)
+    .map(({ type, value }) => type === 'dayPeriod' ? value.toLocaleLowerCase(locale) : value)
+    .join('')
+    .replace(/\s+/gu, ' ');
+}

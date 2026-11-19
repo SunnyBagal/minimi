@@ -1,8 +1,8 @@
 'use client';
 
 import type { DateCandidates, MemoryHit, RecalledQuestion } from '../../src/core/contracts';
-import { recallHeadline } from '../../src/core/recallHeadline';
-import { formatLocal } from '../../src/core/time/format';
+import { recallHeadline, REPEAT_QUESTION_RULE } from '../../src/core/recallHeadline';
+import { formatClockTime, formatLocal } from '../../src/core/time/format';
 
 interface RecallData {
   candidates: DateCandidates;
@@ -16,10 +16,28 @@ function viewerZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
+function repeatHeadline(asked: RecalledQuestion): string {
+  const instant = new Date(asked.createdAtUtc);
+  const timeZone = asked.tz;
+  const date = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone }).format(instant);
+  const time = formatClockTime(instant, timeZone, 'en-GB');
+  const zone = timeZone === viewerZone() ? '' : ` (${timeZone})`;
+  const seeded = asked.origin === 'seed' ? ' (seeded demo history)' : '';
+  return `You asked this before, on ${date} at ${time}${zone}.${seeded}`;
+}
+
 /** The card that names the stored conversation the answer is about, and the question asked then. */
 export function RecallCard({ data }: { data: RecallData }) {
-  const chosenHit = data.chosen !== null ? data.hits.find((hit) => hit.userTurn.localDate === data.chosen) : undefined;
   const asked = data.asked ?? null;
+  if (data.candidates.rule === REPEAT_QUESTION_RULE && asked !== null) {
+    return (
+      <div data-testid="recall" className="recall">
+        <div className="recall-asked" data-testid="recall-asked">{repeatHeadline(asked)}</div>
+      </div>
+    );
+  }
+
+  const chosenHit = data.chosen !== null ? data.hits.find((hit) => hit.userTurn.localDate === data.chosen) : undefined;
   const seeded = (asked?.origin ?? chosenHit?.userTurn.origin) === 'seed';
   const others = data.candidates.dates.filter((date) => date !== data.chosen);
   return (

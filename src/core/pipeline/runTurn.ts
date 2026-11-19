@@ -12,7 +12,8 @@ import { withAssistantOrigin } from '../store/assistantVisibility';
 import { TurnContext } from './context';
 import { chat } from './chat';
 import { fresh } from './fresh';
-import { recall } from './recall';
+import { recall, repeatAnswer } from './recall';
+import { findRepeatedQuestion } from './repeat';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -73,7 +74,10 @@ export const runTurn: RunTurn = async function* (input, deps): AsyncIterable<Age
       signal,
     });
 
-    if (plan.intent === 'chat') {
+    const repeated = findRepeatedQuestion(ctx);
+    if (repeated !== null) {
+      yield* repeatAnswer(ctx, repeated);
+    } else if (plan.intent === 'chat') {
       yield* chat(ctx);
     } else if (plan.intent === 'fresh') {
       yield* fresh(ctx);
@@ -88,8 +92,9 @@ export const runTurn: RunTurn = async function* (input, deps): AsyncIterable<Age
   }
 
   // Save what exists, even after an error, so the turn is never half-recorded.
+  const finalIntent = ctx?.plan.intent ?? plan?.intent ?? 'chat';
   if (ctx !== null) {
-    ctx.saveAssistant({ intent: plan?.intent ?? 'chat', extraction: 'skipped', targetTurnIds: [] });
+    ctx.saveAssistant({ intent: finalIntent, extraction: 'skipped', targetTurnIds: [] });
   }
   const savedId = ctx?.savedTurnId ?? null;
   const loaded = savedId !== null ? store.getTurns([savedId])[0] : undefined;
@@ -110,14 +115,14 @@ export const runTurn: RunTurn = async function* (input, deps): AsyncIterable<Age
             summary: null,
             targetTurnIds: [],
             extraction: 'skipped',
-            intent: plan?.intent ?? 'chat',
+            intent: finalIntent,
           }),
         );
 
   yield {
     type: 'done',
     turnId: loaded?.id ?? savedId ?? assistant?.id ?? '',
-    intent: plan?.intent ?? 'chat',
+    intent: finalIntent,
     userTurnId: userTurn.id,
     createdAtUtc: userTurn.createdAtUtc,
   };

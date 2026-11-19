@@ -30,6 +30,166 @@ function recallEvent(events: AgentEvent[]) {
   return event;
 }
 
+describe('recall without a date', () => {
+  it('finds a topic in another session and lists its stored claims', async () => {
+    const store = new SpyStore();
+    const user = userTurn(store, { sessionId: 'earlier-chat', content: 'How long will it take to finish GTA 6?' });
+    const answer = assistantTurn(store, { sessionId: user.sessionId });
+    const src = source(store);
+    claim(store, answer.id, src.id, { entity: 'GTA 6', attribute: 'completion time', value: '30 hours' });
+    const { run, search } = rig({ store, llm: { route: plan({ intent: 'recall', topic: 'GTA 6' }) } });
+
+    // Different wording exercises the topic fallback after repeat detection.
+    const events = await run({ message: 'From earlier, remind me of GTA 6 playtime.' });
+    const currentUser = store.recentTurns(SESSION, 2).find((turn) => turn.role === 'user');
+    expect(store.findArgs).toEqual([{
+      topic: 'remind me of gta 6 playtime', excludeTurnIds: [currentUser?.id], limit: Number.MAX_SAFE_INTEGER,
+    }, {
+      topic: 'GTA 6', excludeTurnIds: [currentUser?.id], limit: defaultConfig.limits.recentTurns,
+    }]);
+    expect(store.nearestArgs).toEqual([]);
+    expect(recallEvent(events)).toMatchObject({
+      candidates: { dates: [user.localDate], range: null, ambiguous: false, rule: 'no date given: matched by topic' },
+      chosen: user.localDate,
+      asked: { turnId: user.id, question: user.content },
+      hits: [{ userTurn: { id: user.id }, matched: 'topic' }],
+    });
+    expect(textOf(events)).toContain('GTA 6 completion time: 30 hours');
+    expect(textOf(events)).toContain('from memory, not re-checked');
+    expect(search.fetchCalls).toEqual([]);
+    expect(lastAssistant(store)?.targetTurnIds).toEqual([answer.id]);
+  });
+
+  it('re-checks a match found by entities alone', async () => {
+    const store = new InMemoryStore();
+    const user = userTurn(store, { sessionId: 'earlier-chat', content: 'What does Neon Launch cost?' });
+    const answer = assistantTurn(store, { sessionId: user.sessionId });
+    const src = source(store, { firstParty: true });
+    const savedClaim = claim(store, answer.id, src.id, { entity: 'Neon', quote: 'Launch costs 19 USD per month' });
+    const { run, search } = rig({
+      store,
+      llm: { route: plan({ intent: 'recheck', entities: ['Neon'] }), write: ['Summary.'] },
+      search: { pages: { [src.url]: { status: 'ok', live: true, text: `The ${savedClaim.quote}.` } } },
+    });
+
+    const events = await run({ message: 'From earlier, is that Neon price still correct?' });
+    expect(recallEvent(events)).toMatchObject({ chosen: user.localDate, asked: { turnId: user.id } });
+    expect(search.fetchCalls.map((call) => call.url)).toEqual([src.url]);
+    expect(events.filter((event) => event.type === 'verdict')).toMatchObject([
+      { row: { claim: { id: savedClaim.id }, check: { verdict: 'unchanged' } } },
+    ]);
+  });
+
+  it('asks which conversation when equal topic hits fall on different dates', async () => {
+    const store = new InMemoryStore();
+    const first = userTurn(store, { content: 'Neon storage?', localDate: '2026-11-09' });
+    assistantTurn(store, { localDate: first.localDate });
+    const second = userTurn(store, {
+      content: 'Neon compute?', localDate: '2026-11-10', createdAtUtc: '2026-11-10T05:00:00.000Z',
+    });
+    assistantTurn(store, { localDate: second.localDate, createdAtUtc: '2026-11-10T05:05:00.000Z' });
+    const { run } = rig({ store, llm: { route: plan({ intent: 'recheck', topic: 'Neon' }) } });
+
+    const events = await run({ message: 'From earlier, what about Neon?' });
+    expect(recallEvent(events)).toMatchObject({
+      candidates: { dates: [second.localDate, first.localDate], ambiguous: true, rule: 'no date given: matched by topic' },
+      chosen: null,
+      asked: null,
+    });
+    expect(textOf(events)).toContain(first.content);
+    expect(textOf(events)).toContain(second.content);
+    expect(textOf(events)).toContain('Which one do you mean?');
+    expect(events.filter((event) => event.type === 'verdict')).toEqual([]);
+  });
+
+  it('uses the best hit on one date and drops dates below the score share', async () => {
+    const store = new InMemoryStore();
+    const best = userTurn(store, { content: 'Neon Launch pricing?' });
+    assistantTurn(store);
+    userTurn(store, { content: 'Neon Launch limits?' });
+    assistantTurn(store);
+    userTurn(store, { content: 'Neon backups?', localDate: '2026-11-10' });
+    assistantTurn(store, { localDate: '2026-11-10' });
+    const { run } = rig({ store, llm: { route: plan({ intent: 'recall', topic: 'Neon Launch pricing' }) } });
+
+    const event = recallEvent(await run({ message: 'From earlier, what was the Neon Launch pricing?' }));
+    expect(event.hits.map((hit) => hit.score)).toEqual([3, 2, 1]);
+    expect(event.candidates).toMatchObject({ dates: [best.localDate], ambiguous: false });
+    expect(event.chosen).toBe(best.localDate);
+    expect(event.asked?.turnId).toBe(best.id);
+  });
+
+  it('goes to no-record when no other turn matches the topic', async () => {
+    const store = new SpyStore();
+    userTurn(store, { content: 'Redis hosting?' });
+    assistantTurn(store);
+    const { run, llm } = rig({
+      store,
+      llm: { route: plan({ intent: 'recall', topic: 'Neon' }), write: ['I can look up Neon fresh.'] },
+    });
+
+    const events = await run({ message: 'From earlier, what about Neon?' });
+    expect(store.findArgs.map((query) => query.topic)).toEqual(['what about neon', 'Neon']);
+    expect(store.nearestArgs).toHaveLength(1);
+    expect(llm.calls('write')[0]?.input.mode).toBe('no_record');
+    expect(recallEvent(events)).toMatchObject({
+      candidates: { dates: [], rule: 'no date given: no topic match' },
+      hits: [], chosen: null, asked: null, nearest: [],
+    });
+    expect(textOf(events)).toBe('I can look up Neon fresh.');
+  });
+
+  it('reports a topic match separately from an unresolved numeric date', async () => {
+    const store = new InMemoryStore();
+    const user = userTurn(store, { content: 'Neon pricing?' });
+    assistantTurn(store);
+    const { run } = rig({
+      store,
+      llm: { route: plan({ intent: 'recall', topic: 'Neon', timeRef: { kind: 'numeric', first: 31, second: 2 }, timeText: '31/2' }) },
+    });
+
+    const events = await run({ message: 'What did I ask about Neon on 31/2?' });
+    expect(recallEvent(events)).toMatchObject({
+      candidates: { dates: [user.localDate], rule: 'no date resolved: matched by topic' },
+      chosen: user.localDate,
+    });
+    expect(textOf(events)).not.toContain('I read "31/2" as');
+  });
+
+  it('keeps the previous answer in the session when a topic is also present', async () => {
+    const store = new SpyStore();
+    userTurn(store, { sessionId: 'other-chat', content: 'Neon pricing?' });
+    assistantTurn(store, { sessionId: 'other-chat' });
+    const previous = userTurn(store, { content: 'Redis hosting?' });
+    const answer = assistantTurn(store);
+    const { run } = rig({
+      store,
+      llm: { route: plan({ intent: 'recheck', refersToPrevious: true, topic: 'Neon' }) },
+    });
+
+    const event = recallEvent(await run({ message: 'Is that still right for Neon?' }));
+    expect(store.findArgs).toEqual([]);
+    expect(event).toMatchObject({
+      candidates: { rule: 'the previous answer in this session' },
+      asked: { turnId: previous.id },
+      hits: [{ assistantTurn: { id: answer.id } }],
+    });
+  });
+
+  it('uses the existing no-stored-facts message for a topic answer without claims', async () => {
+    const store = new InMemoryStore();
+    const user = userTurn(store, { content: 'Neon pricing?' });
+    assistantTurn(store);
+    const { run, search } = rig({ store, llm: { route: plan({ intent: 'recheck', topic: 'Neon' }) } });
+
+    const events = await run({ message: 'From earlier, is that Neon price still correct?' });
+    expect(recallEvent(events)).toMatchObject({ chosen: user.localDate, asked: { turnId: user.id } });
+    expect(textOf(events)).toBe('That answer has no stored facts to check. I can look this up fresh if you like.');
+    expect(events.filter((event) => event.type === 'verdict')).toEqual([]);
+    expect(search.fetchCalls).toEqual([]);
+  });
+});
+
 describe('recall', () => {
   it('self-match: "On Monday we shortlisted 5 CRM tools…" picks 9 Nov, never the message itself', async () => {
     const store = new InMemoryStore();

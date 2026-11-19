@@ -41,12 +41,24 @@ function memory(initial: Record<string, string> = {}): SessionStorage & { data: 
 const NOW = '2026-11-19T15:00:00.000Z';
 
 describe('chatTitle', () => {
-  it('trims, collapses whitespace, and cuts at 60 characters', () => {
-    expect(chatTitle('  hello   \n world  ')).toBe('hello world');
+  it('trims whitespace, capitalises, and caps titles at 48 characters', () => {
+    expect(chatTitle('  hello   \n world  ')).toBe('Hello world');
     expect(chatTitle('   ')).toBe('New chat');
     const long = 'a'.repeat(TITLE_LIMIT + 5);
-    expect(chatTitle(long)).toBe('a'.repeat(TITLE_LIMIT));
-    expect(chatTitle(long).length).toBe(60);
+    expect(chatTitle(long)).toBe(`A${'a'.repeat(TITLE_LIMIT - 1)}`);
+    expect(chatTitle(long).length).toBe(48);
+    expect(chatTitle('Find the latest documentation page for Supabase authentication')).toBe(
+      'Find the latest documentation page for Supabase',
+    );
+  });
+
+  it.each([
+    ['From earlier, how long will it take to finish GTA 6?', 'Finish GTA 6'],
+    ["What does Supabase's Pro plan cost right now?", "Supabase's Pro plan cost"],
+    ['Earlier today I asked you about Postgres hosting?', 'Postgres hosting'],
+    ['Please, can you explain row-level security right now ?', 'Explain row-level security'],
+  ])('cleans %s into %s', (question, expected) => {
+    expect(chatTitle(question)).toBe(expected);
   });
 });
 
@@ -66,12 +78,16 @@ describe('orderChats / upsertChat / deleteChat', () => {
 });
 
 describe('relativeDay', () => {
-  it('says Today or Yesterday in the caller zone, otherwise a short date', () => {
-    expect(relativeDay('2026-11-19T01:00:00.000Z', NOW, 'UTC')).toBe('Today');
-    expect(relativeDay('2026-11-18T23:00:00.000Z', NOW, 'UTC')).toBe('Yesterday');
-    expect(relativeDay('2026-11-19T01:00:00.000Z', NOW, 'America/Los_Angeles')).toBe('Yesterday');
-    expect(relativeDay('2026-11-01T12:00:00.000Z', NOW, 'UTC')).toBe('1 Nov');
-    expect(relativeDay('not-a-date', NOW, 'UTC')).toBe('');
+  it('shows the day and local clock time in the caller zone', () => {
+    expect(relativeDay('2026-11-19T14:14:00.000Z', NOW, 'UTC', 'en-GB')).toBe('Today, 2:14 pm');
+    expect(relativeDay('2026-11-18T09:05:00.000Z', NOW, 'UTC', 'en-GB')).toBe('Yesterday, 9:05 am');
+    expect(relativeDay('2026-11-19T01:00:00.000Z', NOW, 'America/Los_Angeles', 'en-GB')).toBe('Yesterday, 5:00 pm');
+    expect(relativeDay('2026-11-17T16:30:00.000Z', NOW, 'UTC', 'en-GB')).toBe('17 Nov, 4:30 pm');
+    expect(relativeDay('not-a-date', NOW, 'UTC', 'en-GB')).toBe('');
+  });
+
+  it('uses locale-specific date ordering', () => {
+    expect(relativeDay('2026-11-17T16:30:00.000Z', NOW, 'UTC', 'en-US')).toBe('Nov 17, 4:30 pm');
   });
 });
 
@@ -83,7 +99,7 @@ describe('snapshotChat / messagesBefore / serverUserTurnId', () => {
     ];
     expect(snapshotChat(messages, 's1', NOW)).toEqual({
       id: 's1',
-      title: 'hello there',
+      title: 'Hello there',
       updatedAt: '2026-11-02T00:00:00.000Z',
     });
     expect(latestCreatedAt(messages)).toBe('2026-11-02T00:00:00.000Z');
@@ -157,6 +173,23 @@ describe('applyMigration', () => {
     expect(parseStored(storage.data.get(CHATS_KEY))).toEqual([
       { id: 'sess-9', title: 'Remember this', updatedAt: NOW },
     ]);
+  });
+
+  it('refreshes all indexed titles from the saved transcripts without changing activity dates', () => {
+    const rows = [
+      { id: 'open-chat', title: 'How long will it take to finish GTA 6?', updatedAt: NOW },
+      { id: 'closed-chat', title: 'Earlier today I asked you about Redis?', updatedAt: '2026-11-17T09:00:00.000Z' },
+    ];
+    const storage = memory({ [CHATS_KEY]: JSON.stringify(rows) });
+    for (const row of rows) {
+      storage.data.set(chatStorageKey(row.id), JSON.stringify([{ role: 'user', parts: [{ type: 'text', text: row.title }] }]));
+    }
+    const expected = [
+      { ...rows[0], title: 'Finish GTA 6' },
+      { ...rows[1], title: 'Redis' },
+    ];
+    expect(applyMigration(storage, 'open-chat', NOW)).toEqual(expected);
+    expect(parseStored(storage.data.get(CHATS_KEY))).toEqual(expected);
   });
 
   it('writes an empty index when there is nothing to migrate', () => {

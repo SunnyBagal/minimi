@@ -3,10 +3,11 @@
  * this index is only the list the sidebar shows, plus each chat's messages.
  */
 import { HISTORY_KEY, type SessionStorage } from './session';
+import { formatClockTime } from '../../src/core/time/format';
 
 export const CHATS_KEY = 'minimi.chats';
 export const SIDEBAR_KEY = 'minimi.sidebar';
-export const TITLE_LIMIT = 60;
+export const TITLE_LIMIT = 48;
 
 export interface ChatRow {
   id: string;
@@ -30,11 +31,22 @@ export function chatStorageKey(id: string): string {
   return `minimi.chat.${id}`;
 }
 
-/** First user message, trimmed, whitespace collapsed, cut at 60 characters. */
+const TITLE_PREFIXES = /^(?:(?:earlier today i asked you about|from earlier|what does|how long will it take to|can you|please)(?:[\s,:.!?—-]+|$))+/i;
+
+/** A short, sentence-case title from the opening question. */
 export function chatTitle(text: string): string {
-  const collapsed = text.trim().replace(/\s+/g, ' ');
-  if (collapsed === '') return 'New chat';
-  return collapsed.length <= TITLE_LIMIT ? collapsed : collapsed.slice(0, TITLE_LIMIT);
+  const cleaned = text.trim().replace(/\s+/gu, ' ')
+    .replace(TITLE_PREFIXES, '')
+    .replace(/[?!.]+$/u, '')
+    .trimEnd()
+    .replace(/(?:^|[\s,]+)right now$/iu, '')
+    .trim();
+  if (cleaned === '') return 'New chat';
+  const title = cleaned.replace(/^\p{L}/u, (letter) => letter.toUpperCase());
+  if (title.length <= TITLE_LIMIT) return title;
+  const boundary = title.lastIndexOf(' ', TITLE_LIMIT);
+  if (boundary > 0) return title.slice(0, boundary);
+  return title.slice(0, TITLE_LIMIT).replace(/[\uD800-\uDBFF]$/u, '');
 }
 
 export function orderChats(chats: readonly ChatRow[]): ChatRow[] {
@@ -78,14 +90,18 @@ function previousCalendarDay(yyyyMmDd: string): string {
   return `${y}-${m}-${d}`;
 }
 
-/** "Today", "Yesterday", or a short local date. `nowIso` and `timeZone` come from the caller. */
-export function relativeDay(updatedAt: string, nowIso: string, timeZone: string): string {
+/** A local day label and clock time, relative to the caller's `nowIso`. */
+export function relativeDay(updatedAt: string, nowIso: string, timeZone: string, locale: string): string {
   const updated = calendarDay(updatedAt, timeZone);
   const now = calendarDay(nowIso, timeZone);
   if (updated === '' || now === '') return '';
-  if (updated === now) return 'Today';
-  if (updated === previousCalendarDay(now)) return 'Yesterday';
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone }).format(new Date(updatedAt));
+  const instant = new Date(updatedAt);
+  const offset = updated === now ? 0 : updated === previousCalendarDay(now) ? -1 : null;
+  const day = offset === null
+    ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', timeZone }).format(instant)
+    : new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(offset, 'day')
+        .replace(/^\p{L}/u, (letter) => letter.toLocaleUpperCase(locale));
+  return `${day}, ${formatClockTime(instant, timeZone, locale)}`;
 }
 
 function textOfMessage(message: { parts?: readonly TextPart[] }): string {
@@ -102,11 +118,15 @@ export function latestCreatedAt(messages: readonly ChatMessage[]): string | null
   return null;
 }
 
+export function transcriptTitle(messages: readonly ChatMessage[]): string | null {
+  const user = messages.find((message) => message.role === 'user');
+  return user === undefined ? null : chatTitle(textOfMessage(user));
+}
+
 /** A sidebar row for this transcript, or null when it has no user message yet. */
 export function snapshotChat(messages: readonly ChatMessage[], id: string, fallbackIso: string): ChatRow | null {
-  const user = messages.find((message) => message.role === 'user');
-  if (user === undefined) return null;
-  return { id, title: chatTitle(textOfMessage(user)), updatedAt: latestCreatedAt(messages) ?? fallbackIso };
+  const title = transcriptTitle(messages);
+  return title === null ? null : { id, title, updatedAt: latestCreatedAt(messages) ?? fallbackIso };
 }
 
 /** Messages strictly before `userMessageId`. An unknown id returns the list unchanged. */
@@ -311,14 +331,22 @@ function parseLegacyMessages(raw: string | null): ChatMessage[] | null {
 }
 
 /**
- * First load moves `minimi.messages` into the index. An index that already
- * parses is left as it is, including its legacy key. A missing or unreadable
- * index is replaced so this does not run again. The legacy key is removed
- * only after every destination write for that migration has succeeded.
+ * First load refreshes saved titles from their transcripts. If the index is
+ * missing or unreadable, it also moves any `minimi.messages` into the index.
+ * The legacy key is removed only after both destination writes succeed.
  */
 export function applyMigration(storage: SessionStorage, currentSessionId: string, savedAtIso: string): ChatRow[] {
   const existing = parseChatIndex(getItem(storage, CHATS_KEY));
-  if (existing !== null) return orderChats(existing);
+  if (existing !== null) {
+    const titled = existing.map((row) => {
+      const messages = readChatMessages<ChatMessage>(storage, row.id);
+      const title = messages === null ? null : transcriptTitle(messages);
+      return title === null || title === row.title ? row : { ...row, title };
+    });
+    const ordered = orderChats(titled);
+    if (titled.some((row, index) => row !== existing[index])) writeChatIndex(storage, ordered);
+    return ordered;
+  }
 
   const legacyRaw = getItem(storage, HISTORY_KEY);
   const legacy = parseLegacyMessages(legacyRaw);

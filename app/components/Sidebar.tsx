@@ -9,6 +9,7 @@ export function Sidebar({
   currentId,
   nowIso,
   timeZone,
+  locale,
   busy,
   navRef,
   onNewChat,
@@ -20,6 +21,7 @@ export function Sidebar({
   currentId: string;
   nowIso: string;
   timeZone: string;
+  locale: string;
   busy: boolean;
   navRef: Ref<HTMLElement>;
   onNewChat: () => void;
@@ -46,7 +48,9 @@ export function Sidebar({
                   onClick={() => onOpenChat(chat.id)}
                 >
                   <span className="sidebar-title">{chat.title}</span>
-                  <span className="sidebar-day">{relativeDay(chat.updatedAt, nowIso, timeZone)}</span>
+                  <time className="sidebar-day" dateTime={chat.updatedAt}>
+                    {relativeDay(chat.updatedAt, nowIso, timeZone, locale)}
+                  </time>
                 </button>
                 <button
                   type="button"

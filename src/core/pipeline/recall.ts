@@ -198,7 +198,9 @@ export async function* recall(ctx: TurnContext): AsyncIterable<AgentEvent> {
     const qualifying = [...datesWithHits(hits, !topicOnly && plan.topic !== null).entries()];
     if (qualifying.length === 0) {
       if (topicOnly) candidates = { ...candidates, rule: `${dateStatus}: no topic match` };
-      yield* noRecord(ctx, candidates);
+      // The date had questions, just none whose words match the topic: offer them instead of a dead end.
+      const sameDay = topicOnly ? [] : hits.filter((hit) => hit.matched === 'date');
+      yield* noRecord(ctx, candidates, sameDay);
       yield doneResolve();
       return;
     }

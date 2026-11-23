@@ -13,6 +13,7 @@
  * test clocks do not advance.
  */
 import { accessSync, constants, mkdirSync, readFileSync } from 'node:fs';
+import { matchTerms } from './matchTerms';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -65,7 +66,6 @@ export function ensureHiddenColumn(db: SqlExec): void {
   if (!present()) throw new Error('turns.hidden is missing after ALTER TABLE');
 }
 
-/** Mirrors InMemoryStore.terms(): words of 3+ letters or digits, lowercased. */
 /**
  * The database path to open: `dbPath`, or, when its directory cannot be created or written
  * (a read-only deployment such as Vercel, where only the temp directory is writable), the
@@ -89,7 +89,6 @@ export function writablePath(
   }
 }
 
-const MIN_TERM_CHARS = 3;
 
 /**
  * A missing FTS5 (V5 found none on Node 22.13; the floor is now 26.13, which
@@ -113,10 +112,6 @@ export function chooseTextSearch(compileOptions: string[], fts5Expected: boolean
   return 'like';
 }
 
-/** Words of three letters or more, lowercased — the same rule as the fake. */
-function terms(text: string): string[] {
-  return text.toLowerCase().match(new RegExp(`[\\p{L}\\p{N}]{${MIN_TERM_CHARS},}`, 'gu')) ?? [];
-}
 
 /** The calendar date `days` after `date`, pure UTC arithmetic like the fake. */
 function shiftDate(date: LocalDate, days: number): LocalDate {
@@ -407,12 +402,12 @@ export class SqliteStore implements MemoryStore {
 
   /** Distinct query terms found in the pair's words — the fake's overlap(). */
   private overlap(userTurn: Turn, assistantTurn: Turn | null, topic?: string, entities?: string[]): number {
-    const wanted = new Set(terms([topic ?? '', ...(entities ?? [])].join(' ')));
+    const wanted = new Set(matchTerms([topic ?? '', ...(entities ?? [])].join(' ')));
     if (wanted.size === 0) return 0;
     const haystack = new Set<string>();
     for (const turn of [userTurn, assistantTurn]) {
       if (turn === null) continue;
-      for (const term of terms([turn.content, turn.topic ?? '', turn.summary ?? '', ...turn.entities].join(' '))) {
+      for (const term of matchTerms([turn.content, turn.topic ?? '', turn.summary ?? '', ...turn.entities].join(' '))) {
         haystack.add(term);
       }
     }
@@ -573,7 +568,7 @@ export class SqliteStore implements MemoryStore {
   }): MemoryHit[] {
     const excluded = this.exclusion(query.excludeTurnIds);
     const dated = query.dates !== undefined || query.range !== undefined;
-    const queryTerms = terms([query.topic ?? '', ...(query.entities ?? [])].join(' '));
+    const queryTerms = matchTerms([query.topic ?? '', ...(query.entities ?? [])].join(' '));
 
     if (!dated) {
       if (queryTerms.length === 0) return [];
@@ -674,7 +669,7 @@ export class SqliteStore implements MemoryStore {
     }
 
     // Topic matches on dates that are neither around nor adjacent.
-    const queryTerms = terms([query.topic ?? '', ...(query.entities ?? [])].join(' '));
+    const queryTerms = matchTerms([query.topic ?? '', ...(query.entities ?? [])].join(' '));
     const seenSeqs = new Set(scored.map((entry) => entry.seq));
     const skipDates = new Set([...around, ...adjacent]);
     if (queryTerms.length > 0) {

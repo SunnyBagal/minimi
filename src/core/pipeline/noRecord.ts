@@ -4,7 +4,7 @@
  * matches (dates are exact, so code prints them); the writer then explains in
  * words and offers a fresh lookup without repeating any date.
  */
-import type { AgentEvent, DateCandidates, MemoryHit } from '../contracts';
+import type { AgentEvent, DateCandidates, LocalDate, MemoryHit } from '../contracts';
 import { dateWords, orList } from '../dateWords';
 import type { TurnContext } from './context';
 
@@ -36,18 +36,55 @@ export function noRecordLines(candidates: DateCandidates, nearest: readonly Memo
       `I have nothing saved${about} from ${dateWords(candidates.range.from)} to ${dateWords(candidates.range.to)}, so I can't look that conversation up.`,
     );
   }
-  if (nearest.length === 1 && nearest[0] !== undefined) {
+  // Questions saved on a date that was tried, but about something else (ui recall-fixes): name them
+  // as from that day, so a renamed topic ("Grand Theft Auto VI" for "GTA 6") is not a dead end.
+  const tried = (date: LocalDate) =>
+    candidates.dates.includes(date) ||
+    (candidates.range !== null && date >= candidates.range.from && date <= candidates.range.to);
+  const sameDay = nearest.filter((hit) => tried(hit.userTurn.localDate));
+  const other = nearest.filter((hit) => !tried(hit.userTurn.localDate));
+  if (sameDay.length === 1 && sameDay[0] !== undefined) {
     lines.push(
-      `The nearest saved conversation is from ${dateWords(nearest[0].userTurn.localDate)}: ${literalExcerpt(nearest[0].userTurn.content)}.`,
+      `On ${dateWords(sameDay[0].userTurn.localDate)} I do have: ${literalExcerpt(sameDay[0].userTurn.content)}.`,
     );
-  } else if (nearest.length > 1) {
+  } else if (sameDay.length > 1) {
+    lines.push('On those dates I do have:');
+    for (const hit of sameDay) lines.push(`- ${dateWords(hit.userTurn.localDate)}: ${literalExcerpt(hit.userTurn.content)}`);
+  }
+  if (other.length === 1 && other[0] !== undefined) {
+    lines.push(
+      `The nearest saved conversation is from ${dateWords(other[0].userTurn.localDate)}: ${literalExcerpt(other[0].userTurn.content)}.`,
+    );
+  } else if (other.length > 1) {
     lines.push('The nearest saved conversations:');
-    for (const hit of nearest) lines.push(`- ${dateWords(hit.userTurn.localDate)}: ${literalExcerpt(hit.userTurn.content)}`);
+    for (const hit of other) lines.push(`- ${dateWords(hit.userTurn.localDate)}: ${literalExcerpt(hit.userTurn.content)}`);
   }
   return lines.length === 0 ? '' : `${lines.join('\n')}\n\n`;
 }
 
-export async function* noRecord(ctx: TurnContext, candidates: DateCandidates): AsyncIterable<AgentEvent> {
+/**
+ * The few matches shown: topic matches on other days first, then questions from the tried
+ * dates that matched only by date, then the rest; each turn once.
+ */
+export function mergeNearest(nearest: readonly MemoryHit[], sameDay: readonly MemoryHit[], limit: number): MemoryHit[] {
+  const seen = new Set<string>();
+  const out: MemoryHit[] = [];
+  const add = (hit: MemoryHit) => {
+    if (seen.has(hit.userTurn.id)) return;
+    seen.add(hit.userTurn.id);
+    out.push(hit);
+  };
+  for (const hit of nearest) if (hit.score > 0) add(hit);
+  for (const hit of sameDay) add(hit);
+  for (const hit of nearest) add(hit);
+  return out.slice(0, limit);
+}
+
+export async function* noRecord(
+  ctx: TurnContext,
+  candidates: DateCandidates,
+  sameDay: readonly MemoryHit[] = [],
+): AsyncIterable<AgentEvent> {
   // Around the candidate dates; when only a range exists, its endpoints.
   const around =
     candidates.dates.length > 0
@@ -56,15 +93,17 @@ export async function* noRecord(ctx: TurnContext, candidates: DateCandidates): A
         ? [candidates.range.from, candidates.range.to]
         : [];
   // The user, the writer and the recall event all get the same few nearest matches.
-  const nearest = ctx.store
-    .nearestTurns({
-    around,
-    ...(ctx.plan.topic !== null ? { topic: ctx.plan.topic } : {}),
-    ...(ctx.plan.entities.length > 0 ? { entities: ctx.plan.entities } : {}),
-    excludeTurnIds: [ctx.currentId],
-    limit: ctx.config.limits.recentTurns,
-  })
-    .slice(0, NEAREST_SHOWN);
+  const nearest = mergeNearest(
+    ctx.store.nearestTurns({
+      around,
+      ...(ctx.plan.topic !== null ? { topic: ctx.plan.topic } : {}),
+      ...(ctx.plan.entities.length > 0 ? { entities: ctx.plan.entities } : {}),
+      excludeTurnIds: [ctx.currentId],
+      limit: ctx.config.limits.recentTurns,
+    }),
+    sameDay,
+    NEAREST_SHOWN,
+  );
   yield { type: 'recall', candidates, hits: [], chosen: null, asked: null, nearest };
   const lines = noRecordLines(candidates, nearest, ctx.plan.topic);
   if (lines !== '') yield ctx.textEvent(lines);

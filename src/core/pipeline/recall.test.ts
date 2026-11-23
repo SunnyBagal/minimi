@@ -590,3 +590,54 @@ describe('recall', () => {
     expect(events.filter((e) => e.type === 'verdict')).toHaveLength(0);
   });
 });
+
+describe('recall by a renamed topic (recall-fixes)', () => {
+  const THURSDAY = { kind: 'weekday', weekday: 4, modifier: 'last' } as const;
+  const timeTable = [{ ref: THURSDAY, result: { dates: ['2026-11-12'], range: null, ambiguous: false, rule: 'last Thursday' } }];
+  const gtaOnThursday = (store: InMemoryStore) => {
+    const user = userTurn(store, {
+      sessionId: 'thursday-chat',
+      content: 'How long will it take to finish GTA 6?',
+      localDate: '2026-11-12',
+      createdAtUtc: '2026-11-12T06:10:00.000Z',
+    });
+    assistantTurn(store, { sessionId: 'thursday-chat', localDate: '2026-11-12', createdAtUtc: '2026-11-12T06:10:30.000Z' });
+    return user;
+  };
+
+  it('"Grand Theft Auto VI" on Thursday finds the turn that said "GTA 6"', async () => {
+    const store = new InMemoryStore();
+    const user = gtaOnThursday(store);
+    const { run } = rig({
+      store,
+      llm: { route: plan({ intent: 'recall', timeRef: THURSDAY, topic: 'Grand Theft Auto VI', entities: ['Grand Theft Auto VI'] }) },
+      timeTable,
+    });
+    const events = await run({ message: 'What did I ask about Grand Theft Auto VI on Thursday?' });
+    expect(recallEvent(events)).toMatchObject({
+      chosen: '2026-11-12',
+      asked: { turnId: user.id },
+      hits: [{ userTurn: { id: user.id }, matched: 'date+topic' }],
+    });
+  });
+
+  it('a topic with no match that day offers that day\'s questions instead of a dead end', async () => {
+    const store = new InMemoryStore();
+    const user = gtaOnThursday(store);
+    const { run } = rig({
+      store,
+      llm: {
+        route: plan({ intent: 'recall', timeRef: THURSDAY, topic: 'Cyberpunk 2077', entities: ['Cyberpunk 2077'] }),
+        write: ['Was it that earlier conversation?'],
+      },
+      timeTable,
+    });
+    const events = await run({ message: 'What did I ask about Cyberpunk 2077 on Thursday?' });
+    const recalled = recallEvent(events);
+    expect(recalled.chosen).toBeNull();
+    expect(recalled.nearest?.map((hit) => hit.userTurn.id)).toEqual([user.id]);
+    expect(textOf(events)).toContain(
+      "I have nothing saved about Cyberpunk 2077 from 12 Nov 2026, so I can't look that conversation up.\nOn 12 Nov 2026 I do have: `How long will it take to finish GTA 6?`.",
+    );
+  });
+});

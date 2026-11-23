@@ -5,6 +5,7 @@
  * stored state by mutating what it passed or received.
  */
 import { assistantOriginUserId } from '../store/assistantVisibility';
+import { matchTerms } from '../store/matchTerms';
 import type {
   AgentConfig,
   Check,
@@ -28,10 +29,6 @@ import { defaultConfig } from '../config';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-/** Words of three letters or more, lowercased. Enough for topic and entity overlap. */
-function terms(text: string): string[] {
-  return text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? [];
-}
 
 /** The calendar date `days` after `date`. Pure date arithmetic, no zone involved. */
 function shiftDate(date: LocalDate, days: number): LocalDate {
@@ -166,12 +163,12 @@ export class InMemoryStore implements MemoryStore {
 
   /** How many distinct query terms appear in the pair's content, topic, entities or summary. */
   private overlap(pair: Pair, topic: string | undefined, entities: string[] | undefined): number {
-    const wanted = new Set(terms([topic ?? '', ...(entities ?? [])].join(' ')));
+    const wanted = new Set(matchTerms([topic ?? '', ...(entities ?? [])].join(' ')));
     if (wanted.size === 0) return 0;
     const haystack = new Set<string>();
     for (const turn of [pair.userTurn, pair.assistantTurn]) {
       if (turn === null) continue;
-      for (const term of terms([turn.content, turn.topic ?? '', turn.summary ?? '', ...turn.entities].join(' '))) {
+      for (const term of matchTerms([turn.content, turn.topic ?? '', turn.summary ?? '', ...turn.entities].join(' '))) {
         haystack.add(term);
       }
     }

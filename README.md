@@ -9,7 +9,7 @@ Ask about a price, plan, or release and minimi searches the web, answers with nu
   <img src="docs/images/recheck-light.png" alt="Is that still right? The recalled question and the verdict table" width="48%">
 </p>
 
-Server memory on the live demo is temporary. Each Vercel instance has its own temporary SQLite file, so an earlier answer can be missing when a request reaches a different instance or an instance is replaced. Run locally to keep memory in `data/minimi.db`. [Live demo on Vercel](https://minimi-nine.vercel.app)
+**[Live demo](https://minimi-production.up.railway.app)** on Railway. Its memory is a SQLite file on a persistent volume, so earlier conversations survive restarts and redeploys. The demo has no accounts: every visitor's questions go into one shared memory, so please don't type anything private.
 
 ## Try it
 
@@ -131,7 +131,7 @@ scripts/             seed, measure, smoke test, gate checks
 ## Known limits
 
 - **Some sites are only served from the search engine's stored copy.** Exa live-crawls most pages when asked (`maxAgeHours: 0`), but for some sites (for example `supabase.com/pricing` on 19 Nov 2026) it returns its stored copy instead. minimi will not call a stored copy "verified now": those claims come back *couldn't verify*, with a note saying whether the stored copy still shows the value.
-- **Demo memory resets.** Vercel instances do not share the temporary database. The browser can still show its saved chats even when the server can no longer recall them.
+- **One shared memory on the demo.** There are no accounts, so recall searches every visitor's questions. Deleting a chat in the sidebar forgets it on the server too. If the server ever has no record of a day the browser still has a chat from, the answer card says so and offers to open that chat.
 - **Repeat matching uses word overlap.** It can miss paraphrases that use different words. Follow-up chains use stored links and recognizable references such as “search for this answer”.
 - The scripted evals run against fixture pages; the live web was checked by hand.
 

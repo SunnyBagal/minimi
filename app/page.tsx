@@ -59,6 +59,7 @@ import {
   SendIcon,
   SunIcon,
 } from './components/icons';
+import { DELETE_CONFIRM, FORGET_FAILED, forgetChatOnServer } from './components/forgetChat';
 import { MenuPopover } from './components/MenuPopover';
 import { Markdown } from './components/Markdown';
 import { Oneko } from './components/Oneko';
@@ -163,6 +164,9 @@ export default function Page() {
   const [restored, setRestored] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [chats, setChats] = useState<ChatRow[]>([]);
+  // The latest list, for handlers that read it after an await (deleting a chat).
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
   const [currentId, setCurrentId] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [phone, setPhone] = useState(false);
@@ -467,10 +471,15 @@ export default function Page() {
     }
   }
 
-  function removeChat(id: string) {
+  async function removeChat(id: string) {
     if (busy || !restored) return;
-    if (!window.confirm('Delete this chat?')) return;
-    const next = deleteChat(chats, id);
+    if (!window.confirm(DELETE_CONFIRM)) return;
+    // Forget it on the server first (recall must not find a deleted chat); keep it if that fails.
+    if (!(await forgetChatOnServer(id))) {
+      window.alert(FORGET_FAILED);
+      return;
+    }
+    const next = deleteChat(chatsRef.current, id);
     const store = storage();
     if (store !== null) {
       writeChatIndex(store, next);

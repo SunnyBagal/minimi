@@ -15,6 +15,7 @@ import { z } from 'zod';
 import { getDeps } from '../../../src/compose';
 import type { AgentEvent, IanaTz, Id, MemoryStore } from '../../../src/core/contracts';
 import { runTurn } from '../../../src/core/pipeline/runTurn';
+import { forgetSession } from './forget';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -169,4 +170,18 @@ export async function POST(request: Request): Promise<Response> {
   });
 
   return createUIMessageStreamResponse({ stream });
+}
+
+const forgetSchema = z.object({ sessionId: z.string().min(1) });
+
+/**
+ * DELETE /api/chat with { sessionId }: forget that chat. The sidebar calls this when a chat
+ * is deleted, so its turns are hidden from recall. Unknown sessions hide nothing and still
+ * succeed: the chat may never have reached this server (the browser keeps its own copy).
+ */
+export async function DELETE(request: Request): Promise<Response> {
+  const body = forgetSchema.safeParse(await request.json().catch(() => null));
+  if (!body.success) return Response.json({ error: 'Expected { sessionId }.' }, { status: 400 });
+  const forgotten = forgetSession(getDeps().store, body.data.sessionId);
+  return Response.json({ forgotten });
 }

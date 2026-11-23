@@ -6,7 +6,7 @@ import { defaultConfig } from '../../../src/core/config';
 import { FakeClock, FakeLlm, FakeSearch, fakeTime, passThroughGuard } from '../../../src/core/testing/fakes';
 import { InMemoryStore } from '../../../src/core/testing/inMemoryStore';
 import type { ChatUIMessage } from './route';
-import { POST } from './route';
+import { DELETE, POST } from './route';
 
 const { runTurnMock, receivedInputs, NOW, storeHolder } = vi.hoisted(() => ({
   runTurnMock: vi.fn(),
@@ -449,3 +449,64 @@ describe('POST /api/chat', () => {
     expect(store.getTurns([assistant.id]).map((turn) => turn.content)).toEqual(['no prompt']);
   });
 });
+
+describe('DELETE /api/chat: deleting a chat forgets it', () => {
+  const del = (body: unknown) =>
+    DELETE(
+      new Request('http://test/api/chat', {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: typeof body === 'string' ? body : JSON.stringify(body),
+      }),
+    );
+  const saveIn = (store: InMemoryStore, sessionId: string, role: 'user' | 'assistant', content: string) =>
+    store.saveTurn({
+      sessionId,
+      role,
+      content,
+      createdAtUtc: NOW,
+      tz: 'UTC',
+      localDate: '2026-10-01', // a date no other test in this file uses
+      origin: 'live',
+      topic: null,
+      entities: [],
+      summary: null,
+      extraction: 'skipped',
+      intent: role === 'assistant' ? 'chat' : null,
+      targetTurnIds: [],
+    });
+
+  it('hides every turn of that chat, so recall no longer finds it; other chats stay', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    saveIn(store, 'forget-me', 'user', 'How long will it take to finish GTA 6?');
+    saveIn(store, 'forget-me', 'assistant', 'About 30 hours.');
+    saveIn(store, 'forget-me', 'user', 'And Red Dead Redemption 2?');
+    saveIn(store, 'forget-me', 'assistant', 'About 50 hours.');
+    const kept = saveIn(store, 'keep-me', 'user', 'GTA 6 release date?');
+    const find = () => store.findTurns({ dates: ['2026-10-01'], topic: 'GTA 6', excludeTurnIds: [], limit: 10 });
+    expect([...new Set(find().map((hit) => hit.userTurn.sessionId))].sort()).toEqual(['forget-me', 'keep-me']);
+
+    const response = await del({ sessionId: 'forget-me' });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ forgotten: 4 });
+    expect(find().map((hit) => hit.userTurn.id)).toEqual([kept.id]);
+    expect(store.recentTurns('forget-me', 10)).toEqual([]);
+    expect(store.recentTurns('keep-me', 10)).toHaveLength(1);
+  });
+
+  it('an unknown or already forgotten chat succeeds and hides nothing', async () => {
+    const store = storeHolder.current;
+    if (store === null) throw new Error('store missing');
+    expect(await (await del({ sessionId: 'never-seen' })).json()).toEqual({ forgotten: 0 });
+    saveIn(store, 'twice', 'user', 'Neon price?');
+    expect(await (await del({ sessionId: 'twice' })).json()).toEqual({ forgotten: 1 });
+    expect(await (await del({ sessionId: 'twice' })).json()).toEqual({ forgotten: 0 });
+  });
+
+  it('rejects a body without a sessionId with 400', async () => {
+    expect((await del({})).status).toBe(400);
+    expect((await del('not json')).status).toBe(400);
+  });
+});
+

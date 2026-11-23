@@ -34,6 +34,10 @@ To try a repeat, ask *How long will it take to finish GTA 6?* and then *Search f
 
 A missing key or an older Node stops startup with one named error (`MissingEnvError` or `UnsupportedNodeError`).
 
+### Deploy with lasting memory
+
+The `Dockerfile` runs minimi on any container host. Memory is one SQLite file at `/app/data/minimi.db`, so mount a persistent volume at `/app/data` and it survives restarts and redeploys. On Railway: create a service from this repo (it builds the `Dockerfile`), add a volume with mount path `/app/data`, and set `ANTHROPIC_API_KEY` and `EXA_API_KEY` as service variables. Keys are never baked into the image (`.dockerignore` excludes `.env`).
+
 ## What it does
 
 | You ask | minimi |

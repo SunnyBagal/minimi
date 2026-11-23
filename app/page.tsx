@@ -63,7 +63,7 @@ import { DELETE_CONFIRM, FORGET_FAILED, forgetChatOnServer } from './components/
 import { MenuPopover } from './components/MenuPopover';
 import { Markdown } from './components/Markdown';
 import { Oneko } from './components/Oneko';
-import { RecallCard } from './components/RecallCard';
+import { RecallCard, type BrowserChatsContext } from './components/RecallCard';
 import { SESSION_KEY, sessionId } from './components/session';
 import { Sidebar } from './components/Sidebar';
 import { Sources } from './components/Sources';
@@ -102,14 +102,14 @@ function dataFor(message: ChatUIMessage): MessageData {
 }
 
 /** Renders one assistant message's parts in stream order. */
-function renderAssistantParts(message: ChatUIMessage, data: MessageData): ReactNode[] {
+function renderAssistantParts(message: ChatUIMessage, data: MessageData, browser?: BrowserChatsContext): ReactNode[] {
   const rendered: ReactNode[] = [];
   let tableShown = false;
   message.parts.forEach((part, index) => {
     if (part.type === 'text') {
       rendered.push(<Markdown key={index} text={part.text} citations={data.citations} uncited={data.uncited} />);
     } else if (part.type === 'data-recall') {
-      rendered.push(<RecallCard key={index} data={part.data} />);
+      rendered.push(<RecallCard key={index} data={part.data} browser={browser} />);
     } else if (part.type === 'data-verdict') {
       if (!tableShown) {
         tableShown = true;
@@ -777,7 +777,7 @@ export default function Page() {
                       return (
                         <div key={answer.id} data-role="assistant">
                           <AnswerCard>
-                            {renderAssistantParts(answer, dataFor(answer))}
+                            {renderAssistantParts(answer, dataFor(answer), { currentId, onOpen: openChat })}
                             {lastCard && busy ? <StatusLine text={statusLine} /> : null}
                             {lastCard && !busy && errorText !== null ? <Alert>{errorText}</Alert> : null}
                             <Sources citations={dataFor(answer).citations} />

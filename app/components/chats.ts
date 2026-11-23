@@ -64,7 +64,7 @@ export function deleteChat(chats: readonly ChatRow[], id: string): ChatRow[] {
   return chats.filter((chat) => chat.id !== id);
 }
 
-function calendarDay(iso: string, timeZone: string): string {
+export function calendarDay(iso: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
   const formatted = new Intl.DateTimeFormat('en-CA', {

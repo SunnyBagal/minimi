@@ -54,7 +54,7 @@ The `Dockerfile` runs minimi on any container host. Memory is one SQLite file at
 
 The UI shows the recalled question in a card, a verdict table, a collapsible source list, per-stage timings, and two header menus: **This chat** (citation coverage, live sources, verdicts, latency) and **Test suite** (the main suite's latest run, and the held-out set's first run and run after fixes).
 
-The **Chats** sidebar reopens transcripts saved in this browser. It shows a short title cleaned from the first prompt and the last activity time in your local time zone, such as “Today, 2:14 pm”. The current title also appears above the thread. **Delete** removes the sidebar entry and the browser’s copy of the transcript. The server keeps its SQLite records.
+The **Chats** sidebar reopens transcripts saved in this browser. It shows a short title cleaned from the first prompt and the last activity time in your local time zone, such as “Today, 2:14 pm”. The current title also appears above the thread. **Delete** asks for confirmation, then removes the sidebar entry and the browser’s copy of the transcript, and tells the server to forget that chat: its turns are soft-deleted, so recall and re-check skip them.
 
 Use **Edit** on an earlier prompt to replace it in place. On save, the store’s `hideFrom` operation soft-deletes that prompt and every later turn in the same chat. Recall and re-check skip hidden turns. The edited text starts a replacement answer from that point in the thread.
 

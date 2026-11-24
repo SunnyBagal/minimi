@@ -9,6 +9,8 @@ Ask about a price, plan, or release and minimi searches the web, answers with nu
   <img src="docs/images/recheck-light.png" alt="Is that still right? The recalled question and the verdict table" width="48%">
 </p>
 
+**[1-minute demo video](docs/demo/minimi-demo.mp4)**: recall of last Tuesday's question, the live re-check, the per-chat numbers, the held-out tests, and the cat.
+
 **[Live demo](https://minimi-production.up.railway.app)** on Railway. Its memory is a SQLite file on a persistent volume, so earlier conversations survive restarts and redeploys. The demo has no accounts: every visitor's questions go into one shared memory, so please don't type anything private.
 
 ## Try it

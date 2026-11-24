@@ -2,6 +2,8 @@
 
 **A chat agent with one tool, web search, that remembers what you asked and when, and can re-check what it told you.**
 
+*A personal project built for minimi's agent challenge and named after it. It is not an official minimi product and is not affiliated with the company.*
+
 Ask about a price, plan, or release and minimi searches the web, answers with numbered citations, and extracts dated claims with their source quotes. Days later, ask “Last Tuesday I asked you about Postgres hosting. Has any pricing changed since then?” and it looks up the conversation, fetches the saved sources again, and tells you what it verified, what changed, and what it could not verify.
 
 <p align="center">
